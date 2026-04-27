@@ -3,7 +3,7 @@ name: Deploy VPS
 on:
   push:
     branches:
-      - git-action
+      - main
   workflow_dispatch:
 
 env:

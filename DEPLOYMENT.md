@@ -74,7 +74,7 @@ bash ./ops/rollback_to_tag.sh .env 2026.04.26.3
 
 ## GitHub Actions Deploy Flow
 
-Workflow [deploy.yml](.github/workflows/deploy.yml) runs on pushes to `git-action`, plus manual launch.
+Workflow [deploy.yml](.github/workflows/deploy.yml) runs on pushes to `main`, plus manual launch.
 
 Jobs:
 
