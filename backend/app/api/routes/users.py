@@ -1,12 +1,14 @@
+from secrets import compare_digest
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.core.config import PUBLIC_BOOTSTRAP_ENABLED
+from app.core.config import FIRST_ADMIN_PASS
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_admin
-from app.schemas.users import UserCreatePayload, UserProfileUpdatePayload, UserUpdatePayload
+from app.schemas.users import BootstrapFirstAdminPayload, UserCreatePayload, UserProfileUpdatePayload, UserUpdatePayload
 from app.services.profile_photos import upload_profile_photo
-from app.services.users import bootstrap_first_user, create_user, delete_user, list_users, update_user, update_user_profile
+from app.services.users import UserService, bootstrap_first_user, create_user, delete_user, list_users, update_user, update_user_profile
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -26,10 +28,14 @@ def get_users(
 
 
 @router.post("/bootstrap", status_code=status.HTTP_201_CREATED)
-def bootstrap_user(payload: UserCreatePayload, db: Session = Depends(get_db)) -> dict:
-    if not PUBLIC_BOOTSTRAP_ENABLED:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Public bootstrap is disabled")
-    return bootstrap_first_user(db, payload)
+def bootstrap_user(payload: BootstrapFirstAdminPayload, db: Session = Depends(get_db)) -> dict:
+    if UserService(db).get_setup_status()["users_count"] > 0:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Первый пользователь уже создан")
+    if not FIRST_ADMIN_PASS:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Bootstrap первого администратора не настроен")
+    if not compare_digest(payload.first_admin_pass, FIRST_ADMIN_PASS):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Неверный ключ первого администратора")
+    return bootstrap_first_user(db, UserCreatePayload(**payload.model_dump(exclude={"first_admin_pass"})))
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

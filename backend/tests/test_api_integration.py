@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.core.audit_types import EVENT_TYPE_DOCUMENT_CREATE
+from app.core.config import FIRST_ADMIN_PASS
 from app.core.security import hash_password
 from app.models import AuditEvent, User
 
@@ -25,6 +26,7 @@ def test_bootstrap_and_auth_me_flow(client):
     bootstrap_response = client.post(
         f"{API_PREFIX}/users/bootstrap",
         json={
+            "first_admin_pass": FIRST_ADMIN_PASS,
             "user_login": "first_admin",
             "user_password": "StrongPass123",
             "user_admin": False,
@@ -49,6 +51,25 @@ def test_bootstrap_and_auth_me_flow(client):
 
     assert me_response.status_code == 200
     assert me_response.json()["user"]["user_login"] == "first_admin"
+
+
+def test_bootstrap_rejects_invalid_admin_key(client):
+    response = client.post(
+        f"{API_PREFIX}/users/bootstrap",
+        json={
+            "first_admin_pass": "wrong-admin-key",
+            "user_login": "first_admin",
+            "user_password": "StrongPass123",
+            "user_admin": False,
+            "user_first_name": "First",
+            "user_second_name": "Admin",
+            "user_age": 30,
+            "user_address": "Bootstrap Street",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["message"] == "Неверный ключ первого администратора"
 
 
 def test_health_endpoints_are_available(client):

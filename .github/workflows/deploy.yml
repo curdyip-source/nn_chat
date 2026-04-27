@@ -27,7 +27,7 @@ jobs:
       POSTGRES_PORT: 5432
       CORS_ALLOW_ORIGINS: http://127.0.0.1
       AUTH_TOKEN_SECRET: test-secret-that-is-long-enough-for-ci
-      PUBLIC_BOOTSTRAP_ENABLED: true
+      FIRST_ADMIN_PASS: dev-first-admin-pass
       ACCESS_TOKEN_TTL_MINUTES: 30
       REFRESH_TOKEN_TTL_DAYS: 30
       SESSION_TTL_DAYS: 30

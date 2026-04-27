@@ -126,10 +126,9 @@ bash ./ops/restore_postgres.sh .env backups/appdb-20260427-120000.sql
 
 If the database is empty and you need the first administrator:
 
-1. Set `PUBLIC_BOOTSTRAP_ENABLED=true` in `.env`.
+1. Set a strong `FIRST_ADMIN_PASS` in `.env`.
 2. Deploy once.
-3. Create the first admin.
-4. Set `PUBLIC_BOOTSTRAP_ENABLED=false`.
-5. Deploy again.
+3. Create the first admin in the frontend using the bootstrap key.
+4. Keep `FIRST_ADMIN_PASS` only in your protected env and use it again only if you intentionally bootstrap an empty database.
 
-Do not leave bootstrap enabled in public production longer than necessary.
+Do not share the bootstrap key. While your panel is still served over plain HTTP by public IP, treat the first bootstrap as a trusted-network operation only.

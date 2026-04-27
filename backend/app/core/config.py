@@ -41,10 +41,10 @@ APNS_USE_SANDBOX = os.getenv(
 ).strip().lower() in {"1", "true", "yes", "on"}
 APNS_ENABLED = all([APNS_AUTH_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC])
 INSECURE_ALLOW_HTTP_ORIGINS = os.getenv("INSECURE_ALLOW_HTTP_ORIGINS", "false").strip().lower() in {"1", "true", "yes", "on"}
-PUBLIC_BOOTSTRAP_ENABLED = os.getenv(
-    "PUBLIC_BOOTSTRAP_ENABLED",
-    "true" if APP_ENV != "production" else "false",
-).strip().lower() in {"1", "true", "yes", "on"}
+FIRST_ADMIN_PASS = os.getenv(
+    "FIRST_ADMIN_PASS",
+    "dev-first-admin-pass" if APP_ENV != "production" else "",
+).strip()
 
 
 def _is_placeholder(value: str) -> bool:
@@ -89,6 +89,9 @@ def validate_runtime_config() -> None:
 
     if _is_placeholder(AUTH_TOKEN_SECRET) or len(AUTH_TOKEN_SECRET) < 32:
         raise RuntimeError("AUTH_TOKEN_SECRET must be a strong non-placeholder value with length >= 32 in production")
+
+    if not FIRST_ADMIN_PASS or _is_placeholder(FIRST_ADMIN_PASS) or len(FIRST_ADMIN_PASS) < 12:
+        raise RuntimeError("FIRST_ADMIN_PASS must be set to a strong non-placeholder value with length >= 12 in production")
 
     if "*" in CORS_ALLOW_ORIGINS and CORS_ALLOW_CREDENTIALS:
         raise RuntimeError("CORS_ALLOW_ORIGINS cannot contain '*' when credentials are enabled in production")
