@@ -19,7 +19,7 @@ mkdir -p "$(dirname "$output_file")"
 
 docker compose \
     --env-file "$env_file" \
-    -f docker-compose.prod.yml \
+    -f docker-compose.yml \
     exec -T db \
     pg_dump -U "$(grep '^POSTGRES_USER=' "$env_file" | cut -d= -f2-)" "$(grep '^POSTGRES_DB=' "$env_file" | cut -d= -f2-)" \
     > "$output_file"

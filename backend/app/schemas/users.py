@@ -15,6 +15,10 @@ class UserCreatePayload(BaseModel):
     user_address: str = Field(min_length=1, max_length=255)
 
 
+class BootstrapFirstAdminPayload(UserCreatePayload):
+    first_admin_pass: str = Field(min_length=12, max_length=255)
+
+
 class UserUpdatePayload(BaseModel):
     user_login: Optional[str] = Field(default=None, min_length=3, max_length=100)
     user_password: Optional[str] = Field(default=None, min_length=6, max_length=255)

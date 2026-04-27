@@ -856,6 +856,11 @@
 
                     <form id="bootstrap-form" class="hidden">
                         <div class="field">
+                            <label for="bootstrap-admin-key">Ключ первого администратора</label>
+                            <input id="bootstrap-admin-key" name="first_admin_pass" type="password" autocomplete="one-time-code" minlength="12" required>
+                        </div>
+
+                        <div class="field">
                             <label for="bootstrap-login">Логин администратора</label>
                             <input id="bootstrap-login" name="user_login" autocomplete="username" minlength="3" required>
                         </div>
@@ -1061,7 +1066,7 @@
             bootstrapForm.classList.toggle('hidden', !bootstrapRequired);
 
             if (bootstrapRequired) {
-                showSetupNote('Этот экран вызывает <strong>/api/v1/users/bootstrap</strong> и доступен только пока в системе нет ни одного пользователя и backend разрешает public bootstrap.');
+                showSetupNote('Этот экран вызывает <strong>/api/v1/users/bootstrap</strong> и доступен только пока в системе нет ни одного пользователя. Для создания первого администратора нужен bootstrap-ключ.');
             } else {
                 showSetupNote('Если база уже инициализирована, вход выполняется только существующим пользователем с флагом <strong>user_admin</strong>.');
             }
@@ -1279,6 +1284,7 @@
             const payload = await request('/users/bootstrap', {
                 method: 'POST',
                 body: JSON.stringify({
+                    first_admin_pass: formData.get('first_admin_pass'),
                     user_login: formData.get('user_login'),
                     user_password: formData.get('user_password'),
                     user_first_name: formData.get('user_first_name'),

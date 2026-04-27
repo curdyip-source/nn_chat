@@ -2,17 +2,15 @@
 
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-    echo "Usage: $0 <release-tag>" >&2
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+    echo "Usage: $0 <release-tag> [env-file]" >&2
     exit 1
 fi
 
 release_tag="$1"
-release_env=".env.release"
+release_env="${2:-.env}"
 
-if [[ ! -f "$release_env" ]]; then
-    release_env=".env.release.example"
-fi
+[[ -f "$release_env" ]] || { echo "Env file not found: $release_env" >&2; exit 1; }
 
 get_value() {
     local key="$1"
