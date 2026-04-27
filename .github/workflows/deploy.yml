@@ -9,6 +9,7 @@ on:
 env:
   BACKEND_IMAGE: ghcr.io/curdyip-source/nn_chat-backend
   FRONTEND_IMAGE: ghcr.io/curdyip-source/nn_chat-frontend
+  POSTGRES_IMAGE: ghcr.io/curdyip-source/nn_chat-postgres
   DEPLOY_ROOT: /home/dev/nn_chat
 
 jobs:
@@ -85,6 +86,12 @@ jobs:
           tags: |
             ${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.release_tag }}
             ${{ env.FRONTEND_IMAGE }}:latest
+
+      - name: Mirror postgres image to GHCR
+        run: |
+          docker pull postgres:17-alpine
+          docker tag postgres:17-alpine ${{ env.POSTGRES_IMAGE }}:17-alpine
+          docker push ${{ env.POSTGRES_IMAGE }}:17-alpine
 
   deploy:
     runs-on: ubuntu-latest

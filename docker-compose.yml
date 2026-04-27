@@ -2,7 +2,7 @@ name: nufnaf
 
 services:
   db:
-    image: postgres:17-alpine
+    image: ${POSTGRES_IMAGE:-ghcr.io/curdyip-source/nn_chat-postgres:17-alpine}
     container_name: ${POSTGRES_CONTAINER_NAME}
     restart: unless-stopped
     init: true
