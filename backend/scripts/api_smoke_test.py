@@ -12,13 +12,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.core.database import SessionLocal
-from app.core.security import hash_password
 from app.models.users import User
 
 API_URL = os.getenv("SMOKE_TEST_API_URL", "http://127.0.0.1:8000")
 API_PREFIX = os.getenv("SMOKE_TEST_API_PREFIX", "/api/v1")
-ADMIN_LOGIN = os.getenv("SMOKE_TEST_ADMIN_LOGIN", "smoke_admin")
-ADMIN_PASSWORD = os.getenv("SMOKE_TEST_ADMIN_PASSWORD", "SmokePass123!")
+ADMIN_LOGIN = os.getenv("SMOKE_TEST_ADMIN_LOGIN", "").strip()
+ADMIN_PASSWORD = os.getenv("SMOKE_TEST_ADMIN_PASSWORD", "").strip()
 USER_PASSWORD = "SmokeUserPass123!"
 SMOKE_PREFIX = "smoke_user_"
 
@@ -67,36 +66,6 @@ def cleanup_smoke_data() -> None:
         db.close()
 
 
-def ensure_smoke_admin() -> None:
-    db = SessionLocal()
-    try:
-        admin = db.query(User).filter(User.user_login == ADMIN_LOGIN).first()
-        if admin is None:
-            admin = User(
-                user_login=ADMIN_LOGIN,
-                user_password=hash_password(ADMIN_PASSWORD),
-                user_admin=True,
-                user_active=True,
-                user_first_name="Smoke",
-                user_second_name="Admin",
-                user_age=30,
-                user_address="Smoke Address",
-            )
-            db.add(admin)
-        else:
-            admin.user_password = hash_password(ADMIN_PASSWORD)
-            admin.user_admin = True
-            admin.user_active = True
-            admin.user_first_name = "Smoke"
-            admin.user_second_name = "Admin"
-            admin.user_age = 30
-            admin.user_address = "Smoke Address"
-
-        db.commit()
-    finally:
-        db.close()
-
-
 def wait_for_backend() -> None:
     last_error = None
     for _ in range(20):
@@ -112,8 +81,11 @@ def wait_for_backend() -> None:
 def run() -> None:
     log("Preparing smoke data...")
     cleanup_smoke_data()
-    ensure_smoke_admin()
     wait_for_backend()
+
+    if not ADMIN_LOGIN or not ADMIN_PASSWORD:
+        log("Skipping authenticated deep smoke because SMOKE_TEST_ADMIN_LOGIN and SMOKE_TEST_ADMIN_PASSWORD are not configured.")
+        return
 
     unique_suffix = uuid.uuid4().hex[:8]
     smoke_user_login = f"{SMOKE_PREFIX}{unique_suffix}"
