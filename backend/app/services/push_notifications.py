@@ -1,0 +1,131 @@
+import logging
+import time
+
+import httpx
+import jwt
+from sqlalchemy.orm import Session
+
+from app.core.config import APNS_AUTH_KEY_P8, APNS_ENABLED, APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC, APNS_USE_SANDBOX
+from app.repositories.user_devices import UserDeviceRepository
+
+
+logger = logging.getLogger("app.push")
+
+
+def send_push_notification_event(
+    db: Session,
+    *,
+    excluded_user_id: int,
+    message_type: str,
+    sender_name: str,
+    message_text: str | None,
+    entity_id: int,
+) -> int:
+    if not APNS_ENABLED:
+        logger.info(
+            "push.skipped_disabled",
+            extra={
+                "event_type": "push.skipped_disabled",
+                "message_type": message_type,
+                "entity_id": entity_id,
+            },
+        )
+        return 0
+
+    targets = UserDeviceRepository(db).list_active_for_other_users(excluded_user_id=excluded_user_id)
+    if not targets:
+        logger.info(
+            "push.skipped_no_targets",
+            extra={
+                "event_type": "push.skipped_no_targets",
+                "message_type": message_type,
+                "entity_id": entity_id,
+                "excluded_user_id": excluded_user_id,
+            },
+        )
+        return 0
+
+    title, body = build_notification_content(message_type=message_type, sender_name=sender_name, message_text=message_text)
+    token = build_apns_provider_token()
+    endpoint_base = "https://api.sandbox.push.apple.com" if APNS_USE_SANDBOX else "https://api.push.apple.com"
+    sent_count = 0
+
+    with httpx.Client(http2=True, timeout=10.0) as client:
+        for device in targets:
+            response = client.post(
+                f"{endpoint_base}/3/device/{device.user_device_token}",
+                headers={
+                    "authorization": f"bearer {token}",
+                    "apns-topic": APNS_TOPIC,
+                    "apns-push-type": "alert",
+                    "apns-priority": "10",
+                },
+                json={
+                    "aps": {
+                        "alert": {
+                            "title": title,
+                            "body": body,
+                        },
+                        "sound": "default",
+                    },
+                    "event_type": message_type,
+                    "entity_id": entity_id,
+                },
+            )
+
+            if response.status_code == 200:
+                sent_count += 1
+                continue
+
+            logger.warning(
+                "push.delivery_failed",
+                extra={
+                    "event_type": "push.delivery_failed",
+                    "device_token": device.user_device_token,
+                    "status_code": response.status_code,
+                    "response_text": response.text,
+                },
+            )
+
+            if response.status_code in {400, 410}:
+                UserDeviceRepository(db).deactivate_token(device.user_device_token)
+
+    logger.info(
+        "push.sent_summary",
+        extra={
+            "event_type": "push.sent_summary",
+            "message_type": message_type,
+            "entity_id": entity_id,
+            "target_count": len(targets),
+            "sent_count": sent_count,
+        },
+    )
+
+    return sent_count
+
+
+def build_apns_provider_token() -> str:
+    issued_at = int(time.time())
+    with open(APNS_AUTH_KEY_P8, "r", encoding="utf-8") as key_file:
+        private_key = key_file.read()
+    return jwt.encode(
+        {"iss": APNS_TEAM_ID, "iat": issued_at},
+        private_key,
+        algorithm="ES256",
+        headers={"alg": "ES256", "kid": APNS_KEY_ID},
+    )
+
+
+def build_notification_content(*, message_type: str, sender_name: str, message_text: str | None) -> tuple[str, str]:
+    normalized_sender_name = sender_name.strip() or "Пользователь"
+    normalized_text = (message_text or "").strip()
+
+    if message_type == "order":
+        return "Новый заказ", f"{normalized_sender_name} создал новый заказ"
+    if message_type == "inventory":
+        return "Новая инвентаризация", f"{normalized_sender_name} создал новую инвентаризацию"
+    if message_type == "product_registration":
+        return "Новая приемка", f"{normalized_sender_name} создал новую приемку"
+    if normalized_text:
+        return "Новое сообщение", f"{normalized_sender_name}: {normalized_text}"
+    return "Новое сообщение", f"Новое сообщение от {normalized_sender_name}"

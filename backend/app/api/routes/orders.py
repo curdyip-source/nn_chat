@@ -1,0 +1,44 @@
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
+from app.dependencies.auth import get_current_user
+from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
+from app.services.orders import add_order_comment, create_order, get_order, list_order_comments, list_orders, update_order, update_order_status
+
+router = APIRouter(prefix="/orders", tags=["orders"])
+
+
+@router.get("")
+def get_orders(_: dict = Depends(get_current_user), db: Session = Depends(get_db), page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100)) -> dict:
+    return list_orders(db, page=page, page_size=page_size)
+
+
+@router.get("/{order_id}")
+def get_order_route(order_id: int, _: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return {"item": get_order(db, order_id)}
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_order_route(payload: OrderCreatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return {"item": create_order(db, payload, current_user)}
+
+
+@router.put("/{order_id}")
+def update_order_route(order_id: int, payload: OrderUpdatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return {"item": update_order(db, order_id, payload, current_user)}
+
+
+@router.put("/{order_id}/status")
+def update_order_status_route(order_id: int, payload: OrderStatusUpdatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return {"item": update_order_status(db, order_id, payload, current_user)}
+
+
+@router.get("/{order_id}/comments")
+def get_order_comments(order_id: int, _: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return list_order_comments(db, order_id)
+
+
+@router.post("/{order_id}/comments", status_code=status.HTTP_201_CREATED)
+def add_order_comment_route(order_id: int, payload: OrderCommentCreatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return {"item": add_order_comment(db, order_id, payload, current_user)}
