@@ -2,6 +2,7 @@
 .env.*
 *.p8
 docs/
+.git-backups/
 
 # Python
 .venv/
@@ -32,6 +33,7 @@ DerivedData/
 build/
 .derivedData/
 .derivedData-ios17pro/
+xcuserdata/
 *.xcuserstate
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
