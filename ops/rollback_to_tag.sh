@@ -2,31 +2,30 @@
 
 set -euo pipefail
 
-if [[ $# -ne 3 ]]; then
-    echo "Usage: $0 <production-env-file> <release-env-file> <release-tag>" >&2
+if [[ $# -ne 2 ]]; then
+    echo "Usage: $0 <env-file> <release-tag>" >&2
     exit 1
 fi
 
-production_env="$1"
-release_env="$2"
-release_tag="$3"
+env_file="$1"
+release_tag="$2"
 
-[[ -f "$production_env" ]] || { echo "Env file not found: $production_env" >&2; exit 1; }
-[[ -f "$release_env" ]] || { echo "Release env file not found: $release_env" >&2; exit 1; }
+[[ -f "$env_file" ]] || { echo "Env file not found: $env_file" >&2; exit 1; }
 
-set -a
-source "$production_env"
-source "$release_env"
 export RELEASE_TAG="$release_tag"
-set +a
+front_port="$(grep '^FRONTEND_PORT=' "$env_file" | cut -d= -f2-)"
 
 docker compose \
-    --env-file "$production_env" \
-    --env-file "$release_env" \
-    -f docker-compose.release.yml \
+    --env-file "$env_file" \
+    -f docker-compose.yml \
+    pull backend frontend
+
+docker compose \
+    --env-file "$env_file" \
+    -f docker-compose.yml \
     up -d
 
-./ops/post_deploy_check.sh "http://127.0.0.1:${FRONTEND_PORT}"
-./ops/post_deploy_api_smoke.sh docker-compose.release.yml "$production_env" "$release_env"
+./ops/post_deploy_check.sh "http://127.0.0.1:${front_port}"
+./ops/post_deploy_api_smoke.sh docker-compose.yml "$env_file"
 
 echo "Rollback to ${release_tag} completed successfully"

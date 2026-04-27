@@ -1,4 +1,5 @@
 import os
+from ipaddress import ip_address
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -39,6 +40,7 @@ APNS_USE_SANDBOX = os.getenv(
     "true" if APP_ENV != "production" else "false",
 ).strip().lower() in {"1", "true", "yes", "on"}
 APNS_ENABLED = all([APNS_AUTH_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC])
+INSECURE_ALLOW_HTTP_ORIGINS = os.getenv("INSECURE_ALLOW_HTTP_ORIGINS", "false").strip().lower() in {"1", "true", "yes", "on"}
 PUBLIC_BOOTSTRAP_ENABLED = os.getenv(
     "PUBLIC_BOOTSTRAP_ENABLED",
     "true" if APP_ENV != "production" else "false",
@@ -53,8 +55,22 @@ def _is_placeholder(value: str) -> bool:
 def _validate_https_origins(origins: list[str]) -> None:
     for origin in origins:
         parsed = urlparse(origin)
-        if parsed.scheme != "https":
-            raise RuntimeError("CORS_ALLOW_ORIGINS must contain only https origins in production")
+        if parsed.scheme == "https" and parsed.netloc:
+            continue
+
+        if parsed.scheme == "http" and parsed.hostname and INSECURE_ALLOW_HTTP_ORIGINS:
+            try:
+                host_ip = ip_address(parsed.hostname)
+            except ValueError as exc:
+                raise RuntimeError("HTTP CORS origins in production are allowed only for explicit IP hosts") from exc
+
+            if host_ip.is_loopback or host_ip.is_private or host_ip.is_link_local or host_ip.is_multicast:
+                raise RuntimeError("HTTP CORS origins in production cannot point to private or local IP hosts")
+
+            if parsed.netloc:
+                continue
+
+        raise RuntimeError("CORS_ALLOW_ORIGINS must contain https origins in production, or explicit public IP http origins when INSECURE_ALLOW_HTTP_ORIGINS=true")
         if not parsed.netloc:
             raise RuntimeError("CORS_ALLOW_ORIGINS must contain valid absolute origins in production")
 

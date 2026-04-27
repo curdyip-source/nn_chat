@@ -38,6 +38,7 @@ auth_token_secret="$(get_value AUTH_TOKEN_SECRET)"
 cors_allow_origins="$(get_value CORS_ALLOW_ORIGINS)"
 public_bootstrap_enabled="$(get_value PUBLIC_BOOTSTRAP_ENABLED)"
 apns_auth_key_p8="$(get_value APNS_AUTH_KEY_P8)"
+insecure_allow_http_origins="$(get_value INSECURE_ALLOW_HTTP_ORIGINS)"
 
 [[ "$app_env" == "production" ]] || fail "APP_ENV must be set to production"
 [[ -n "$postgres_password" ]] || fail "POSTGRES_PASSWORD must be set"
@@ -48,6 +49,14 @@ apns_auth_key_p8="$(get_value APNS_AUTH_KEY_P8)"
 [[ "$auth_token_secret" != "dev-secret-change-me" ]] || fail "AUTH_TOKEN_SECRET cannot use the development default"
 [[ "$cors_allow_origins" != *"*"* ]] || fail "CORS_ALLOW_ORIGINS cannot contain '*' in production"
 [[ "$public_bootstrap_enabled" == "false" ]] || fail "PUBLIC_BOOTSTRAP_ENABLED must be false in production"
+
+if [[ "$cors_allow_origins" == *"http://"* && "$insecure_allow_http_origins" != "true" ]]; then
+    fail "Set INSECURE_ALLOW_HTTP_ORIGINS=true when using http CORS origins in production"
+fi
+
+if [[ "$cors_allow_origins" == *"localhost"* || "$cors_allow_origins" == *"127.0.0.1"* ]]; then
+    fail "CORS_ALLOW_ORIGINS cannot point to localhost in production"
+fi
 
 if [[ -n "$apns_auth_key_p8" && ! -f "$apns_auth_key_p8" ]]; then
     fail "APNS_AUTH_KEY_P8 points to a missing file: $apns_auth_key_p8"

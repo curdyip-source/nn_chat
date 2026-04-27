@@ -1,0 +1,124 @@
+name: Deploy VPS
+
+on:
+  push:
+    branches:
+      - git-action
+  workflow_dispatch:
+
+env:
+  BACKEND_IMAGE: ghcr.io/curdyip-source/nn_chat-backend
+  FRONTEND_IMAGE: ghcr.io/curdyip-source/nn_chat-frontend
+  DEPLOY_ROOT: /home/dev/nn_chat
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      APP_ENV: test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      CORS_ALLOW_ORIGINS: http://127.0.0.1
+      AUTH_TOKEN_SECRET: test-secret-that-is-long-enough-for-ci
+      PUBLIC_BOOTSTRAP_ENABLED: true
+      ACCESS_TOKEN_TTL_MINUTES: 30
+      REFRESH_TOKEN_TTL_DAYS: 30
+      SESSION_TTL_DAYS: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: verify
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      release_tag: ${{ steps.meta.outputs.release_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute release tag
+        id: meta
+        run: echo "release_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.release_tag }}
+            ${{ env.BACKEND_IMAGE }}:latest
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.release_tag }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' '${{ secrets.VPS_SSH_KEY }}' > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p '${{ secrets.VPS_PORT }}' '${{ secrets.VPS_HOST }}' >> ~/.ssh/known_hosts
+
+      - name: Prepare deploy artifacts
+        run: |
+          printf '%s' '${{ secrets.PRODUCTION_ENV_FILE }}' > .deploy.env
+
+      - name: Upload compose and scripts
+        run: |
+          ssh -p '${{ secrets.VPS_PORT }}' '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}' 'mkdir -p ${{ env.DEPLOY_ROOT }}/secrets'
+          scp -P '${{ secrets.VPS_PORT }}' docker-compose.yml '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_ROOT }}/docker-compose.yml'
+          scp -P '${{ secrets.VPS_PORT }}' .deploy.env '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_ROOT }}/.env'
+          scp -P '${{ secrets.VPS_PORT }}' -r ops '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_ROOT }}/'
+
+      - name: Deploy on VPS
+        run: |
+          ssh -p '${{ secrets.VPS_PORT }}' '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}' "cd ${{ env.DEPLOY_ROOT }} && \
+            chmod +x ops/*.sh && \
+            if grep -q '^RELEASE_TAG=' .env; then \
+              sed -i 's|^RELEASE_TAG=.*|RELEASE_TAG=${{ needs.build-and-push.outputs.release_tag }}|' .env; \
+            else \
+              printf '\\nRELEASE_TAG=${{ needs.build-and-push.outputs.release_tag }}\\n' >> .env; \
+            fi && \
+            echo '${{ secrets.GHCR_TOKEN }}' | docker login ghcr.io -u '${{ secrets.GHCR_USERNAME }}' --password-stdin && \
+            bash ./ops/release_deploy.sh .env '${{ needs.build-and-push.outputs.release_tag }}'"
