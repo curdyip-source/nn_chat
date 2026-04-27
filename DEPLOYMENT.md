@@ -18,16 +18,16 @@ You need:
 3. SSH access to the VPS.
 4. A GHCR token with package read access on the server deploy step.
 
-For your current server shape, `.env` can use:
+For the current production domain, `.env` can use:
 
 ```env
-CORS_ALLOW_ORIGINS=http://147.45.253.161:25256
-INSECURE_ALLOW_HTTP_ORIGINS=true
+CORS_ALLOW_ORIGINS=https://chat.nufnafchat.su
+INSECURE_ALLOW_HTTP_ORIGINS=false
 FRONTEND_PORT=25256
 APNS_AUTH_KEY_P8=/home/dev/nn_chat/secrets/AuthKey_RLV35R5LP5.p8
 ```
 
-This keeps the app reachable by IP and port until you move to a domain with HTTPS.
+The public entrypoint is expected to be `https://chat.nufnafchat.su`, with TLS terminated on the VPS and proxied to the frontend container on `127.0.0.1:25256`.
 
 ## Local Validation
 
@@ -43,7 +43,7 @@ Render compose config:
 docker compose --env-file .env -f docker-compose.yml config
 ```
 
-The preflight will fail until the APNS key exists at the path from `APNS_AUTH_KEY_P8`.
+The preflight will fail locally until the APNS key exists at the path from `APNS_AUTH_KEY_P8`. This is expected when that key is stored only on the VPS.
 
 ## Manual Release Flow
 
@@ -101,12 +101,16 @@ Recommended `PRODUCTION_ENV_FILE` base:
 
 - Copy from [.env.example](.env.example)
 - Replace database password and auth secret
+- Set `CORS_ALLOW_ORIGINS=https://chat.nufnafchat.su`
+- Set `INSECURE_ALLOW_HTTP_ORIGINS=false`
 - Keep `BACKEND_IMAGE=ghcr.io/curdyip-source/nn_chat-backend`
 - Keep `FRONTEND_IMAGE=ghcr.io/curdyip-source/nn_chat-frontend`
 - Keep `POSTGRES_IMAGE=ghcr.io/curdyip-source/nn_chat-postgres:17-alpine` or leave it unset to use the compose default
 - Keep `APNS_AUTH_KEY_P8=/home/dev/nn_chat/secrets/AuthKey_RLV35R5LP5.p8`
 
 The workflow rewrites `RELEASE_TAG` on the server to the current commit SHA before deploy.
+
+Because the deploy workflow uploads the full `.env` from `PRODUCTION_ENV_FILE`, any domain or CORS change must be updated in that GitHub secret before the next deploy.
 
 ## Database Operations
 
