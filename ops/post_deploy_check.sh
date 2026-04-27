@@ -44,7 +44,7 @@ assert_header() {
 echo "Checking frontend root..."
 status_code="$(request GET "$base_url/")"
 [[ "$status_code" == "200" ]]
-grep 'myclearproject' "$body_file" >/dev/null
+grep -Eiq 'NufNaf (Admin|Control|workspace)' "$body_file"
 assert_header "x-content-type-options"
 
 echo "Checking live health..."
