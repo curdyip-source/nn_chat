@@ -641,6 +641,63 @@ def test_admin_activation_sets_verified_user(client, integration_db_session, int
     assert created_user.user_verified_user_id == integration_admin.user_id
 
 
+def test_order_info_can_be_empty_on_create_and_update(client, integration_db_session, integration_admin, integration_user):
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+
+    user_token = login(client, "worker", "WorkerPass123")["token"]
+
+    reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
+    establishment_id = reference_payload["establishments"][0]["establishment_id"]
+    order_method_id = reference_payload["order_methods"][0]["order_method_id"]
+    order_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "orders" and item["status_status"] == "Новый")["status_id"]
+
+    create_response = client.post(
+        f"{API_PREFIX}/orders",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_customer": "Марина",
+            "order_info": "",
+            "items": [
+                {
+                    "product_article": "EMPTY-INFO-001",
+                    "product_name": "Test Product",
+                    "order_item_quantity": 1,
+                    "order_item_price": "10.00",
+                }
+            ],
+        },
+    )
+    assert create_response.status_code == 201
+    created_order = create_response.json()["item"]
+    assert created_order["order_info"] == ""
+
+    update_response = client.put(
+        f"{API_PREFIX}/orders/{created_order['order_id']}",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_customer": "Марина",
+            "order_info": "",
+            "order_status_id": order_status_id,
+            "items": [
+                {
+                    "product_article": "EMPTY-INFO-001",
+                    "product_name": "Test Product",
+                    "order_item_quantity": 1,
+                    "order_item_price": "10.00",
+                }
+            ],
+        },
+    )
+    assert update_response.status_code == 200
+    assert update_response.json()["item"]["order_info"] == ""
+
+
 def test_admin_can_import_products_from_xlsx(client, integration_db_session, integration_admin):
     integration_admin.user_password = hash_password("AdminPass123")
     integration_db_session.commit()
