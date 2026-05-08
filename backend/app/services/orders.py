@@ -185,6 +185,9 @@ class OrderService:
                 product_cost_usd=item.order_item_price,
             )
             item_status = get_status_or_404(self.db, item.order_item_status_id, expected_type="order_products") if item.order_item_status_id else default_item_status
+            normalized_item_supplier = item.order_item_supplier.strip() if item.order_item_supplier else None
+            if item_status.status_status != "Заказ":
+                normalized_item_supplier = None
             source_establishment_id, destination_establishment_id = self._resolve_item_route(item_status.status_status if item_status else None, item.order_item_source_establishment_id, item.order_item_destination_establishment_id)
             items.append(
                 {
@@ -194,6 +197,7 @@ class OrderService:
                     "order_item_quantity": item.order_item_quantity,
                     "order_item_price": price,
                     "order_item_status_id": item_status.status_id,
+                    "order_item_supplier": normalized_item_supplier,
                     "order_item_source_establishment_id": source_establishment_id,
                     "order_item_destination_establishment_id": destination_establishment_id,
                     "order_item_currency_id": item.order_item_currency_id or default_currency.currency_id,
@@ -292,6 +296,9 @@ class OrderService:
                 product_cost_usd=item.order_item_price,
             )
             item_status = get_status_or_404(self.db, item.order_item_status_id, expected_type="order_products") if item.order_item_status_id else default_item_status
+            normalized_item_supplier = item.order_item_supplier.strip() if item.order_item_supplier else None
+            if item_status.status_status != "Заказ":
+                normalized_item_supplier = None
             source_establishment_id, destination_establishment_id = self._resolve_item_route(item_status.status_status if item_status else None, item.order_item_source_establishment_id, item.order_item_destination_establishment_id)
             items.append(
                 {
@@ -301,6 +308,7 @@ class OrderService:
                     "order_item_quantity": item.order_item_quantity,
                     "order_item_price": price,
                     "order_item_status_id": item_status.status_id,
+                    "order_item_supplier": normalized_item_supplier,
                     "order_item_source_establishment_id": source_establishment_id,
                     "order_item_destination_establishment_id": destination_establishment_id,
                     "order_item_currency_id": item.order_item_currency_id or default_currency.currency_id,

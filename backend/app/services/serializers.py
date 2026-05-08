@@ -188,6 +188,7 @@ def serialize_order_item(row) -> dict:
         "order_item_status_id": row.order_item_status_id,
         "order_item_status": status.status_status if status else None,
         "order_item_status_color": status.status_color if status else None,
+        "order_item_supplier": row.order_item_supplier,
         "order_item_source_establishment_id": row.order_item_source_establishment_id,
         "order_item_source_establishment_name": source_establishment.establishment_name if source_establishment else None,
         "order_item_destination_establishment_id": row.order_item_destination_establishment_id,

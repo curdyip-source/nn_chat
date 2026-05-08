@@ -42,6 +42,7 @@ class OrderItem(Base):
     order_item_quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     order_item_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     order_item_status_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("statuses.status_id", ondelete="SET NULL"), nullable=True, index=True)
+    order_item_supplier: Mapped[str | None] = mapped_column(String(255), nullable=True)
     order_item_source_establishment_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("establishments.establishment_id", ondelete="SET NULL"), nullable=True, index=True)
     order_item_destination_establishment_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("establishments.establishment_id", ondelete="SET NULL"), nullable=True, index=True)
     order_item_currency_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("currencies.currency_id", ondelete="SET NULL"), nullable=True, index=True)
