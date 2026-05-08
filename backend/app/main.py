@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.auth import router as auth_router
 from app.api.routes.audit import router as audit_router
+from app.api.routes.contacts import router as contacts_router
 from app.api.routes.documents import router as documents_router
 from app.api.routes.inventories import router as inventories_router
 from app.api.routes.message_attachments import router as message_attachments_router
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
     api_v1_router.include_router(system_router)
     api_v1_router.include_router(auth_router)
     api_v1_router.include_router(audit_router)
+    api_v1_router.include_router(contacts_router)
     api_v1_router.include_router(documents_router)
     api_v1_router.include_router(reference_data_router)
     api_v1_router.include_router(products_router)

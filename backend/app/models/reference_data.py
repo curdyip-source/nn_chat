@@ -25,6 +25,7 @@ class Establishment(Base):
     destination_order_items = relationship("OrderItem", foreign_keys="OrderItem.order_item_destination_establishment_id", back_populates="destination_establishment")
     inventories = relationship("Inventory", back_populates="establishment")
     product_registrations = relationship("ProductRegistration", back_populates="establishment")
+    contacts = relationship("Contact", back_populates="establishment")
 
 
 class OrderMethod(Base):
@@ -39,6 +40,7 @@ class OrderMethod(Base):
 
     owner = relationship("User", back_populates="owned_order_methods")
     orders = relationship("Order", back_populates="order_method")
+    contacts = relationship("Contact", back_populates="order_method")
 
 
 class Status(Base):

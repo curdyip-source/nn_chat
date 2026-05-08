@@ -9,6 +9,7 @@ from app.repositories.messages import MessageRepository
 from app.repositories.orders import OrderRepository
 from app.schemas.common import build_pagination
 from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
+from app.services.contacts import save_buyer_contact_from_order
 from app.services.audit import log_audit_event
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.push_notifications import send_push_notification_event
@@ -214,6 +215,16 @@ class OrderService:
             },
             items,
         )
+        if payload.save_contact:
+            save_buyer_contact_from_order(
+                self.db,
+                order_customer=payload.order_customer,
+                order_info=payload.order_info,
+                order_establishment_id=payload.order_establishment_id,
+                order_method_id=payload.order_method_id,
+                order_sub_method=normalized_order_sub_method,
+                current_user=current_user,
+            )
         message = self.message_repository.create(
             {
                 "message_type": "order",

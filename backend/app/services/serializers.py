@@ -142,6 +142,26 @@ def serialize_product(row) -> dict:
     }
 
 
+def serialize_contact(row) -> dict:
+    establishment = getattr(row, "establishment", None)
+    order_method = getattr(row, "order_method", None)
+    owner = getattr(row, "owner", None)
+    return {
+        "contact_id": row.contact_id,
+        "contact_type": row.contact_type,
+        "contact_name": row.contact_name,
+        "contact_info": row.contact_info,
+        "contact_establishment_id": row.contact_establishment_id,
+        "contact_establishment_name": establishment.establishment_name if establishment else None,
+        "contact_order_method_id": row.contact_order_method_id,
+        "contact_order_method_name": order_method.order_method_name if order_method else None,
+        "contact_order_sub_method": row.contact_order_sub_method,
+        "contact_owner_user_id": row.contact_owner_user_id,
+        "contact_owner_user_login": owner.user_login if owner else None,
+        "contact_created_at": serialize_datetime(row.contact_created_at),
+    }
+
+
 def serialize_message_attachment(row) -> dict:
     return {
         "attachment_id": row.attachment_id,

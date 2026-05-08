@@ -16,6 +16,7 @@ class ProductRegistrationItemCreatePayload(BaseModel):
 class ProductRegistrationCreatePayload(BaseModel):
     product_registration_establishment_id: int = Field(ge=1)
     product_registration_supplier: str = Field(min_length=1, max_length=255)
+    save_contact: bool = False
     product_registration_status_id: Optional[int] = Field(default=None, ge=1)
     message_text: Optional[str] = Field(default=None, max_length=4000)
     items: list[ProductRegistrationItemCreatePayload] = Field(min_length=1)

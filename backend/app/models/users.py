@@ -45,3 +45,4 @@ class User(Base):
     owned_statuses = relationship("Status", back_populates="owner")
     owned_currencies = relationship("Currency", back_populates="owner")
     owned_products = relationship("Product", back_populates="owner")
+    owned_contacts = relationship("Contact", back_populates="owner")

@@ -16,6 +16,7 @@ class InventoryItemCreatePayload(BaseModel):
 class InventoryCreatePayload(BaseModel):
     inventory_establishment_id: int = Field(ge=1)
     inventory_supplier: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    save_contact: bool = False
     inventory_status_id: Optional[int] = Field(default=None, ge=1)
     message_text: Optional[str] = Field(default=None, max_length=4000)
     items: list[InventoryItemCreatePayload] = Field(min_length=1)

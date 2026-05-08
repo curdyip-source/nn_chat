@@ -8,6 +8,7 @@ from app.repositories.inventories import InventoryRepository
 from app.repositories.messages import MessageRepository
 from app.schemas.common import build_pagination
 from app.schemas.inventories import InventoryCreatePayload, InventoryStatusUpdatePayload
+from app.services.contacts import save_supplier_contact
 from app.services.audit import log_audit_event
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.push_notifications import send_push_notification_event
@@ -67,6 +68,8 @@ class InventoryService:
             },
             items,
         )
+        if payload.save_contact:
+            save_supplier_contact(self.db, supplier_name=payload.inventory_supplier, current_user=current_user)
         message = self.message_repository.create(
             {
                 "message_type": "inventory",

@@ -26,6 +26,7 @@ class OrderCreatePayload(BaseModel):
     order_sub_method: Optional[str] = Field(default=None, min_length=1, max_length=255)
     order_customer: str = Field(min_length=1, max_length=255)
     order_info: str = Field(default="", max_length=4000)
+    save_contact: bool = False
     order_status_id: Optional[int] = Field(default=None, ge=1)
     message_text: Optional[str] = Field(default=None, max_length=4000)
     items: list[OrderItemCreatePayload] = Field(min_length=1)
