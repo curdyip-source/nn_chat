@@ -408,6 +408,7 @@ def test_order_inventory_and_product_registration_create_messages(client, integr
                     "order_item_quantity": 5,
                     "order_item_price": "21.50",
                     "order_item_status_id": order_product_status_id,
+                    "order_item_supplier": "ООО Восток",
                 },
                 {
                     "product_article": "NEW-002",
@@ -425,6 +426,14 @@ def test_order_inventory_and_product_registration_create_messages(client, integr
     assert updated_order_payload["order_sub_method"] == "Авито"
     assert len(updated_order_payload["items"]) == 2
     assert updated_order_payload["items"][0]["order_item_status"] == "Заказ поставщику"
+    assert updated_order_payload["items"][0]["order_item_supplier"] == "ООО Восток"
+
+    supplier_contacts_response = client.get(
+        f"{API_PREFIX}/contacts?contact_type=supplier&search=Восток",
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert supplier_contacts_response.status_code == 200
+    assert any(item["contact_name"] == "ООО Восток" for item in supplier_contacts_response.json()["items"])
 
     movement_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "order_products" and item["status_status"] == "Перемещение")["status_id"]
     movement_update_response = client.put(

@@ -9,7 +9,7 @@ from app.repositories.messages import MessageRepository
 from app.repositories.orders import OrderRepository
 from app.schemas.common import build_pagination
 from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
-from app.services.contacts import save_buyer_contact_from_order
+from app.services.contacts import save_buyer_contact_from_order, save_supplier_contact
 from app.services.audit import log_audit_event
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.push_notifications import send_push_notification_event
@@ -136,6 +136,16 @@ def _build_order_create_audit_payload(order_data: dict, message_id: int) -> dict
     }
 
 
+def _save_supplier_contacts_from_items(db: Session, *, items: list[dict], current_user: dict) -> None:
+    supplier_names = {
+        supplier_name
+        for supplier_name in (item.get("order_item_supplier") for item in items)
+        if supplier_name is not None and supplier_name.strip()
+    }
+    for supplier_name in supplier_names:
+        save_supplier_contact(db, supplier_name=supplier_name, current_user=current_user)
+
+
 def _build_order_update_audit_payload(before: dict, after: dict) -> dict:
     return {
         "changed_fields": _build_order_audit_changes(before, after),
@@ -219,6 +229,7 @@ class OrderService:
             },
             items,
         )
+        _save_supplier_contacts_from_items(self.db, items=items, current_user=current_user)
         if payload.save_contact:
             save_buyer_contact_from_order(
                 self.db,
@@ -330,6 +341,7 @@ class OrderService:
             },
             items,
         )
+        _save_supplier_contacts_from_items(self.db, items=items, current_user=current_user)
         log_audit_event(
             self.db,
             actor_user_id=current_user["user_id"],
