@@ -38,10 +38,15 @@ def test_reference_data_products_messages_and_profile_flow(client, integration_d
     assert avito_method["order_method_sub_methods"] == ["Авито", "СДЭК", "Яндекс", "5Post", "Почта"]
     assert any(item["status_type"] == "orders" and item["status_status"] == "Новый" for item in reference_payload["statuses"])
     assert any(item["status_type"] == "orders" and item["status_status"] == "Новый" and item["status_color"] == "orange" for item in reference_payload["statuses"])
+    assert any(item["status_type"] == "orders" and item["status_status"] == "На сборку" and item["status_color"] == "blue" for item in reference_payload["statuses"])
+    assert any(item["status_type"] == "orders" and item["status_status"] == "Собран" and item["status_color"] == "green" for item in reference_payload["statuses"])
+    assert any(item["status_type"] == "orders" and item["status_status"] == "Отменен" and item["status_color"] == "red" for item in reference_payload["statuses"])
+    assert any(item["status_type"] == "order_products" and item["status_status"] == "Не обработан" and item["status_color"] == "gray" for item in reference_payload["statuses"])
     assert any(item["status_type"] == "order_products" and item["status_status"] == "Перемещение" for item in reference_payload["statuses"])
-    assert any(item["status_type"] == "order_products" and item["status_status"] == "Заказ" for item in reference_payload["statuses"])
+    assert any(item["status_type"] == "order_products" and item["status_status"] == "Заказ поставщику" and item["status_color"] == "orange" for item in reference_payload["statuses"])
     assert any(item["status_type"] == "order_products" and item["status_status"] == "В наличии" for item in reference_payload["statuses"])
     assert any(item["status_type"] == "order_products" and item["status_status"] == "Отгружено" for item in reference_payload["statuses"])
+    assert not any(item["status_type"] == "order_products" and item["status_status"] in {"Новый", "Не новый", "В обработке", "Заказ"} for item in reference_payload["statuses"])
 
     products_response = client.get(f"{API_PREFIX}/products?search=000009", headers={"Authorization": f"Bearer {user_token}"})
     assert products_response.status_code == 200
@@ -216,8 +221,10 @@ def test_reference_data_restores_missing_default_statuses(client, integration_db
     assert reference_response.status_code == 200
     statuses = reference_response.json()["statuses"]
     assert any(item["status_type"] == "orders" and item["status_status"] == "Новый" for item in statuses)
+    assert any(item["status_type"] == "orders" and item["status_status"] == "Собран" for item in statuses)
     assert any(item["status_type"] == "inventory" and item["status_status"] == "Новый" for item in statuses)
     assert any(item["status_type"] == "product_registration" and item["status_status"] == "Новый" for item in statuses)
+    assert any(item["status_type"] == "order_products" and item["status_status"] == "Не обработан" for item in statuses)
     assert any(item["status_type"] == "order_products" and item["status_status"] == "Перемещение" for item in statuses)
     assert len({(item["status_type"], item["status_status"]) for item in statuses}) == len(statuses)
 
@@ -379,10 +386,11 @@ def test_order_inventory_and_product_registration_create_messages(client, integr
     assert len(order_detail_response.json()["item"]["items"]) == 1
     assert len(order_detail_response.json()["item"]["comments"]) == 2
     assert len(order_detail_response.json()["item"]["comments"][1]["attachments"]) == 1
-    assert order_detail_response.json()["item"]["items"][0]["order_item_status"] == "Новый"
+    assert order_detail_response.json()["item"]["items"][0]["order_item_status"] == "Не обработан"
+    assert order_detail_response.json()["item"]["items"][0]["order_item_status_color"] == "gray"
 
     order_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "orders" and item["status_status"] == "В обработке")["status_id"]
-    order_product_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "order_products" and item["status_status"] == "В обработке")["status_id"]
+    order_product_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "order_products" and item["status_status"] == "Заказ поставщику")["status_id"]
     updated_order_response = client.put(
         f"{API_PREFIX}/orders/{order_id}",
         headers={"Authorization": f"Bearer {user_token}"},
@@ -416,7 +424,7 @@ def test_order_inventory_and_product_registration_create_messages(client, integr
     assert updated_order_payload["order_customer"] == "Марина Петрова"
     assert updated_order_payload["order_sub_method"] == "Авито"
     assert len(updated_order_payload["items"]) == 2
-    assert updated_order_payload["items"][0]["order_item_status"] == "В обработке"
+    assert updated_order_payload["items"][0]["order_item_status"] == "Заказ поставщику"
 
     movement_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "order_products" and item["status_status"] == "Перемещение")["status_id"]
     movement_update_response = client.put(
@@ -509,7 +517,7 @@ def test_order_audit_payload_contains_field_and_item_changes(client, integration
     order_method_id = next(item for item in reference_payload["order_methods"] if item["order_method_name"] == "Авито")["order_method_id"]
     new_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "orders" and item["status_status"] == "Новый")["status_id"]
     processing_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "orders" and item["status_status"] == "В обработке")["status_id"]
-    order_product_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "order_products" and item["status_status"] == "В обработке")["status_id"]
+    order_product_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "order_products" and item["status_status"] == "Заказ поставщику")["status_id"]
 
     create_response = client.post(
         f"{API_PREFIX}/orders",

@@ -30,7 +30,7 @@ def get_status_or_404(db: Session, status_id: int, *, expected_type: str | None 
 
 def get_default_status_or_400(db: Session, *, status_type: str):
     ensure_reference_data(db)
-    default_name = "Новый"
+    default_name = "Не обработан" if status_type == "order_products" else "Новый"
     row = ReferenceDataRepository(db).get_status_by_type_and_name(status_type, default_name)
     if row is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Не найден базовый статус '{default_name}'")
