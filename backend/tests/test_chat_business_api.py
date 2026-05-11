@@ -519,7 +519,7 @@ def test_order_inventory_and_product_registration_create_messages(client, integr
     messages_payload = messages_response.json()["items"]
     message_types = {item["message_type"] for item in messages_payload}
     assert {"order", "inventory", "product_registration"}.issubset(message_types)
-    assert any(item["message_type"] == "order" and item["message_status"] == "В обработке" and item["message_status_color"] == "blue" for item in messages_payload)
+    assert any(item["message_type"] == "order" and item["message_status"] == "В обработке" and item["message_status_color"] == "#3b82f6" for item in messages_payload)
 
 
 def test_order_audit_payload_contains_field_and_item_changes(client, integration_db_session, integration_admin, integration_user):
