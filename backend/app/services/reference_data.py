@@ -33,24 +33,31 @@ DEFAULT_ORDER_METHODS = [
 ]
 DEFAULT_STATUSES = [
     {"status_type": "orders", "status_status": "Новый", "status_color": "orange"},
-    {"status_type": "orders", "status_status": "В обработке", "status_color": "blue"},
-    {"status_type": "orders", "status_status": "На сборку", "status_color": "blue"},
-    {"status_type": "orders", "status_status": "Собран", "status_color": "green"},
-    {"status_type": "orders", "status_status": "Выполнен", "status_color": "green"},
+    {"status_type": "orders", "status_status": "В обработке", "status_color": "#3b82f6"},
+    {"status_type": "orders", "status_status": "На сборку", "status_color": "#6366f1"},
+    {"status_type": "orders", "status_status": "Собран", "status_color": "#16a34a"},
+    {"status_type": "orders", "status_status": "Выполнен", "status_color": "#0f766e"},
     {"status_type": "orders", "status_status": "Отменен", "status_color": "red"},
+    {"status_type": "orders", "status_status": "Возврат", "status_color": "#9a8b2f"},
     {"status_type": "inventory", "status_status": "Новый", "status_color": "orange"},
     {"status_type": "inventory", "status_status": "В обработке", "status_color": "blue"},
     {"status_type": "inventory", "status_status": "Завершена", "status_color": "green"},
     {"status_type": "order_products", "status_status": "Не обработан", "status_color": "gray"},
-    {"status_type": "order_products", "status_status": "Принято на складе", "status_color": "green"},
     {"status_type": "order_products", "status_status": "Перемещение", "status_color": "blue"},
     {"status_type": "order_products", "status_status": "Заказ поставщику", "status_color": "orange"},
+    {"status_type": "order_products", "status_status": "Собрано", "status_color": "#8b5cf6"},
     {"status_type": "order_products", "status_status": "В наличии", "status_color": "green"},
     {"status_type": "order_products", "status_status": "Отгружено", "status_color": "blue"},
+    {"status_type": "order_products", "status_status": "Отменен", "status_color": "red"},
+    {"status_type": "order_products", "status_status": "Возврат", "status_color": "#9a8b2f"},
     {"status_type": "product_registration", "status_status": "Новый", "status_color": "orange"},
     {"status_type": "product_registration", "status_status": "В обработке", "status_color": "blue"},
     {"status_type": "product_registration", "status_status": "Принято на складе", "status_color": "green"},
 ]
+
+OBSOLETE_DEFAULT_STATUSES = {
+    ("order_products", "Принято на складе"),
+}
 DEFAULT_CURRENCIES = [
     {"currency_name": "USD", "currency_sign": "$"},
     {"currency_name": "RUB", "currency_sign": "₽"},
@@ -331,6 +338,12 @@ class ReferenceDataService:
                 expected_color = item.get("status_color")
                 if existing_status.status_color != expected_color:
                     self.repository.update_row(existing_status, {"status_color": expected_color})
+
+            for status_type, status_name in OBSOLETE_DEFAULT_STATUSES:
+                obsolete_status = self.repository.get_status_by_type_and_name(status_type, status_name)
+                if obsolete_status is not None:
+                    self.db.delete(obsolete_status)
+                    self.db.commit()
 
             existing_currencies = {
                 (item.currency_name or "").strip().upper(): item

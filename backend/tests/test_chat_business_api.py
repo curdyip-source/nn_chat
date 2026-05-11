@@ -38,14 +38,21 @@ def test_reference_data_products_messages_and_profile_flow(client, integration_d
     assert avito_method["order_method_sub_methods"] == ["Авито", "СДЭК", "Яндекс", "5Post", "Почта"]
     assert any(item["status_type"] == "orders" and item["status_status"] == "Новый" for item in reference_payload["statuses"])
     assert any(item["status_type"] == "orders" and item["status_status"] == "Новый" and item["status_color"] == "orange" for item in reference_payload["statuses"])
-    assert any(item["status_type"] == "orders" and item["status_status"] == "На сборку" and item["status_color"] == "blue" for item in reference_payload["statuses"])
-    assert any(item["status_type"] == "orders" and item["status_status"] == "Собран" and item["status_color"] == "green" for item in reference_payload["statuses"])
+    assert any(item["status_type"] == "orders" and item["status_status"] == "В обработке" and item["status_color"] == "#3b82f6" for item in reference_payload["statuses"])
+    assert any(item["status_type"] == "orders" and item["status_status"] == "На сборку" and item["status_color"] == "#6366f1" for item in reference_payload["statuses"])
+    assert any(item["status_type"] == "orders" and item["status_status"] == "Собран" and item["status_color"] == "#16a34a" for item in reference_payload["statuses"])
+    assert any(item["status_type"] == "orders" and item["status_status"] == "Выполнен" and item["status_color"] == "#0f766e" for item in reference_payload["statuses"])
     assert any(item["status_type"] == "orders" and item["status_status"] == "Отменен" and item["status_color"] == "red" for item in reference_payload["statuses"])
+    assert any(item["status_type"] == "orders" and item["status_status"] == "Возврат" and item["status_color"] == "#9a8b2f" for item in reference_payload["statuses"])
     assert any(item["status_type"] == "order_products" and item["status_status"] == "Не обработан" and item["status_color"] == "gray" for item in reference_payload["statuses"])
     assert any(item["status_type"] == "order_products" and item["status_status"] == "Перемещение" for item in reference_payload["statuses"])
     assert any(item["status_type"] == "order_products" and item["status_status"] == "Заказ поставщику" and item["status_color"] == "orange" for item in reference_payload["statuses"])
+    assert any(item["status_type"] == "order_products" and item["status_status"] == "Собрано" and item["status_color"] == "#8b5cf6" for item in reference_payload["statuses"])
     assert any(item["status_type"] == "order_products" and item["status_status"] == "В наличии" for item in reference_payload["statuses"])
     assert any(item["status_type"] == "order_products" and item["status_status"] == "Отгружено" for item in reference_payload["statuses"])
+    assert any(item["status_type"] == "order_products" and item["status_status"] == "Отменен" and item["status_color"] == "red" for item in reference_payload["statuses"])
+    assert any(item["status_type"] == "order_products" and item["status_status"] == "Возврат" and item["status_color"] == "#9a8b2f" for item in reference_payload["statuses"])
+    assert not any(item["status_type"] == "order_products" and item["status_status"] == "Принято на складе" for item in reference_payload["statuses"])
     assert not any(item["status_type"] == "order_products" and item["status_status"] in {"Новый", "Не новый", "В обработке", "Заказ"} for item in reference_payload["statuses"])
 
     products_response = client.get(f"{API_PREFIX}/products?search=000009", headers={"Authorization": f"Bearer {user_token}"})
@@ -226,6 +233,8 @@ def test_reference_data_restores_missing_default_statuses(client, integration_db
     assert any(item["status_type"] == "product_registration" and item["status_status"] == "Новый" for item in statuses)
     assert any(item["status_type"] == "order_products" and item["status_status"] == "Не обработан" for item in statuses)
     assert any(item["status_type"] == "order_products" and item["status_status"] == "Перемещение" for item in statuses)
+    assert any(item["status_type"] == "order_products" and item["status_status"] == "Собрано" for item in statuses)
+    assert not any(item["status_type"] == "order_products" and item["status_status"] == "Принято на складе" for item in statuses)
     assert len({(item["status_type"], item["status_status"]) for item in statuses}) == len(statuses)
 
 
