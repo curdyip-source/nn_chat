@@ -26,7 +26,7 @@ class Order(Base):
     order_method = relationship("OrderMethod", back_populates="orders")
     status = relationship("Status", back_populates="orders")
     owner = relationship("User", back_populates="orders")
-    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan", order_by="OrderItem.order_item_id")
     comments = relationship("OrderComment", back_populates="order", cascade="all, delete-orphan")
     messages = relationship("Message", back_populates="order")
 
@@ -43,6 +43,7 @@ class OrderItem(Base):
     order_item_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     order_item_status_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("statuses.status_id", ondelete="SET NULL"), nullable=True, index=True)
     order_item_supplier: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    order_item_note: Mapped[str | None] = mapped_column(String(255), nullable=True)
     order_item_source_establishment_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("establishments.establishment_id", ondelete="SET NULL"), nullable=True, index=True)
     order_item_destination_establishment_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("establishments.establishment_id", ondelete="SET NULL"), nullable=True, index=True)
     order_item_currency_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("currencies.currency_id", ondelete="SET NULL"), nullable=True, index=True)

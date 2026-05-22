@@ -14,6 +14,7 @@ class OrderItemCreatePayload(BaseModel):
     order_item_price: Decimal = Field(ge=0, decimal_places=2, max_digits=12)
     order_item_status_id: Optional[int] = Field(default=None, ge=1)
     order_item_supplier: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    order_item_note: Optional[str] = Field(default=None, max_length=255)
     order_item_source_establishment_id: Optional[int] = Field(default=None, ge=1)
     order_item_destination_establishment_id: Optional[int] = Field(default=None, ge=1)
     order_item_currency_id: Optional[int] = Field(default=None, ge=1)

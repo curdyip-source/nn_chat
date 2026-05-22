@@ -39,6 +39,7 @@ ORDER_ITEM_AUDIT_FIELDS = (
     "order_item_price",
     "order_item_status_id",
     "order_item_status",
+    "order_item_note",
     "order_item_source_establishment_id",
     "order_item_source_establishment_name",
     "order_item_destination_establishment_id",
@@ -82,6 +83,14 @@ def _build_order_audit_changes(before: dict, after: dict) -> dict:
         if before_value != after_value:
             changes[field] = {"from": before_value, "to": after_value}
     return changes
+
+
+def _normalize_order_item_note(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    normalized = " ".join(value.splitlines()).strip()
+    return normalized or None
 
 
 def _build_order_item_audit_changes(before_items: list[dict], after_items: list[dict]) -> dict:
@@ -196,6 +205,7 @@ class OrderService:
             )
             item_status = get_status_or_404(self.db, item.order_item_status_id, expected_type="order_products") if item.order_item_status_id else default_item_status
             normalized_item_supplier = item.order_item_supplier.strip() if item.order_item_supplier else None
+            normalized_item_note = _normalize_order_item_note(item.order_item_note)
             if item_status.status_status != "Заказ поставщику":
                 normalized_item_supplier = None
             source_establishment_id, destination_establishment_id = self._resolve_item_route(item_status.status_status if item_status else None, item.order_item_source_establishment_id, item.order_item_destination_establishment_id)
@@ -208,6 +218,7 @@ class OrderService:
                     "order_item_price": price,
                     "order_item_status_id": item_status.status_id,
                     "order_item_supplier": normalized_item_supplier,
+                    "order_item_note": normalized_item_note,
                     "order_item_source_establishment_id": source_establishment_id,
                     "order_item_destination_establishment_id": destination_establishment_id,
                     "order_item_currency_id": item.order_item_currency_id or default_currency.currency_id,
@@ -308,6 +319,7 @@ class OrderService:
             )
             item_status = get_status_or_404(self.db, item.order_item_status_id, expected_type="order_products") if item.order_item_status_id else default_item_status
             normalized_item_supplier = item.order_item_supplier.strip() if item.order_item_supplier else None
+            normalized_item_note = _normalize_order_item_note(item.order_item_note)
             if item_status.status_status != "Заказ поставщику":
                 normalized_item_supplier = None
             source_establishment_id, destination_establishment_id = self._resolve_item_route(item_status.status_status if item_status else None, item.order_item_source_establishment_id, item.order_item_destination_establishment_id)
@@ -320,6 +332,7 @@ class OrderService:
                     "order_item_price": price,
                     "order_item_status_id": item_status.status_id,
                     "order_item_supplier": normalized_item_supplier,
+                    "order_item_note": normalized_item_note,
                     "order_item_source_establishment_id": source_establishment_id,
                     "order_item_destination_establishment_id": destination_establishment_id,
                     "order_item_currency_id": item.order_item_currency_id or default_currency.currency_id,
