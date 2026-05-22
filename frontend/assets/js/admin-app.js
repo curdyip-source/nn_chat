@@ -30,6 +30,13 @@
             currentProductImportJobId: '',
             productImportStatus: '',
             productImportStatusType: '',
+            orderImport: {
+                rawText: '',
+                parsedRows: [],
+                loading: false,
+                status: '',
+                statusType: '',
+            },
             orderDraft: {
                 order_establishment_id: '',
                 order_method_id: '',
@@ -66,7 +73,7 @@
                 loading: false,
             },
             editing: {},
-            activeMenu: 'create-order',
+            activeMenu: 'order-create',
         };
 
         const loginView = document.getElementById('login-view');
@@ -99,7 +106,9 @@
         };
 
         const dashboardMenuItems = [
-            { id: 'create-order', title: 'Создать заказ' },
+            { id: 'order-create', title: 'Заказ' },
+            { id: 'receipts', title: 'Приемки' },
+            { id: 'inventory', title: 'Инвентаризация' },
             { id: 'orders', title: 'Все заказы' },
             { id: 'counterparties', title: 'Контрагенты' },
             { id: 'communication', title: 'Чат' },
@@ -300,6 +309,13 @@
             state.currentProductImportJobId = '';
             state.productImportStatus = '';
             state.productImportStatusType = '';
+            state.orderImport = {
+                rawText: '',
+                parsedRows: [],
+                loading: false,
+                status: '',
+                statusType: '',
+            };
             state.orderManagement = {
                 items: [],
                 pagination: { page: 1, page_size: 50, total: 0, total_pages: 0 },
@@ -327,7 +343,7 @@
             resetSingleDocumentProductSearch('inventory');
             resetSingleDocumentProductSearch('productRegistration');
             state.editing = {};
-            state.activeMenu = 'create-order';
+            state.activeMenu = 'order-create';
             localStorage.removeItem(tokenStorageKey);
             localStorage.removeItem(userStorageKey);
         }
@@ -924,6 +940,35 @@
             }).join('');
         }
 
+        function renderChoiceButtons(items, getValue, getLabel, selectedValue = '', options = {}) {
+            const { field, allowEmpty = false, emptyLabel = 'Без значения' } = options;
+            const buttons = items.map((item) => {
+                const value = String(getValue(item));
+                const isSelected = String(selectedValue) === value;
+                return `
+                    <button
+                        class="choice-button${isSelected ? ' active' : ''}"
+                        type="button"
+                        data-order-choice-field="${escapeHtml(field)}"
+                        data-order-choice-value="${escapeHtml(value)}"
+                    >${escapeHtml(getLabel(item))}</button>
+                `;
+            });
+
+            if (allowEmpty) {
+                buttons.unshift(`
+                    <button
+                        class="choice-button is-clear${!selectedValue ? ' active' : ''}"
+                        type="button"
+                        data-order-choice-field="${escapeHtml(field)}"
+                        data-order-choice-value=""
+                    >${escapeHtml(emptyLabel)}</button>
+                `);
+            }
+
+            return buttons.join('');
+        }
+
         function createOrderItemDraft() {
             return {
                 key: createDraftKey('order-item'),
@@ -1022,9 +1067,104 @@
             renderOrderManagement();
         }
 
+        function normalizeMatchValue(value) {
+            return String(value || '')
+                .toLowerCase()
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function parseImportedOrderRows(rawText) {
+            return String(rawText || '')
+                .split(/\r?\n/)
+                .map((line) => line.trim())
+                .filter(Boolean)
+                .map((line) => {
+                    const delimiter = line.includes('\t') ? '\t' : line.includes(';') ? ';' : ',';
+                    const columns = line.split(delimiter).map((item) => item.trim());
+                    const nomenclature = columns[0] || '';
+                    const quantity = columns[1] || '1';
+                    const price = columns[2] || '0.00';
+                    return { nomenclature, quantity, price };
+                })
+                .filter((row) => row.nomenclature);
+        }
+
+        async function findProductByImportedNomenclature(nomenclature) {
+            const query = String(nomenclature || '').trim();
+            if (!query) {
+                return null;
+            }
+
+            const params = new URLSearchParams({
+                search: query,
+                page: '1',
+                page_size: '8',
+                sort_by: 'product_name',
+                sort_order: 'asc',
+            });
+            const payload = await request(`/products?${params.toString()}`, { method: 'GET' });
+            const items = payload.items || [];
+            const normalizedQuery = normalizeMatchValue(query);
+
+            return items.find((item) => normalizeMatchValue(item.product_name) === normalizedQuery || normalizeMatchValue(item.product_article) === normalizedQuery)
+                || items.find((item) => normalizeMatchValue(item.product_name).includes(normalizedQuery) || normalizeMatchValue(item.product_article).includes(normalizedQuery))
+                || null;
+        }
+
+        async function importOrderRowsToDraft(rawText) {
+            const rows = parseImportedOrderRows(rawText);
+            if (!rows.length) {
+                throw new Error('Вставь строки товаров: номенклатура, количество, цена');
+            }
+
+            state.orderImport.loading = true;
+            state.orderImport.status = 'Ищем совпадения по каталогу и собираем позиции заказа...';
+            state.orderImport.statusType = '';
+            renderProductImport();
+
+            const defaultCurrencyID = String(getDefaultCurrencyID() || '');
+            const importedRows = [];
+
+            for (const row of rows) {
+                const matchedProduct = await findProductByImportedNomenclature(row.nomenclature);
+                importedRows.push({
+                    ...row,
+                    matchedProduct,
+                });
+            }
+
+            const nextItems = importedRows.map((row) => ({
+                ...createOrderItemDraft(),
+                product_id: row.matchedProduct ? String(row.matchedProduct.product_id || '') : '',
+                product_article: row.matchedProduct?.product_article || '',
+                product_name: row.matchedProduct?.product_name || row.nomenclature,
+                item_quantity: String(Number(row.quantity) > 0 ? Number(row.quantity) : 1),
+                item_price: String(row.price || '0.00').trim() || '0.00',
+                item_currency_id: defaultCurrencyID,
+                selectedProduct: row.matchedProduct || null,
+                searchQuery: row.matchedProduct ? formatProductSearchLabel(row.matchedProduct) : row.nomenclature,
+            }));
+
+            ensureOrderDraftDefaults();
+            state.orderDraft.items = nextItems.length ? nextItems : [createOrderItemDraft()];
+            state.orderImport.rawText = rawText;
+            state.orderImport.parsedRows = importedRows;
+            state.orderImport.loading = false;
+            const matchedCount = importedRows.filter((row) => row.matchedProduct).length;
+            state.orderImport.status = `Импортировано строк: ${importedRows.length}. Совпадений по каталогу: ${matchedCount}.`;
+            state.orderImport.statusType = matchedCount === importedRows.length ? 'ok' : '';
+            renderOrderCreate();
+            renderProductImport();
+        }
+
         function updateContactsSearch(value) {
             state.contactsView.search = value;
             renderContacts();
+        }
+
+        function updateOrderImportRawText(value) {
+            state.orderImport.rawText = value;
         }
 
         function updateManagedOrderEditorMeta(orderID, field, value) {
@@ -2037,19 +2177,22 @@
                 <div class="card-header">
                     <div>
                         <h3>Создание заказа</h3>
-                        <p>Один заказ может содержать несколько позиций. Поиск по каталогу помогает не держать артикулы в голове.</p>
+                        <p>Заказ теперь собирается как рабочий лист: точка, метод и статус выбираются кнопками, а товары можно добавить вручную или подтянуть через импорт.</p>
                     </div>
                     <div class="pill">${state.orders.length} orders</div>
+                </div>
+                <div class="section-banner">
+                    <p>Быстрый сценарий: сначала подтяни строки через импорт на вкладке Импорт, потом здесь проверь клиента, адрес и состав заказа.</p>
                 </div>
                 <form class="inline-form" data-document-form="order">
                     <div class="form-grid">
                         <div class="field">
                             <label>Точка</label>
-                            <select name="order_establishment_id" data-order-meta-field="order_establishment_id" required>${renderSelectOptions(state.establishments, (item) => item.establishment_id, (item) => item.establishment_name, state.orderDraft.order_establishment_id)}</select>
+                            <div class="choice-grid">${renderChoiceButtons(state.establishments, (item) => item.establishment_id, (item) => item.establishment_name, state.orderDraft.order_establishment_id, { field: 'order_establishment_id' })}</div>
                         </div>
                         <div class="field">
                             <label>Метод</label>
-                            <select name="order_method_id" data-order-meta-field="order_method_id" required>${renderSelectOptions(state.orderMethods, (item) => item.order_method_id, (item) => item.order_method_name, state.orderDraft.order_method_id)}</select>
+                            <div class="choice-grid">${renderChoiceButtons(state.orderMethods, (item) => item.order_method_id, (item) => item.order_method_name, state.orderDraft.order_method_id, { field: 'order_method_id' })}</div>
                         </div>
                         <div class="field">
                             <label>Подметод</label>
@@ -2057,7 +2200,7 @@
                         </div>
                         <div class="field">
                             <label>Статус заказа</label>
-                            <select name="order_status_id" data-order-meta-field="order_status_id"><option value="">По умолчанию</option>${renderSelectOptions(orderStatuses, (item) => item.status_id, (item) => item.status_status, state.orderDraft.order_status_id)}</select>
+                            <div class="choice-grid">${renderChoiceButtons(orderStatuses, (item) => item.status_id, (item) => item.status_status, state.orderDraft.order_status_id, { field: 'order_status_id', allowEmpty: true, emptyLabel: 'По умолчанию' })}</div>
                         </div>
                         <div class="field">
                             <label>Клиент</label>
@@ -2095,7 +2238,7 @@
                 <div class="card-header">
                     <div>
                         <h3>Инвентаризация</h3>
-                        <p>Создание инвентаризации с одной позицией прямо из web admin.</p>
+                        <p>Отдельный поток только для инвентаризации. Здесь не смешиваются приемки и заказы.</p>
                     </div>
                     <div class="pill">${state.inventories.length} inventories</div>
                 </div>
@@ -2139,7 +2282,7 @@
                 <div class="card-header">
                     <div>
                         <h3>Приемка товара</h3>
-                        <p>Создание приемки поставки с публикацией в общий чат и бизнес-ленту.</p>
+                        <p>Отдельный поток для приемок поставки, без смешивания с заказами и инвентаризацией.</p>
                     </div>
                     <div class="pill">${state.productRegistrations.length} receipts</div>
                 </div>
@@ -2183,28 +2326,66 @@
             const status = state.productImportStatus
                 ? `<div class="${statusClass.trim()}">${escapeHtml(state.productImportStatus)}</div>`
                 : '';
+            const orderImportStatusClass = state.orderImport.statusType ? ` row-subtitle ${state.orderImport.statusType}` : 'row-subtitle';
+            const orderImportStatus = state.orderImport.status
+                ? `<div class="${orderImportStatusClass.trim()}">${escapeHtml(state.orderImport.status)}</div>`
+                : '';
+            const importPreview = state.orderImport.parsedRows.length ? `
+                <div class="import-preview">
+                    ${state.orderImport.parsedRows.map((row) => `
+                        <div class="import-preview-row ${row.matchedProduct ? 'matched' : 'missing'}">
+                            <strong>${escapeHtml(row.nomenclature)}</strong>
+                            <div class="import-preview-meta">Количество: ${escapeHtml(row.quantity)} • Цена: ${escapeHtml(row.price)}</div>
+                            <div class="import-preview-meta">${row.matchedProduct ? `Совпадение: ${escapeHtml(formatProductSearchLabel(row.matchedProduct))}` : 'Совпадение в каталоге не найдено, строка попадет как ручная позиция.'}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : '<div class="empty">Пока нет импортированных строк заказа</div>';
 
             cards.productImport.innerHTML = `
                 <div class="card-header">
                     <div>
-                        <h3>Импорт товаров из XLSX</h3>
-                        <p>Загрузи прайс в формате Excel. Будут обработаны только строки, где заполнена колонка A.</p>
+                        <h3>Импорт</h3>
+                        <p>Одна зона для каталога, вторая для быстрой сборки заказа из таблицы товаров с ценой.</p>
                     </div>
                     <div class="pill">${state.productsTotal} products</div>
                 </div>
-                <form class="inline-form" data-product-import-form="true">
-                    <div class="form-grid single">
-                        <div class="field">
-                            <label>Файл Excel (.xlsx)</label>
-                            <input name="file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required ${state.isProductImportRunning ? 'disabled' : ''}>
+                <div class="split-panels">
+                    <form class="inline-form import-panel" data-product-import-form="true">
+                        <div>
+                            <h4>Импорт каталога из XLSX</h4>
+                            <p>Загрузи прайс в формате Excel. Будут обработаны только строки, где заполнена колонка A.</p>
                         </div>
-                    </div>
-                    <div class="row-actions">
-                        <button class="button" type="submit" ${state.isProductImportRunning ? 'disabled' : ''}>${state.isProductImportRunning ? 'Идёт импорт...' : 'Импортировать товары'}</button>
-                    </div>
-                    ${status}
-                    ${summary}
-                </form>
+                        <div class="form-grid single">
+                            <div class="field">
+                                <label>Файл Excel (.xlsx)</label>
+                                <input name="file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required ${state.isProductImportRunning ? 'disabled' : ''}>
+                            </div>
+                        </div>
+                        <div class="row-actions">
+                            <button class="button" type="submit" ${state.isProductImportRunning ? 'disabled' : ''}>${state.isProductImportRunning ? 'Идёт импорт...' : 'Импортировать товары'}</button>
+                        </div>
+                        ${status}
+                        ${summary}
+                    </form>
+                    <form class="inline-form import-panel" data-order-import-form="true">
+                        <div>
+                            <h4>Импорт строк заказа</h4>
+                            <p>Вставь таблицу строками: номенклатура, количество, цена. Поддерживаются табы, `;` и запятые. Найденные совпадения попадут в новый заказ.</p>
+                        </div>
+                        <div class="form-grid single">
+                            <div class="field">
+                                <label>Таблица товаров</label>
+                                <textarea name="order_import_text" data-order-import-raw="true" placeholder="Куртка синяя	2	3990\nАртикул-123	1	1490">${escapeHtml(state.orderImport.rawText)}</textarea>
+                            </div>
+                        </div>
+                        <div class="row-actions">
+                            <button class="button" type="submit" ${state.orderImport.loading ? 'disabled' : ''}>${state.orderImport.loading ? 'Ищем совпадения...' : 'Добавить в заказ'}</button>
+                        </div>
+                        ${orderImportStatus}
+                        ${importPreview}
+                    </form>
+                </div>
             `;
         }
 
@@ -2553,57 +2734,34 @@
         }
 
         function renderStatuses() {
+            const groupedStatuses = state.statuses.reduce((accumulator, item) => {
+                const key = item.status_type || 'unknown';
+                if (!accumulator[key]) {
+                    accumulator[key] = [];
+                }
+                accumulator[key].push(item);
+                return accumulator;
+            }, {});
+
             cards.statuses.innerHTML = `
                 <div class="card-header">
                     <div>
                         <h3>Статусы</h3>
-                        <p>Редактирование статусов для orders, inventory и product_registration.</p>
+                        <p>Статусы только читаются из базы. Добавление из админки отключено, чтобы клиент не ловил неконсистентные записи.</p>
                     </div>
                 </div>
-                <form class="inline-form" data-create-form="statuses">
-                    <div class="form-grid">
-                        <div class="field"><label>Тип</label><input name="status_type" placeholder="orders" required></div>
-                        <div class="field"><label>Статус</label><input name="status_status" placeholder="Новый" required></div>
-                        <div class="field"><label>Цвет</label><input name="status_color" placeholder="1"></div>
-                    </div>
-                    <button class="button" type="submit">Добавить статус</button>
-                </form>
-                <div class="list">
-                    ${state.statuses.length ? state.statuses.map((item) => renderStatusRow(item)).join('') : '<div class="empty">Список пуст</div>'}
-                </div>
-            `;
-        }
-
-        function renderStatusRow(item) {
-            const key = `statuses:${item.status_id}`;
-            const editing = state.editing[key];
-            if (editing) {
-                return `
-                    <form class="row inline-form" data-edit-form="statuses" data-id="${item.status_id}">
-                        <div class="form-grid">
-                            <div class="field"><label>Тип</label><input name="status_type" value="${escapeHtml(editing.status_type)}" required></div>
-                            <div class="field"><label>Статус</label><input name="status_status" value="${escapeHtml(editing.status_status)}" required></div>
-                            <div class="field"><label>Цвет</label><input name="status_color" value="${escapeHtml(editing.status_color || '')}"></div>
+                <div class="status-groups">
+                    ${Object.keys(groupedStatuses).length ? Object.entries(groupedStatuses).map(([type, items]) => `
+                        <div class="status-group">
+                            <div>
+                                <h4>${escapeHtml(type)}</h4>
+                                <p>${escapeHtml(items.length)} статусов доступны из БД</p>
+                            </div>
+                            <div class="status-chip-list">
+                                ${items.map((item) => `<span class="status-chip">${escapeHtml(item.status_status)}${item.status_color ? ` • ${escapeHtml(item.status_color)}` : ''}</span>`).join('')}
+                            </div>
                         </div>
-                        <div class="row-actions">
-                            <button class="button" type="submit">Сохранить</button>
-                            <button class="ghost-button" type="button" data-cancel-edit="statuses" data-id="${item.status_id}">Отмена</button>
-                        </div>
-                    </form>
-                `;
-            }
-
-            return `
-                <div class="row">
-                    <div class="row-top">
-                        <div>
-                            <div class="row-title">${escapeHtml(item.status_status)}</div>
-                            <div class="row-subtitle">type: ${escapeHtml(item.status_type)}${item.status_color ? `, color: ${escapeHtml(item.status_color)}` : ''}</div>
-                        </div>
-                        <div class="row-actions">
-                            <button class="ghost-button" type="button" data-edit="statuses" data-id="${item.status_id}">Изменить</button>
-                        </div>
-                    </div>
+                    `).join('') : '<div class="empty">Список пуст</div>'}
                 </div>
             `;
         }
@@ -2858,6 +3016,24 @@
                 return;
             }
 
+            if (event.target.dataset.orderImportForm) {
+                event.preventDefault();
+                setMessage(dashboardMessage, 'Импортируем строки заказа...');
+
+                try {
+                    const formData = new FormData(event.target);
+                    await importOrderRowsToDraft(formData.get('order_import_text'));
+                    setMessage(dashboardMessage, 'Строки перенесены в создание заказа. Проверь реквизиты и отправляй заказ.', 'ok');
+                } catch (error) {
+                    state.orderImport.loading = false;
+                    state.orderImport.status = error.message;
+                    state.orderImport.statusType = 'error';
+                    renderProductImport();
+                    setMessage(dashboardMessage, error.message, 'error');
+                }
+                return;
+            }
+
             if (event.target.dataset.sendMessageForm) {
                 event.preventDefault();
                 setMessage(dashboardMessage, 'Отправляем тестовое сообщение...');
@@ -2949,6 +3125,7 @@
             const orderRemoveItemButton = event.target.closest('[data-order-remove-item]');
             const orderItemSelectButton = event.target.closest('[data-order-item-select-product]');
             const orderItemClearButton = event.target.closest('[data-order-item-clear-product]');
+            const orderChoiceButton = event.target.closest('[data-order-choice-field]');
             const singleProductSelectButton = event.target.closest('[data-single-product-select]');
             const singleProductClearButton = event.target.closest('[data-single-product-clear]');
             const auditRefreshButton = event.target.closest('[data-audit-refresh]');
@@ -2985,6 +3162,12 @@
 
             if (orderItemClearButton) {
                 clearOrderItemProduct(orderItemClearButton.dataset.orderItemClearProduct, true);
+                return;
+            }
+
+            if (orderChoiceButton) {
+                updateOrderDraftMeta(orderChoiceButton.dataset.orderChoiceField, orderChoiceButton.dataset.orderChoiceValue);
+                renderOrderCreate();
                 return;
             }
 
@@ -3117,6 +3300,12 @@
             const orderMetaField = event.target.closest('[data-order-meta-field]');
             if (orderMetaField) {
                 updateOrderDraftMeta(orderMetaField.dataset.orderMetaField, orderMetaField.value);
+                return;
+            }
+
+            const orderImportRaw = event.target.closest('[data-order-import-raw]');
+            if (orderImportRaw) {
+                updateOrderImportRawText(orderImportRaw.value);
                 return;
             }
 
