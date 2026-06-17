@@ -930,3 +930,107 @@ def test_message_create_sends_mention_push_to_active_mentioned_users(client, int
     assert captured["recipient_user_ids"] == [manager.user_id]
     assert captured["context"] == "chat"
     assert "Worker" in captured["sender_name"]
+
+
+def test_order_update_sends_push_when_items_added_or_removed(client, integration_db_session, integration_user, monkeypatch):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    user_token = login(client, "worker", "WorkerPass123")["token"]
+
+    reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
+    establishment_id = reference_payload["establishments"][0]["establishment_id"]
+    order_method_id = next(item for item in reference_payload["order_methods"] if item["order_method_name"] == "Самовывоз")["order_method_id"]
+
+    def item(article, name):
+        return {"product_article": article, "product_name": name, "order_item_quantity": 1, "order_item_price": "10.00"}
+
+    create_response = client.post(
+        f"{API_PREFIX}/orders",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_customer": "Марина",
+            "order_info": "Лена",
+            "items": [item("CHG-1", "First")],
+        },
+    )
+    assert create_response.status_code == 201
+    order = create_response.json()["item"]
+
+    captured = []
+    monkeypatch.setattr(
+        "app.services.orders.send_order_change_push_event",
+        lambda db, **kwargs: captured.append(kwargs) or 1,
+    )
+
+    base_update = {
+        "order_establishment_id": establishment_id,
+        "order_method_id": order_method_id,
+        "order_customer": "Марина",
+        "order_info": "Лена",
+        "order_status_id": order["order_status_id"],
+    }
+
+    add_response = client.put(
+        f"{API_PREFIX}/orders/{order['order_id']}",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={**base_update, "items": [item("CHG-1", "First"), item("CHG-2", "Second")]},
+    )
+    assert add_response.status_code == 200
+    assert captured[-1]["added_count"] == 1
+    assert captured[-1]["removed_count"] == 0
+
+    remove_response = client.put(
+        f"{API_PREFIX}/orders/{order['order_id']}",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={**base_update, "items": [item("CHG-1", "First")]},
+    )
+    assert remove_response.status_code == 200
+    assert captured[-1]["added_count"] == 0
+    assert captured[-1]["removed_count"] == 1
+
+
+def test_order_update_does_not_push_when_items_unchanged(client, integration_db_session, integration_user, monkeypatch):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    user_token = login(client, "worker", "WorkerPass123")["token"]
+
+    reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
+    establishment_id = reference_payload["establishments"][0]["establishment_id"]
+    order_method_id = next(item for item in reference_payload["order_methods"] if item["order_method_name"] == "Самовывоз")["order_method_id"]
+
+    create_response = client.post(
+        f"{API_PREFIX}/orders",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_customer": "Марина",
+            "order_info": "Лена",
+            "items": [{"product_article": "UNCH-1", "product_name": "Item", "order_item_quantity": 1, "order_item_price": "10.00"}],
+        },
+    )
+    assert create_response.status_code == 201
+    order = create_response.json()["item"]
+
+    captured = []
+    monkeypatch.setattr(
+        "app.services.orders.send_order_change_push_event",
+        lambda db, **kwargs: captured.append(kwargs) or 1,
+    )
+
+    update_response = client.put(
+        f"{API_PREFIX}/orders/{order['order_id']}",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_customer": "Марина Новая",
+            "order_info": "Лена",
+            "order_status_id": order["order_status_id"],
+            "items": [{"product_article": "UNCH-1", "product_name": "Item", "order_item_quantity": 5, "order_item_price": "20.00"}],
+        },
+    )
+    assert update_response.status_code == 200
+    assert captured == []

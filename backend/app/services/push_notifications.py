@@ -79,6 +79,42 @@ def send_mention_push_event(
     return _dispatch_to_devices(db, devices=targets, title=title, body=body, event_type=event_type, entity_id=entity_id)
 
 
+def send_order_change_push_event(
+    db: Session,
+    *,
+    excluded_user_id: int,
+    sender_name: str,
+    order_id: int,
+    added_count: int,
+    removed_count: int,
+) -> int:
+    if not APNS_ENABLED:
+        logger.info(
+            "push.order_change.skipped_disabled",
+            extra={"event_type": "push.order_change.skipped_disabled", "order_id": order_id},
+        )
+        return 0
+
+    targets = UserDeviceRepository(db).list_active_for_other_users(excluded_user_id=excluded_user_id)
+    if not targets:
+        logger.info(
+            "push.order_change.skipped_no_targets",
+            extra={"event_type": "push.order_change.skipped_no_targets", "order_id": order_id},
+        )
+        return 0
+
+    normalized_sender_name = sender_name.strip() or "Пользователь"
+    title = "Заказ изменён"
+    parts: list[str] = []
+    if added_count > 0:
+        parts.append("добавлен товар" if added_count == 1 else f"добавлено товаров: {added_count}")
+    if removed_count > 0:
+        parts.append("удалён товар" if removed_count == 1 else f"удалено товаров: {removed_count}")
+    detail = ", ".join(parts) if parts else "изменён состав"
+    body = f"{normalized_sender_name} изменил заказ №{order_id}: {detail}"
+    return _dispatch_to_devices(db, devices=targets, title=title, body=body, event_type="order_updated", entity_id=order_id)
+
+
 def _dispatch_to_devices(db: Session, *, devices, title: str, body: str, event_type: str, entity_id: int) -> int:
     token = build_apns_provider_token()
     endpoint_base = "https://api.sandbox.push.apple.com" if APNS_USE_SANDBOX else "https://api.push.apple.com"

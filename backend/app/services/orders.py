@@ -1,4 +1,5 @@
 import logging
+from collections import Counter
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -13,7 +14,7 @@ from app.services.contacts import save_buyer_contact_from_order, save_supplier_c
 from app.services.audit import log_audit_event
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.messages import resolve_mention_recipient_ids
-from app.services.push_notifications import send_mention_push_event, send_push_notification_event
+from app.services.push_notifications import send_mention_push_event, send_order_change_push_event, send_push_notification_event
 from app.services.serializers import serialize_order, serialize_order_comment
 
 
@@ -32,6 +33,23 @@ def _normalize_order_contact_method(value: str | None) -> str | None:
     if normalized not in ALLOWED_ORDER_CONTACT_METHODS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Передан неизвестный способ связи")
     return normalized
+
+
+def _order_item_identity(item: dict) -> str:
+    product_id = item.get("order_item_product_id")
+    if product_id is not None:
+        return f"p:{product_id}"
+    name = (item.get("order_item_name") or "").strip().lower()
+    article = (item.get("order_item_article") or "").strip().lower()
+    return f"n:{name}|{article}"
+
+
+def _count_order_item_changes(before_items: list[dict], after_items: list[dict]) -> tuple[int, int]:
+    before_counts = Counter(_order_item_identity(item) for item in before_items)
+    after_counts = Counter(_order_item_identity(item) for item in after_items)
+    added_count = sum((after_counts - before_counts).values())
+    removed_count = sum((before_counts - after_counts).values())
+    return added_count, removed_count
 
 
 ORDER_AUDIT_FIELDS = (
@@ -379,6 +397,28 @@ class OrderService:
             event_type=EVENT_TYPE_ORDER_UPDATE,
             event_payload=_build_order_update_audit_payload(before_snapshot, serialize_order(row)),
         )
+
+        added_count, removed_count = _count_order_item_changes(before_snapshot.get("items", []), items)
+        if added_count or removed_count:
+            try:
+                send_order_change_push_event(
+                    self.db,
+                    excluded_user_id=current_user["user_id"],
+                    sender_name=f"{current_user['user_second_name']} {current_user['user_first_name']}".strip() or current_user["user_login"],
+                    order_id=row.order_id,
+                    added_count=added_count,
+                    removed_count=removed_count,
+                )
+            except Exception:
+                logger.exception(
+                    "push.order_change_dispatch_failed",
+                    extra={
+                        "event_type": "push.order_change_dispatch_failed",
+                        "order_id": row.order_id,
+                        "user_id": current_user["user_id"],
+                    },
+                )
+
         return serialize_order(row)
 
     def update_order_status(self, order_id: int, payload: OrderStatusUpdatePayload, current_user: dict) -> dict:
