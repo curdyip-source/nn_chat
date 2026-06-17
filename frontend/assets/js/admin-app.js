@@ -1,6 +1,7 @@
         const apiBasePath = '/api/v1';
         const tokenStorageKey = 'admin.accessToken';
         const userStorageKey = 'admin.user';
+        const ORDER_CONTACT_METHODS = ['WA', 'TG', 'AV', 'IG', 'SMS', 'MX'];
 
         const state = {
             accessToken: localStorage.getItem(tokenStorageKey) || '',
@@ -41,6 +42,7 @@
                 order_establishment_id: '',
                 order_method_id: '',
                 order_sub_method: '',
+                order_contact_method: '',
                 order_customer: '',
                 message_text: '',
                 order_info: '',
@@ -1036,6 +1038,7 @@
                 order_establishment_id: String(order.order_establishment_id || state.establishments[0]?.establishment_id || ''),
                 order_method_id: String(order.order_method_id || state.orderMethods[0]?.order_method_id || ''),
                 order_sub_method: order.order_sub_method || '',
+                order_contact_method: order.order_contact_method || '',
                 order_customer: order.order_customer || '',
                 order_info: order.order_info || '',
                 order_status_id: String(order.order_status_id || orderStatuses[0]?.status_id || ''),
@@ -1326,6 +1329,7 @@
                 order_establishment_id: Number(editor.order_establishment_id),
                 order_method_id: Number(editor.order_method_id),
                 order_sub_method: String(editor.order_sub_method || '').trim() || null,
+                order_contact_method: String(editor.order_contact_method || '').trim() || null,
                 order_customer: String(editor.order_customer || '').trim(),
                 order_info: String(editor.order_info || '').trim(),
                 order_status_id: Number(editor.order_status_id),
@@ -1414,6 +1418,7 @@
                         <div class="field"><label>Точка</label><select data-managed-order-meta="order_establishment_id" data-order-id="${escapeHtml(orderID)}">${renderSelectOptions(state.establishments, (item) => item.establishment_id, (item) => item.establishment_name, editor.order_establishment_id)}</select></div>
                         <div class="field"><label>Метод</label><select data-managed-order-meta="order_method_id" data-order-id="${escapeHtml(orderID)}">${renderSelectOptions(state.orderMethods, (item) => item.order_method_id, (item) => item.order_method_name, editor.order_method_id)}</select></div>
                         <div class="field"><label>Подметод</label><input data-managed-order-meta="order_sub_method" data-order-id="${escapeHtml(orderID)}" value="${escapeHtml(editor.order_sub_method)}"></div>
+                        <div class="field"><label>Способ связи</label><select data-managed-order-meta="order_contact_method" data-order-id="${escapeHtml(orderID)}"><option value=""${editor.order_contact_method ? '' : ' selected'}>Не указан</option>${renderSelectOptions(ORDER_CONTACT_METHODS, (item) => item, (item) => item, editor.order_contact_method)}</select></div>
                         <div class="field"><label>Статус заказа</label><select data-managed-order-meta="order_status_id" data-order-id="${escapeHtml(orderID)}">${renderSelectOptions(orderStatuses, (item) => item.status_id, (item) => item.status_status, editor.order_status_id)}</select></div>
                         <div class="field"><label>Покупатель</label><input data-managed-order-meta="order_customer" data-order-id="${escapeHtml(orderID)}" value="${escapeHtml(editor.order_customer)}"></div>
                         <div class="field field-wide"><label>Информация / адрес</label><input data-managed-order-meta="order_info" data-order-id="${escapeHtml(orderID)}" value="${escapeHtml(editor.order_info)}"></div>
@@ -1450,6 +1455,9 @@
                         </div>
                     </td>
                     <td>
+                        ${order.order_contact_method ? `<span class="pill">${escapeHtml(order.order_contact_method)}</span>` : '<div class="table-subtitle">—</div>'}
+                    </td>
+                    <td>
                         <div class="table-cell-stack">
                             <div class="table-title">${escapeHtml(order.order_customer || 'Без покупателя')}</div>
                             <div class="table-subtitle">${escapeHtml(order.order_info || 'Без адреса')}</div>
@@ -1474,7 +1482,7 @@
                         </div>
                     </td>
                 </tr>
-                ${isExpanded ? `<tr class="orders-editor-row"><td colspan="7">${renderManagedOrderEditor(order.order_id)}</td></tr>` : ''}
+                ${isExpanded ? `<tr class="orders-editor-row"><td colspan="8">${renderManagedOrderEditor(order.order_id)}</td></tr>` : ''}
             `;
         }
 
@@ -1503,6 +1511,7 @@
                             <tr>
                                 <th>ID</th>
                                 <th>Точка / метод</th>
+                                <th>Связь</th>
                                 <th>Покупатель</th>
                                 <th>Позиции</th>
                                 <th>Статус</th>
@@ -1511,8 +1520,8 @@
                             </tr>
                         </thead>
                         <tbody>
-                            ${state.orderManagement.loading && !state.orderManagement.items.length ? '<tr><td colspan="7"><div class="empty">Загружаем заказы...</div></td></tr>' : ''}
-                            ${!state.orderManagement.loading && !items.length ? '<tr><td colspan="7"><div class="empty">На этой странице нет заказов под выбранные фильтры</div></td></tr>' : ''}
+                            ${state.orderManagement.loading && !state.orderManagement.items.length ? '<tr><td colspan="8"><div class="empty">Загружаем заказы...</div></td></tr>' : ''}
+                            ${!state.orderManagement.loading && !items.length ? '<tr><td colspan="8"><div class="empty">На этой странице нет заказов под выбранные фильтры</div></td></tr>' : ''}
                             ${items.map((order) => renderManagedOrderRow(order)).join('')}
                         </tbody>
                     </table>
@@ -1608,6 +1617,7 @@
                 order_establishment_id: '',
                 order_method_id: '',
                 order_sub_method: '',
+                order_contact_method: '',
                 order_customer: '',
                 message_text: '',
                 order_info: '',
@@ -2197,6 +2207,10 @@
                         <div class="field">
                             <label>Подметод</label>
                             <input name="order_sub_method" data-order-meta-field="order_sub_method" value="${escapeHtml(state.orderDraft.order_sub_method)}" placeholder="Авито / СДЭК / Яндекс">
+                        </div>
+                        <div class="field">
+                            <label>Способ связи</label>
+                            <div class="choice-grid">${renderChoiceButtons(ORDER_CONTACT_METHODS, (item) => item, (item) => item, state.orderDraft.order_contact_method, { field: 'order_contact_method', allowEmpty: true, emptyLabel: 'Не указан' })}</div>
                         </div>
                         <div class="field">
                             <label>Статус заказа</label>
@@ -2869,6 +2883,7 @@
                         order_establishment_id: Number(state.orderDraft.order_establishment_id),
                         order_method_id: Number(state.orderDraft.order_method_id),
                         order_sub_method: state.orderDraft.order_sub_method.trim() || null,
+                        order_contact_method: state.orderDraft.order_contact_method.trim() || null,
                         order_customer: state.orderDraft.order_customer.trim(),
                         order_info: state.orderDraft.order_info.trim(),
                         order_status_id: state.orderDraft.order_status_id ? Number(state.orderDraft.order_status_id) : null,

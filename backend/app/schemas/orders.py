@@ -26,6 +26,7 @@ class OrderCreatePayload(BaseModel):
     order_establishment_id: int = Field(ge=1)
     order_method_id: int = Field(ge=1)
     order_sub_method: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    order_contact_method: Optional[str] = Field(default=None, min_length=1, max_length=50)
     order_customer: str = Field(min_length=1, max_length=255)
     order_info: str = Field(default="", max_length=4000)
     save_contact: bool = False
@@ -42,6 +43,7 @@ class OrderUpdatePayload(BaseModel):
     order_establishment_id: int = Field(ge=1)
     order_method_id: int = Field(ge=1)
     order_sub_method: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    order_contact_method: Optional[str] = Field(default=None, min_length=1, max_length=50)
     order_customer: str = Field(min_length=1, max_length=255)
     order_info: str = Field(default="", max_length=4000)
     order_status_id: int = Field(ge=1)
@@ -51,6 +53,7 @@ class OrderUpdatePayload(BaseModel):
 class OrderCommentCreatePayload(BaseModel):
     order_comment_text: Optional[str] = Field(default=None, max_length=4000)
     attachments: list[MessageAttachmentCreatePayload] = Field(default_factory=list)
+    mentioned_user_ids: list[int] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
     def validate_comment(self):

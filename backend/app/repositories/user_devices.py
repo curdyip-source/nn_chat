@@ -38,3 +38,12 @@ class UserDeviceRepository:
             .filter(UserDevice.user_device_is_active.is_(True), UserDevice.user_device_user_id != excluded_user_id)
             .all()
         )
+
+    def list_active_for_users(self, *, user_ids: list[int]) -> list[UserDevice]:
+        if not user_ids:
+            return []
+        return (
+            self.db.query(UserDevice)
+            .filter(UserDevice.user_device_is_active.is_(True), UserDevice.user_device_user_id.in_(user_ids))
+            .all()
+        )

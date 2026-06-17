@@ -20,6 +20,23 @@ class UserRepository:
     def get_by_id(self, user_id: int) -> User | None:
         return self.db.query(User).filter(User.user_id == user_id).first()
 
+    def list_active(self) -> list[User]:
+        return (
+            self.db.query(User)
+            .filter(User.user_active.is_(True))
+            .order_by(asc(User.user_second_name), asc(User.user_first_name), asc(User.user_id))
+            .all()
+        )
+
+    def list_active_by_ids(self, user_ids: list[int]) -> list[User]:
+        if not user_ids:
+            return []
+        return (
+            self.db.query(User)
+            .filter(User.user_active.is_(True), User.user_id.in_(user_ids))
+            .all()
+        )
+
     def list(self, *, search: str | None = None, admin_only: bool | None = None, page: int = 1, page_size: int = 10, sort_by: str = "user_id", sort_order: str = "asc") -> tuple[list[User], int]:
         query = self.db.query(User)
 

@@ -23,7 +23,7 @@ from app.schemas.common import build_pagination, model_to_dict
 from app.schemas.users import UserCreatePayload, UserProfileUpdatePayload, UserUpdatePayload
 from app.services.audit import log_audit_event
 from app.services.profile_photos import build_profile_photo_storage_key
-from app.services.serializers import serialize_datetime, serialize_user
+from app.services.serializers import serialize_chat_participant, serialize_datetime, serialize_user
 
 
 class UserService:
@@ -52,6 +52,10 @@ class UserService:
                 "sort_order": sort_order,
             },
         }
+
+    def list_chat_participants(self) -> dict:
+        rows = self.repository.list_active()
+        return {"items": [serialize_chat_participant(row) for row in rows]}
 
     def get_user_by_login(self, user_login: str):
         return self.repository.get_by_login(user_login)
@@ -234,6 +238,10 @@ def get_setup_status(db: Session) -> dict:
 
 def list_users(db: Session, *, search: str | None = None, admin_only: bool | None = None, page: int = 1, page_size: int = 10, sort_by: str = "user_id", sort_order: str = "asc") -> dict:
     return UserService(db).list_users(search=search, admin_only=admin_only, page=page, page_size=page_size, sort_by=sort_by, sort_order=sort_order)
+
+
+def list_chat_participants(db: Session) -> dict:
+    return UserService(db).list_chat_participants()
 
 
 def get_user_by_login(db: Session, user_login: str):
