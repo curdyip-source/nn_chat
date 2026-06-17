@@ -304,6 +304,74 @@ def test_order_create_succeeds_when_push_dispatch_fails(client, integration_db_s
     assert any(item["message_type"] == "order" and item["message_order_id"] == order_payload["order_id"] for item in messages_response.json()["items"])
 
 
+def test_order_create_allows_method_with_submethods_without_submethod(client, integration_db_session, integration_user):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    user_token = login(client, "worker", "WorkerPass123")["token"]
+
+    reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
+    establishment_id = reference_payload["establishments"][0]["establishment_id"]
+    avito_method = next(item for item in reference_payload["order_methods"] if item["order_method_name"] == "Авито")
+    assert avito_method["order_method_sub_methods"]
+
+    create_order_response = client.post(
+        f"{API_PREFIX}/orders",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": avito_method["order_method_id"],
+            "order_contact_method": "WA",
+            "order_customer": "Марина",
+            "order_info": "Лена",
+            "items": [
+                {
+                    "product_article": "TEST-CONTACT-001",
+                    "product_name": "Test Product",
+                    "order_item_quantity": 1,
+                    "order_item_price": "10.00",
+                }
+            ],
+        },
+    )
+
+    assert create_order_response.status_code == 201
+    order_payload = create_order_response.json()["item"]
+    assert order_payload["order_sub_method"] is None
+    assert order_payload["order_contact_method"] == "WA"
+
+
+def test_order_create_rejects_unknown_contact_method(client, integration_db_session, integration_user):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    user_token = login(client, "worker", "WorkerPass123")["token"]
+
+    reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
+    establishment_id = reference_payload["establishments"][0]["establishment_id"]
+    order_method_id = reference_payload["order_methods"][0]["order_method_id"]
+
+    create_order_response = client.post(
+        f"{API_PREFIX}/orders",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_contact_method": "ZZ",
+            "order_customer": "Марина",
+            "order_info": "Лена",
+            "items": [
+                {
+                    "product_article": "TEST-CONTACT-002",
+                    "product_name": "Test Product",
+                    "order_item_quantity": 1,
+                    "order_item_price": "10.00",
+                }
+            ],
+        },
+    )
+
+    assert create_order_response.status_code == 400
+
+
 def test_order_inventory_and_product_registration_create_messages(client, integration_db_session, integration_admin, integration_user):
     integration_admin.user_password = hash_password("AdminPass123")
     integration_user.user_password = hash_password("WorkerPass123")
@@ -793,3 +861,72 @@ def test_admin_can_import_products_from_xlsx(client, integration_db_session, int
     updated_product = next(item for item in updated_response.json()["items"] if item["product_article"] == "EXIST-1")
     assert updated_product["product_name"] == "New Name"
     assert updated_product["product_cost_usd"] == "8.50"
+
+def _add_user(db_session, *, login, first_name, second_name, active=True, password="WorkerPass123"):
+    user = User(
+        user_login=login,
+        user_password=hash_password(password),
+        user_admin=False,
+        user_active=active,
+        user_first_name=first_name,
+        user_second_name=second_name,
+        user_age=30,
+        user_address="Somewhere",
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+def test_chat_participants_returns_active_users_for_non_admin(client, integration_db_session, integration_user):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    manager = _add_user(integration_db_session, login="manager", first_name="Stanislav", second_name="Kirillov")
+    _add_user(integration_db_session, login="ghost", first_name="In", second_name="Active", active=False)
+
+    user_token = login(client, "worker", "WorkerPass123")["token"]
+    response = client.get(f"{API_PREFIX}/users/participants", headers={"Authorization": f"Bearer {user_token}"})
+
+    assert response.status_code == 200
+    logins = {item["user_login"] for item in response.json()["items"]}
+    assert "worker" in logins
+    assert "manager" in logins
+    assert "ghost" not in logins
+    manager_item = next(item for item in response.json()["items"] if item["user_login"] == "manager")
+    assert manager_item["user_first_name"] == "Stanislav"
+    assert manager_item["user_second_name"] == "Kirillov"
+    assert "user_id" in manager_item
+
+
+def test_message_create_sends_mention_push_to_active_mentioned_users(client, integration_db_session, integration_user, monkeypatch):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    manager = _add_user(integration_db_session, login="manager", first_name="Stanislav", second_name="Kirillov")
+    ghost = _add_user(integration_db_session, login="ghost", first_name="In", second_name="Active", active=False)
+
+    captured = {}
+
+    def fake_mention_push(db, *, recipient_user_ids, sender_name, context, entity_id):
+        captured["recipient_user_ids"] = recipient_user_ids
+        captured["context"] = context
+        captured["sender_name"] = sender_name
+        return len(recipient_user_ids)
+
+    monkeypatch.setattr("app.services.messages.send_mention_push_event", fake_mention_push)
+
+    user_token = login(client, "worker", "WorkerPass123")["token"]
+    response = client.post(
+        f"{API_PREFIX}/messages",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "message_type": "message",
+            "message_text": "@Kirillov Stanislav привет",
+            "mentioned_user_ids": [manager.user_id, ghost.user_id, integration_user.user_id],
+        },
+    )
+
+    assert response.status_code == 201
+    assert captured["recipient_user_ids"] == [manager.user_id]
+    assert captured["context"] == "chat"
+    assert "Worker" in captured["sender_name"]

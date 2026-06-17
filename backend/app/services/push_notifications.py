@@ -46,12 +46,46 @@ def send_push_notification_event(
         return 0
 
     title, body = build_notification_content(message_type=message_type, sender_name=sender_name, message_text=message_text)
+    return _dispatch_to_devices(db, devices=targets, title=title, body=body, event_type=message_type, entity_id=entity_id)
+
+
+def send_mention_push_event(
+    db: Session,
+    *,
+    recipient_user_ids: list[int],
+    sender_name: str,
+    context: str,
+    entity_id: int,
+) -> int:
+    if not APNS_ENABLED:
+        logger.info(
+            "push.mention.skipped_disabled",
+            extra={"event_type": "push.mention.skipped_disabled", "context": context, "entity_id": entity_id},
+        )
+        return 0
+
+    targets = UserDeviceRepository(db).list_active_for_users(user_ids=recipient_user_ids)
+    if not targets:
+        logger.info(
+            "push.mention.skipped_no_targets",
+            extra={"event_type": "push.mention.skipped_no_targets", "context": context, "entity_id": entity_id},
+        )
+        return 0
+
+    normalized_sender_name = sender_name.strip() or "Пользователь"
+    title = "Упоминание"
+    body = f"{normalized_sender_name} вас отметил в чате"
+    event_type = "mention_chat" if context == "chat" else "mention_order"
+    return _dispatch_to_devices(db, devices=targets, title=title, body=body, event_type=event_type, entity_id=entity_id)
+
+
+def _dispatch_to_devices(db: Session, *, devices, title: str, body: str, event_type: str, entity_id: int) -> int:
     token = build_apns_provider_token()
     endpoint_base = "https://api.sandbox.push.apple.com" if APNS_USE_SANDBOX else "https://api.push.apple.com"
     sent_count = 0
 
     with httpx.Client(http2=True, timeout=10.0) as client:
-        for device in targets:
+        for device in devices:
             response = client.post(
                 f"{endpoint_base}/3/device/{device.user_device_token}",
                 headers={
@@ -68,7 +102,7 @@ def send_push_notification_event(
                         },
                         "sound": "default",
                     },
-                    "event_type": message_type,
+                    "event_type": event_type,
                     "entity_id": entity_id,
                 },
             )
@@ -94,9 +128,9 @@ def send_push_notification_event(
         "push.sent_summary",
         extra={
             "event_type": "push.sent_summary",
-            "message_type": message_type,
+            "notification_event_type": event_type,
             "entity_id": entity_id,
-            "target_count": len(targets),
+            "target_count": len(devices),
             "sent_count": sent_count,
         },
     )

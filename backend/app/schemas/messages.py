@@ -15,6 +15,7 @@ class MessageCreatePayload(BaseModel):
     message_type: Literal["message", "file"]
     message_text: Optional[str] = Field(default=None, max_length=4000)
     attachments: list[MessageAttachmentCreatePayload] = Field(default_factory=list)
+    mentioned_user_ids: list[int] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
     def validate_message(self):

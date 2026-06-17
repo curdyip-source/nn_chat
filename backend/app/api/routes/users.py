@@ -8,9 +8,14 @@ from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_admin
 from app.schemas.users import BootstrapFirstAdminPayload, UserCreatePayload, UserProfileUpdatePayload, UserUpdatePayload
 from app.services.profile_photos import upload_profile_photo
-from app.services.users import UserService, bootstrap_first_user, create_user, delete_user, list_users, update_user, update_user_profile
+from app.services.users import UserService, bootstrap_first_user, create_user, delete_user, list_chat_participants, list_users, update_user, update_user_profile
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+@router.get("/participants")
+def get_chat_participants(_: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return list_chat_participants(db)
 
 
 @router.get("")

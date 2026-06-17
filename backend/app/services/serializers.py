@@ -34,6 +34,16 @@ def serialize_user(row) -> dict:
     }
 
 
+def serialize_chat_participant(row) -> dict:
+    return {
+        "user_id": row.user_id,
+        "user_login": row.user_login,
+        "user_first_name": row.user_first_name,
+        "user_second_name": row.user_second_name,
+        "user_profile_photo": row.user_profile_photo,
+    }
+
+
 def serialize_user_session(row, *, is_current: bool = False) -> dict:
     return {
         "session_id": row.session_id,
@@ -233,6 +243,7 @@ def serialize_order(row) -> dict:
         "order_method_id": row.order_method_id,
         "order_method_name": order_method.order_method_name if order_method else None,
         "order_sub_method": row.order_sub_method,
+        "order_contact_method": row.order_contact_method,
         "order_customer": row.order_customer,
         "order_info": row.order_info,
         "order_status_id": row.order_status_id,

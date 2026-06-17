@@ -12,11 +12,26 @@ from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, Or
 from app.services.contacts import save_buyer_contact_from_order, save_supplier_contact
 from app.services.audit import log_audit_event
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
-from app.services.push_notifications import send_push_notification_event
+from app.services.messages import resolve_mention_recipient_ids
+from app.services.push_notifications import send_mention_push_event, send_push_notification_event
 from app.services.serializers import serialize_order, serialize_order_comment
 
 
 logger = logging.getLogger("app.orders")
+
+
+ALLOWED_ORDER_CONTACT_METHODS = ("WA", "TG", "AV", "IG", "SMS", "MX")
+
+
+def _normalize_order_contact_method(value: str | None) -> str | None:
+    if not value:
+        return None
+    normalized = value.strip().upper()
+    if not normalized:
+        return None
+    if normalized not in ALLOWED_ORDER_CONTACT_METHODS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Передан неизвестный способ связи")
+    return normalized
 
 
 ORDER_AUDIT_FIELDS = (
@@ -25,6 +40,7 @@ ORDER_AUDIT_FIELDS = (
     "order_method_id",
     "order_method_name",
     "order_sub_method",
+    "order_contact_method",
     "order_customer",
     "order_info",
     "order_status_id",
@@ -184,12 +200,11 @@ class OrderService:
         order_method_row = get_order_method_or_404(self.db, payload.order_method_id)
         available_sub_methods = order_method_row.order_method_sub_methods or []
         normalized_order_sub_method = payload.order_sub_method.strip() if payload.order_sub_method else None
-        if available_sub_methods and normalized_order_sub_method is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Для выбранного способа заказа нужно указать подспособ")
         if not available_sub_methods and normalized_order_sub_method is not None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Для выбранного способа заказа подспособ не поддерживается")
         if normalized_order_sub_method is not None and normalized_order_sub_method not in available_sub_methods:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Передан неизвестный подспособ заказа")
+        normalized_order_contact_method = _normalize_order_contact_method(payload.order_contact_method)
         status_row = get_status_or_404(self.db, payload.order_status_id, expected_type="orders") if payload.order_status_id else get_default_status_or_400(self.db, status_type="orders")
         default_currency = get_default_currency_or_400(self.db)
         default_item_status = get_default_status_or_400(self.db, status_type="order_products")
@@ -233,6 +248,7 @@ class OrderService:
                 "order_establishment_id": payload.order_establishment_id,
                 "order_method_id": payload.order_method_id,
                 "order_sub_method": normalized_order_sub_method,
+                "order_contact_method": normalized_order_contact_method,
                 "order_customer": payload.order_customer,
                 "order_info": payload.order_info,
                 "order_status_id": status_row.status_id,
@@ -297,12 +313,11 @@ class OrderService:
         order_method_row = get_order_method_or_404(self.db, payload.order_method_id)
         available_sub_methods = order_method_row.order_method_sub_methods or []
         normalized_order_sub_method = payload.order_sub_method.strip() if payload.order_sub_method else None
-        if available_sub_methods and normalized_order_sub_method is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Для выбранного способа заказа нужно указать подспособ")
         if not available_sub_methods and normalized_order_sub_method is not None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Для выбранного способа заказа подспособ не поддерживается")
         if normalized_order_sub_method is not None and normalized_order_sub_method not in available_sub_methods:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Передан неизвестный подспособ заказа")
+        normalized_order_contact_method = _normalize_order_contact_method(payload.order_contact_method)
 
         status_row = get_status_or_404(self.db, payload.order_status_id, expected_type="orders")
         default_currency = get_default_currency_or_400(self.db)
@@ -348,6 +363,7 @@ class OrderService:
                 "order_establishment_id": payload.order_establishment_id,
                 "order_method_id": payload.order_method_id,
                 "order_sub_method": normalized_order_sub_method,
+                "order_contact_method": normalized_order_contact_method,
                 "order_customer": payload.order_customer,
                 "order_info": payload.order_info,
                 "order_status_id": status_row.status_id,
@@ -431,6 +447,29 @@ class OrderService:
                 "attachment_count": len(attachments),
             },
         )
+        try:
+            mention_recipient_ids = resolve_mention_recipient_ids(
+                self.db,
+                mentioned_user_ids=payload.mentioned_user_ids,
+                sender_user_id=current_user["user_id"],
+            )
+            if mention_recipient_ids:
+                send_mention_push_event(
+                    self.db,
+                    recipient_user_ids=mention_recipient_ids,
+                    sender_name=f"{current_user['user_second_name']} {current_user['user_first_name']}".strip() or current_user["user_login"],
+                    context="order",
+                    entity_id=order_id,
+                )
+        except Exception:
+            logger.exception(
+                "push.mention_dispatch_failed",
+                extra={
+                    "event_type": "push.mention_dispatch_failed",
+                    "order_id": order_id,
+                    "user_id": current_user["user_id"],
+                },
+            )
         return serialize_order_comment(row)
 
     def _resolve_item_route(self, status_name: str | None, source_establishment_id: int | None, destination_establishment_id: int | None) -> tuple[int | None, int | None]:

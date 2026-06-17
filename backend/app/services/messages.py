@@ -7,11 +7,20 @@ from app.core.audit_types import ENTITY_TYPE_MESSAGE, EVENT_TYPE_MESSAGE_CREATE,
 from app.repositories.message_attachment_assets import MessageAttachmentAssetRepository
 from app.repositories.messages import MessageRepository
 from app.repositories.user_devices import UserDeviceRepository
+from app.repositories.users import UserRepository
 from app.schemas.common import build_pagination
 from app.schemas.messages import MessageCreatePayload, MessageUpdatePayload
 from app.services.audit import log_audit_event
-from app.services.push_notifications import send_push_notification_event
+from app.services.push_notifications import send_mention_push_event, send_push_notification_event
 from app.services.serializers import serialize_message
+
+
+def resolve_mention_recipient_ids(db: Session, *, mentioned_user_ids: list[int], sender_user_id: int) -> list[int]:
+    unique_ids = {user_id for user_id in mentioned_user_ids if user_id != sender_user_id}
+    if not unique_ids:
+        return []
+    active_rows = UserRepository(db).list_active_by_ids(list(unique_ids))
+    return [row.user_id for row in active_rows]
 
 
 logger = logging.getLogger("app.messages")
@@ -113,6 +122,30 @@ class MessageService:
                     "event_type": "push.dispatch_failed",
                     "message_id": row.message_id,
                     "message_type": row.message_type,
+                    "user_id": current_user["user_id"],
+                },
+            )
+
+        try:
+            mention_recipient_ids = resolve_mention_recipient_ids(
+                self.db,
+                mentioned_user_ids=payload.mentioned_user_ids,
+                sender_user_id=current_user["user_id"],
+            )
+            if mention_recipient_ids:
+                send_mention_push_event(
+                    self.db,
+                    recipient_user_ids=mention_recipient_ids,
+                    sender_name=f"{current_user['user_second_name']} {current_user['user_first_name']}".strip() or current_user["user_login"],
+                    context="chat",
+                    entity_id=row.message_id,
+                )
+        except Exception:
+            logger.exception(
+                "push.mention_dispatch_failed",
+                extra={
+                    "event_type": "push.mention_dispatch_failed",
+                    "message_id": row.message_id,
                     "user_id": current_user["user_id"],
                 },
             )
