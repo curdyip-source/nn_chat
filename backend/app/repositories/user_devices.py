@@ -10,16 +10,17 @@ class UserDeviceRepository:
     def get_by_token(self, token: str) -> UserDevice | None:
         return self.db.query(UserDevice).filter(UserDevice.user_device_token == token).first()
 
-    def register(self, *, user_id: int, token: str, platform: str) -> UserDevice:
+    def register(self, *, user_id: int, token: str, platform: str, environment: str) -> UserDevice:
         existing = self.get_by_token(token)
         if existing is not None:
             existing.user_device_user_id = user_id
             existing.user_device_platform = platform
+            existing.user_device_environment = environment
             existing.user_device_is_active = True
             self.db.commit()
             self.db.refresh(existing)
             return existing
-        row = UserDevice(user_device_user_id=user_id, user_device_token=token, user_device_platform=platform, user_device_is_active=True)
+        row = UserDevice(user_device_user_id=user_id, user_device_token=token, user_device_platform=platform, user_device_environment=environment, user_device_is_active=True)
         self.db.add(row)
         self.db.commit()
         self.db.refresh(row)

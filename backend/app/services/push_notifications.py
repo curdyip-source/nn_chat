@@ -117,11 +117,11 @@ def send_order_change_push_event(
 
 def _dispatch_to_devices(db: Session, *, devices, title: str, body: str, event_type: str, entity_id: int) -> int:
     token = build_apns_provider_token()
-    endpoint_base = "https://api.sandbox.push.apple.com" if APNS_USE_SANDBOX else "https://api.push.apple.com"
     sent_count = 0
 
     with httpx.Client(http2=True, timeout=10.0) as client:
         for device in devices:
+            endpoint_base = _apns_endpoint_for_device(device)
             response = client.post(
                 f"{endpoint_base}/3/device/{device.user_device_token}",
                 headers={
@@ -172,6 +172,20 @@ def _dispatch_to_devices(db: Session, *, devices, title: str, body: str, event_t
     )
 
     return sent_count
+
+
+def _apns_endpoint_for_device(device) -> str:
+    sandbox_base = "https://api.sandbox.push.apple.com"
+    production_base = "https://api.push.apple.com"
+
+    environment = getattr(device, "user_device_environment", None)
+    if environment == "sandbox":
+        return sandbox_base
+    if environment == "production":
+        return production_base
+
+    # No per-device environment recorded (legacy rows): fall back to the global flag.
+    return sandbox_base if APNS_USE_SANDBOX else production_base
 
 
 def build_apns_provider_token() -> str:

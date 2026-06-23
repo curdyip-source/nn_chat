@@ -15,6 +15,7 @@ class UserDevice(Base):
     user_device_user_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
     user_device_token: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     user_device_platform: Mapped[str] = mapped_column(String(50), nullable=False)
+    user_device_environment: Mapped[str] = mapped_column(String(20), nullable=False, default="production", server_default="production")
     user_device_is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=func.true())
     user_device_created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     user_device_updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
