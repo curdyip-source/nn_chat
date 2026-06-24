@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { AuditPage } from '../features/audit/AuditPage'
 import { OrdersPage } from '../features/orders/OrdersPage'
 import { ProductsPage } from '../features/products/ProductsPage'
+import { ReferencePage } from '../features/reference/ReferencePage'
 import { UsersPage } from '../features/users/UsersPage'
 import styles from './AppShell.module.css'
 
@@ -19,7 +20,7 @@ const SECTIONS: Section[] = [
   { key: 'orders', label: 'Заказы', icon: '📦', render: () => <OrdersPage />, ready: true },
   { key: 'products', label: 'Товары', icon: '🏷️', render: () => <ProductsPage />, ready: true },
   { key: 'inventory', label: 'Инвентаризации', icon: '📊', render: () => <Placeholder name="Инвентаризации" />, ready: false },
-  { key: 'reference', label: 'Справочники', icon: '⚙️', render: () => <Placeholder name="Справочники" />, ready: false },
+  { key: 'reference', label: 'Справочники', icon: '⚙️', render: () => <ReferencePage />, ready: true },
   { key: 'users', label: 'Пользователи', icon: '👤', render: () => <UsersPage />, ready: true },
   { key: 'audit', label: 'Аудит', icon: '📜', render: () => <AuditPage />, ready: true },
   { key: 'chat', label: 'Чат', icon: '💬', render: () => <Placeholder name="Чат" />, ready: false },

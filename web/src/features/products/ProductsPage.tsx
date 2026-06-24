@@ -9,14 +9,13 @@ import { ImportXlsxModal } from './ImportXlsxModal'
 import { ProductFormModal } from './ProductFormModal'
 import styles from './ProductsPage.module.css'
 
-const PAGE_SIZE = 100
+const PAGE_SIZE = 50
 
 export function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search.trim(), 300)
@@ -25,41 +24,33 @@ export function ProductsPage() {
   const [creating, setCreating] = useState(false)
   const [importing, setImporting] = useState(false)
 
-  const reload = useCallback(() => {
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  // Сброс на первую страницу при изменении поиска.
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch])
+
+  const load = useCallback(() => {
     setLoading(true)
-    listProducts({ search: debouncedSearch, page: 1, pageSize: PAGE_SIZE })
+    listProducts({ search: debouncedSearch, page, pageSize: PAGE_SIZE })
       .then((res) => {
         setProducts(res.items)
         setTotal(res.pagination?.total ?? res.items.length)
-        setPage(1)
         setError(null)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
-  }, [debouncedSearch])
+  }, [debouncedSearch, page])
 
-  useEffect(reload, [reload])
-
-  const loadMore = () => {
-    const next = page + 1
-    setLoadingMore(true)
-    listProducts({ search: debouncedSearch, page: next, pageSize: PAGE_SIZE })
-      .then((res) => {
-        setProducts((prev) => [...prev, ...res.items])
-        setPage(next)
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
-      .finally(() => setLoadingMore(false))
-  }
+  useEffect(load, [load])
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Товары</h1>
-          <p className="muted">
-            Номенклатура{total ? ` · ${total}` : ''}: поиск, создание и импорт
-          </p>
+          <p className="muted">Номенклатура{total ? ` · ${total}` : ''}: поиск, создание и импорт</p>
         </div>
         <div className={styles.headerActions}>
           <Button variant="secondary" onClick={() => setImporting(true)}>
@@ -77,6 +68,29 @@ export function ProductsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <div className={styles.pager}>
+          <Button variant="secondary" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
+            ←
+          </Button>
+          <span className={styles.pageInfo}>
+            Стр.{' '}
+            <input
+              className={styles.pageInput}
+              type="number"
+              min={1}
+              max={totalPages}
+              value={page}
+              onChange={(e) => {
+                const n = Number(e.target.value)
+                if (n >= 1 && n <= totalPages) setPage(n)
+              }}
+            />{' '}
+            из {totalPages}
+          </span>
+          <Button variant="secondary" disabled={page >= totalPages || loading} onClick={() => setPage((p) => p + 1)}>
+            →
+          </Button>
+        </div>
       </div>
 
       {error && <div className={styles.error}>{error}</div>}
@@ -99,30 +113,13 @@ export function ProductsPage() {
                 <span className={styles.right}>{formatAmount(Number(p.product_cost_usd) || 0)}</span>
               </button>
             ))}
-            {products.length < total && (
-              <div className={styles.more}>
-                <Button variant="secondary" loading={loadingMore} onClick={loadMore}>
-                  Загрузить ещё ({products.length} из {total})
-                </Button>
-              </div>
-            )}
           </div>
         )}
       </div>
 
-      <ProductFormModal
-        open={creating}
-        product={null}
-        onClose={() => setCreating(false)}
-        onSaved={reload}
-      />
-      <ProductFormModal
-        open={editing != null}
-        product={editing}
-        onClose={() => setEditing(null)}
-        onSaved={reload}
-      />
-      <ImportXlsxModal open={importing} onClose={() => setImporting(false)} onDone={reload} />
+      <ProductFormModal open={creating} product={null} onClose={() => setCreating(false)} onSaved={load} />
+      <ProductFormModal open={editing != null} product={editing} onClose={() => setEditing(null)} onSaved={load} />
+      <ImportXlsxModal open={importing} onClose={() => setImporting(false)} onDone={load} />
     </div>
   )
 }

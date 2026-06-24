@@ -155,3 +155,7 @@ class ProductRepository:
         self.db.commit()
         self.db.refresh(row)
         return self.get_by_id(row.product_id)
+
+    def delete(self, row: Product) -> None:
+        self.db.delete(row)
+        self.db.commit()

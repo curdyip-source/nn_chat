@@ -37,6 +37,7 @@ const EVENT_LABELS: Record<string, string> = {
 
   'product.create': 'Добавил товар',
   'product.update': 'Изменил товар',
+  'product.delete': 'Удалил товар',
 
   'push.delivery_failed': 'Пуш не доставлен',
   'push.dispatch_failed': 'Ошибка отправки пуша',

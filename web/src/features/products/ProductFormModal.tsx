@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createProduct, updateProduct } from '../../api/endpoints'
+import { createProduct, deleteProduct, updateProduct } from '../../api/endpoints'
 import type { Product } from '../../api/types'
 import { Button } from '../../ui/Button'
 import { Field, TextInput } from '../../ui/Field'
@@ -27,6 +27,22 @@ export function ProductFormModal({ open, product, onClose, onSaved }: Props) {
       setError('')
     }
   }, [open, product])
+
+  const remove = async () => {
+    if (!product) return
+    if (!window.confirm(`Удалить товар «${product.product_name}»?`)) return
+    setError('')
+    setBusy(true)
+    try {
+      await deleteProduct(product.product_id)
+      onSaved()
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось удалить товар')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const submit = async () => {
     setError('')
@@ -56,6 +72,11 @@ export function ProductFormModal({ open, product, onClose, onSaved }: Props) {
       width={420}
       footer={
         <>
+          {product && (
+            <Button variant="danger" loading={busy} onClick={remove} style={{ marginRight: 'auto' }}>
+              Удалить
+            </Button>
+          )}
           <Button variant="ghost" onClick={onClose}>
             Отмена
           </Button>

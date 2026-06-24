@@ -3,14 +3,18 @@ import type {
   AuditEvent,
   AuthResponse,
   Contact,
+  Currency,
+  Establishment,
   Order,
   OrderCreate,
+  OrderMethod,
   OrderUpdate,
   Paginated,
   Product,
   ProductImportJob,
   ReferenceData,
   SetupStatus,
+  Status,
   User,
 } from './types'
 
@@ -42,6 +46,47 @@ export function fetchReferenceData() {
   return apiRequest<ReferenceData>('/reference-data')
 }
 
+// Справочники: CRUD.
+export function saveEstablishment(
+  id: number | null,
+  body: { establishment_name: string; establishment_address?: string | null },
+) {
+  return apiRequest<{ item: Establishment }>(
+    id ? `/establishments/${id}` : '/establishments',
+    { method: id ? 'PUT' : 'POST', body },
+  )
+}
+
+export function saveOrderMethod(
+  id: number | null,
+  body: { order_method_name: string; order_method_sub_methods?: string[] },
+) {
+  return apiRequest<{ item: OrderMethod }>(
+    id ? `/order-methods/${id}` : '/order-methods',
+    { method: id ? 'PUT' : 'POST', body },
+  )
+}
+
+export function saveStatus(
+  id: number | null,
+  body: { status_type: string; status_status: string; status_color?: string | null },
+) {
+  return apiRequest<{ item: Status }>(id ? `/statuses/${id}` : '/statuses', {
+    method: id ? 'PUT' : 'POST',
+    body,
+  })
+}
+
+export function saveCurrency(
+  id: number | null,
+  body: { currency_name: string; currency_sign?: string | null },
+) {
+  return apiRequest<{ item: Currency }>(id ? `/currencies/${id}` : '/currencies', {
+    method: id ? 'PUT' : 'POST',
+    body,
+  })
+}
+
 // ---------- Products ----------
 
 export function searchProducts(search: string, signal?: AbortSignal) {
@@ -71,6 +116,10 @@ export function updateProduct(
   patch: { product_article?: string; product_name?: string; product_cost_usd?: string },
 ) {
   return apiRequest<{ item: Product }>(`/products/${productId}`, { method: 'PUT', body: patch })
+}
+
+export function deleteProduct(productId: number) {
+  return apiRequest<void>(`/products/${productId}`, { method: 'DELETE' })
 }
 
 export function importProductsXlsx(file: File) {

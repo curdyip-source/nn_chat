@@ -9,7 +9,7 @@ from openpyxl import load_workbook
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.exc import IntegrityError
 
-from app.core.audit_types import ENTITY_TYPE_PRODUCT, EVENT_TYPE_PRODUCT_CREATE, EVENT_TYPE_PRODUCT_UPDATE
+from app.core.audit_types import ENTITY_TYPE_PRODUCT, EVENT_TYPE_PRODUCT_CREATE, EVENT_TYPE_PRODUCT_DELETE, EVENT_TYPE_PRODUCT_UPDATE
 from app.models.reference_data import Product
 from app.repositories.reference_data import ProductRepository, ReferenceDataRepository
 from app.schemas.common import build_pagination, model_to_dict
@@ -497,6 +497,12 @@ class ReferenceDataService:
         log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_PRODUCT, entity_id=row.product_id, event_type=EVENT_TYPE_PRODUCT_UPDATE, event_payload={"changed_fields": sorted(data.keys())})
         return serialize_product(row)
 
+    def delete_product(self, product_id: int, current_user: dict) -> None:
+        row = self.get_product_or_404(product_id)
+        article = row.product_article
+        self.product_repository.delete(row)
+        log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_PRODUCT, entity_id=product_id, event_type=EVENT_TYPE_PRODUCT_DELETE, event_payload={"product_article": article})
+
     def import_products_from_xlsx(self, *, content: bytes, filename: str | None, current_user: dict) -> dict:
         if filename and not filename.lower().endswith(".xlsx"):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Нужен файл формата .xlsx")
@@ -589,6 +595,10 @@ def match_products_by_name(db: Session, names: list[str]) -> dict:
 
 def update_product(db: Session, product_id: int, payload: ProductUpdatePayload, current_user: dict) -> dict:
     return ReferenceDataService(db).update_product(product_id, payload, current_user)
+
+
+def delete_product(db: Session, product_id: int, current_user: dict) -> None:
+    return ReferenceDataService(db).delete_product(product_id, current_user)
 
 
 def import_products_from_xlsx(db: Session, *, content: bytes, filename: str | None, current_user: dict) -> dict:
