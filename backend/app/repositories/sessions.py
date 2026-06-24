@@ -80,10 +80,6 @@ class SessionRepository:
         self.db.refresh(session)
         return session
 
-    def delete_by_token(self, token: str) -> None:
-        self.db.query(UserSession).filter(UserSession.session_token == token).delete(synchronize_session=False)
-        self.db.commit()
-
     def delete_by_id(self, session_id: int) -> None:
         self.db.query(UserSession).filter(UserSession.session_id == session_id).delete(synchronize_session=False)
         self.db.commit()

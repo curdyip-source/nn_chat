@@ -1056,11 +1056,6 @@
             return state.orderManagement.items.find((item) => Number(item.order_id) === Number(orderID)) || null;
         }
 
-        function replaceManagedOrder(item) {
-            state.orderManagement.items = state.orderManagement.items.map((entry) => Number(entry.order_id) === Number(item.order_id) ? item : entry);
-            state.orders = state.orders.map((entry) => Number(entry.order_id) === Number(item.order_id) ? item : entry);
-        }
-
         function updateManagedOrderStatusDraft(orderID, value) {
             state.orderManagement.statusDrafts[String(orderID)] = value;
         }

@@ -48,12 +48,3 @@ def get_database_info() -> dict:
             "database": engine.url.database,
             "user": engine.url.username,
         }
-
-
-def get_database_health() -> dict:
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-        return {"status": "ok"}
-    except Exception as error:
-        return {"status": "error", "message": str(error)}

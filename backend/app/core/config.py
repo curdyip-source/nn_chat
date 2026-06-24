@@ -71,8 +71,6 @@ def _validate_https_origins(origins: list[str]) -> None:
                 continue
 
         raise RuntimeError("CORS_ALLOW_ORIGINS must contain https origins in production, or explicit public IP http origins when INSECURE_ALLOW_HTTP_ORIGINS=true")
-        if not parsed.netloc:
-            raise RuntimeError("CORS_ALLOW_ORIGINS must contain valid absolute origins in production")
 
 
 def _validate_positive_ttl(name: str, value: int, minimum: int, maximum: int) -> None:

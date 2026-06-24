@@ -22,12 +22,6 @@ class DocumentService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Документ не найден")
         return row
 
-    def ensure_access(self, row, current_user: dict) -> None:
-        if current_user["user_admin"]:
-            return
-        if row.document_owner_user_id != current_user["user_id"]:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для доступа к документу")
-
     def list_documents(self, *, current_user: dict, kind: str | None, status_value: str | None, page: int, page_size: int) -> dict:
         rows, total = self.repository.list_for_user(
             user_id=current_user["user_id"],
