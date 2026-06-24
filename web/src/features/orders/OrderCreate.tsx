@@ -1,12 +1,12 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
-import { createOrder, searchContacts, searchProducts } from '../../api/endpoints'
-import type { Contact, Product } from '../../api/types'
+import { createOrder, searchContacts, searchProducts, updateOrder } from '../../api/endpoints'
+import type { Contact, Order, Product } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
 import { ButtonGroup } from '../../ui/ButtonGroup'
 import { Field, TextArea } from '../../ui/Field'
 import { SearchSelect } from '../../ui/SearchSelect'
-import { cartItemFromProduct, type CartItem } from './cart'
+import { cartItemFromProduct, newUid, type CartItem } from './cart'
 import { CartRow } from './CartRow'
 import { CreateProductModal } from './CreateProductModal'
 import styles from './OrderCreate.module.css'
@@ -21,9 +21,11 @@ const CONTACT_METHODS = ['WA', 'TG', 'AV', 'IG', 'SMS', 'MX']
 type Step = 'info' | 'cart'
 
 export function OrderCreate({
+  editOrder,
   onCancel,
   onCreated,
 }: {
+  editOrder?: Order | null
   onCancel: () => void
   onCreated: () => void
 }) {
@@ -31,14 +33,27 @@ export function OrderCreate({
   const defaultCurrencyId = ref.defaultCurrency?.currency_id ?? null
 
   const [step, setStep] = useState<Step>('info')
-  const [customer, setCustomer] = useState('')
-  const [info, setInfo] = useState('')
-  const [establishmentId, setEstablishmentId] = useState<number | null>(null)
-  const [methodId, setMethodId] = useState<number | null>(null)
-  const [subMethod, setSubMethod] = useState<string | null>(null)
-  const [contactMethod, setContactMethod] = useState<string | null>(null)
+  const [customer, setCustomer] = useState(editOrder?.order_customer ?? '')
+  const [info, setInfo] = useState(editOrder?.order_info ?? '')
+  const [establishmentId, setEstablishmentId] = useState<number | null>(editOrder?.order_establishment_id ?? null)
+  const [methodId, setMethodId] = useState<number | null>(editOrder?.order_method_id ?? null)
+  const [subMethod, setSubMethod] = useState<string | null>(editOrder?.order_sub_method ?? null)
+  const [contactMethod, setContactMethod] = useState<string | null>(editOrder?.order_contact_method ?? null)
   const [saveContact, setSaveContact] = useState(false)
-  const [items, setItems] = useState<CartItem[]>([])
+  const [items, setItems] = useState<CartItem[]>(
+    editOrder
+      ? editOrder.items.map((it) => ({
+          uid: newUid(),
+          productId: it.order_item_product_id ?? null,
+          article: it.order_item_article,
+          name: it.order_item_name,
+          quantity: it.order_item_quantity,
+          price: it.order_item_price,
+          currencyId: it.order_item_currency_id ?? null,
+          statusId: it.order_item_status_id ?? null,
+        }))
+      : [],
+  )
 
   const [excelOpen, setExcelOpen] = useState(false)
   const [createProductName, setCreateProductName] = useState<string | null>(null)
@@ -85,28 +100,43 @@ export function OrderCreate({
       return
     }
     setSubmitting(true)
+    const mappedItems = items.map((it) => ({
+      product_id: it.productId,
+      product_article: it.productId ? null : it.article,
+      product_name: it.productId ? null : it.name,
+      order_item_quantity: it.quantity,
+      order_item_price: (Number(it.price) || 0).toFixed(2),
+      order_item_status_id: it.statusId ?? null,
+      order_item_currency_id: it.currencyId,
+    }))
     try {
-      await createOrder({
-        order_establishment_id: establishmentId!,
-        order_method_id: methodId!,
-        order_sub_method: subMethod,
-        order_contact_method: contactMethod,
-        order_customer: customer.trim(),
-        order_info: info.trim(),
-        save_contact: saveContact,
-        order_status_id: null,
-        items: items.map((it) => ({
-          product_id: it.productId,
-          product_article: it.productId ? null : it.article,
-          product_name: it.productId ? null : it.name,
-          order_item_quantity: it.quantity,
-          order_item_price: (Number(it.price) || 0).toFixed(2),
-          order_item_currency_id: it.currencyId,
-        })),
-      })
+      if (editOrder) {
+        await updateOrder(editOrder.order_id, {
+          order_establishment_id: establishmentId!,
+          order_method_id: methodId!,
+          order_sub_method: subMethod,
+          order_contact_method: contactMethod,
+          order_customer: customer.trim(),
+          order_info: info.trim(),
+          order_status_id: editOrder.order_status_id!,
+          items: mappedItems,
+        })
+      } else {
+        await createOrder({
+          order_establishment_id: establishmentId!,
+          order_method_id: methodId!,
+          order_sub_method: subMethod,
+          order_contact_method: contactMethod,
+          order_customer: customer.trim(),
+          order_info: info.trim(),
+          save_contact: saveContact,
+          order_status_id: null,
+          items: mappedItems,
+        })
+      }
       onCreated()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось создать заказ')
+      setError(e instanceof Error ? e.message : 'Не удалось сохранить заказ')
     } finally {
       setSubmitting(false)
     }
@@ -118,7 +148,7 @@ export function OrderCreate({
         <button className={styles.back} onClick={onCancel}>
           ← Назад
         </button>
-        <h1 className={styles.title}>Новый заказ</h1>
+        <h1 className={styles.title}>{editOrder ? `Заказ №${editOrder.order_id}` : 'Новый заказ'}</h1>
       </header>
 
       <div className={styles.tabs}>
@@ -273,7 +303,7 @@ export function OrderCreate({
           {items.length} поз. · итого {total}
         </div>
         <Button variant="primary" loading={submitting} disabled={!canSubmit} onClick={submit}>
-          Создать заказ
+          {editOrder ? 'Сохранить' : 'Создать заказ'}
         </Button>
       </footer>
 

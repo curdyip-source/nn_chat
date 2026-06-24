@@ -5,10 +5,10 @@ import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
 import { ButtonGroup } from '../../ui/ButtonGroup'
 import { SearchSelect } from '../../ui/SearchSelect'
-import { cartItemFromProduct, type CartItem } from '../orders/cart'
+import { cartItemFromProduct, newUid, type CartItem } from '../orders/cart'
 import { CartRow } from '../orders/CartRow'
 import { CreateProductModal } from '../orders/CreateProductModal'
-import type { DocKind } from './docKind'
+import type { DocKind, DocView } from './docKind'
 import styles from './documents.module.css'
 
 const ExcelImport = lazy(() =>
@@ -17,20 +17,34 @@ const ExcelImport = lazy(() =>
 
 export function DocumentComposer({
   kind,
+  editDoc,
   onCancel,
   onCreated,
 }: {
   kind: DocKind
+  editDoc?: DocView | null
   onCancel: () => void
   onCreated: () => void
 }) {
   const ref = useReference()
   const defaultCurrencyId = ref.defaultCurrency?.currency_id ?? null
 
-  const [supplier, setSupplier] = useState('')
-  const [establishmentId, setEstablishmentId] = useState<number | null>(null)
+  const [supplier, setSupplier] = useState(editDoc?.supplier ?? '')
+  const [establishmentId, setEstablishmentId] = useState<number | null>(editDoc?.establishmentId ?? null)
   const [saveContact, setSaveContact] = useState(false)
-  const [items, setItems] = useState<CartItem[]>([])
+  const [items, setItems] = useState<CartItem[]>(
+    editDoc
+      ? editDoc.items.map((it) => ({
+          uid: newUid(),
+          productId: it.productId,
+          article: it.article,
+          name: it.name,
+          quantity: it.quantity,
+          price: it.cost,
+          currencyId: it.currencyId,
+        }))
+      : [],
+  )
   const [excelOpen, setExcelOpen] = useState(false)
   const [createProductName, setCreateProductName] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -60,13 +74,15 @@ export function DocumentComposer({
       return
     }
     setSubmitting(true)
+    const state = {
+      establishmentId: establishmentId!,
+      supplier: supplier.trim() || null,
+      saveContact,
+      items,
+    }
     try {
-      await kind.create({
-        establishmentId: establishmentId!,
-        supplier: supplier.trim() || null,
-        saveContact,
-        items,
-      })
+      if (editDoc) await kind.update(editDoc.id, state)
+      else await kind.create(state)
       onCreated()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось создать документ')
@@ -81,7 +97,7 @@ export function DocumentComposer({
         <button className={styles.back} onClick={onCancel}>
           ← Назад
         </button>
-        <h1 className={styles.title}>{kind.createTitle}</h1>
+        <h1 className={styles.title}>{editDoc ? `${kind.singular} №${editDoc.id}` : kind.createTitle}</h1>
       </header>
 
       <div className={styles.scroll}>
@@ -170,7 +186,7 @@ export function DocumentComposer({
           {items.length} поз. · итого {total}
         </div>
         <Button variant="primary" loading={submitting} disabled={!canSubmit} onClick={submit}>
-          Создать
+          {editDoc ? 'Сохранить' : 'Создать'}
         </Button>
       </footer>
 

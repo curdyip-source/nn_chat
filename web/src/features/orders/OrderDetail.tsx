@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getOrder, updateOrder, updateOrderStatus } from '../../api/endpoints'
 import type { Order, OrderUpdate } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
+import { Button } from '../../ui/Button'
 import { StatusSelect } from '../../ui/StatusSelect'
 import { formatAmount, formatDateTime } from '../../lib/format'
 import styles from './OrderDetail.module.css'
@@ -29,7 +30,15 @@ function buildUpdatePayload(order: Order): OrderUpdate {
   }
 }
 
-export function OrderDetail({ orderId, onBack }: { orderId: number; onBack: () => void }) {
+export function OrderDetail({
+  orderId,
+  onBack,
+  onEdit,
+}: {
+  orderId: number
+  onBack: () => void
+  onEdit: (order: Order) => void
+}) {
   const ref = useReference()
   const orderStatusOptions = ref.statusesByType('orders').map((s) => ({ id: s.status_id, label: s.status_status, color: s.status_color }))
   const itemStatusOptions = ref.statusesByType('order_products').map((s) => ({ id: s.status_id, label: s.status_status, color: s.status_color }))
@@ -99,6 +108,11 @@ export function OrderDetail({ orderId, onBack }: { orderId: number; onBack: () =
         </button>
         {order && <h1 className={styles.title}>Заказ №{order.order_id}</h1>}
         {saving && <span className="dim">Сохранение…</span>}
+        {order && (
+          <Button variant="secondary" style={{ marginLeft: 'auto' }} onClick={() => onEdit(order)}>
+            ✏️ Редактировать
+          </Button>
+        )}
       </header>
 
       <div className={styles.scroll}>

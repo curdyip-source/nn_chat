@@ -9,6 +9,7 @@ export type CartItem = {
   quantity: number
   price: string // строка для аккуратного ввода десятичных
   currencyId: number | null
+  statusId?: number | null // статус позиции (для заказов; сохраняется при редактировании)
 }
 
 export function newUid(): string {

@@ -7,7 +7,7 @@ from app.core.audit_types import ENTITY_TYPE_INVENTORY, EVENT_TYPE_INVENTORY_CRE
 from app.repositories.inventories import InventoryRepository
 from app.repositories.messages import MessageRepository
 from app.schemas.common import build_pagination
-from app.schemas.inventories import InventoryCreatePayload, InventoryStatusUpdatePayload
+from app.schemas.inventories import InventoryCreatePayload, InventoryStatusUpdatePayload, InventoryUpdatePayload
 from app.services.contacts import save_supplier_contact
 from app.services.audit import log_audit_event
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_status_or_404, resolve_product_snapshot
@@ -102,6 +102,46 @@ class InventoryService:
             )
         return result
 
+    def update_inventory(self, inventory_id: int, payload: InventoryUpdatePayload, current_user: dict) -> dict:
+        row = self.get_inventory_or_404(inventory_id)
+        get_establishment_or_404(self.db, payload.inventory_establishment_id)
+        status_id = row.inventory_status_id
+        if payload.inventory_status_id:
+            status_id = get_status_or_404(self.db, payload.inventory_status_id, expected_type="inventory").status_id
+        default_currency = get_default_currency_or_400(self.db)
+        items = []
+        for item in payload.items:
+            product_row, article, name, cost = resolve_product_snapshot(
+                self.db,
+                current_user=current_user,
+                product_id=item.product_id,
+                product_article=item.product_article,
+                product_name=item.product_name,
+                product_cost_usd=item.inventory_item_cost,
+            )
+            items.append(
+                {
+                    "inventory_item_product_id": product_row.product_id,
+                    "inventory_item_name": name,
+                    "inventory_item_article": article,
+                    "inventory_item_quantity": item.inventory_item_quantity,
+                    "inventory_item_cost": cost,
+                    "inventory_item_currency_id": item.inventory_item_currency_id or default_currency.currency_id,
+                    "inventory_item_owner_user_id": current_user["user_id"],
+                }
+            )
+        row = self.repository.update_with_items(
+            row,
+            {
+                "inventory_establishment_id": payload.inventory_establishment_id,
+                "inventory_supplier": payload.inventory_supplier.strip() if payload.inventory_supplier else None,
+                "inventory_status_id": status_id,
+            },
+            items,
+        )
+        log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_INVENTORY, entity_id=row.inventory_id, event_type=EVENT_TYPE_INVENTORY_UPDATE, event_payload={"items_count": len(items)})
+        return serialize_inventory(row)
+
     def update_inventory_status(self, inventory_id: int, payload: InventoryStatusUpdatePayload, current_user: dict) -> dict:
         row = self.get_inventory_or_404(inventory_id)
         status_row = get_status_or_404(self.db, payload.inventory_status_id, expected_type="inventory")
@@ -120,6 +160,10 @@ def get_inventory(db: Session, inventory_id: int) -> dict:
 
 def create_inventory(db: Session, payload: InventoryCreatePayload, current_user: dict) -> dict:
     return InventoryService(db).create_inventory(payload, current_user)
+
+
+def update_inventory(db: Session, inventory_id: int, payload: InventoryUpdatePayload, current_user: dict) -> dict:
+    return InventoryService(db).update_inventory(inventory_id, payload, current_user)
 
 
 def update_inventory_status(db: Session, inventory_id: int, payload: InventoryStatusUpdatePayload, current_user: dict) -> dict:

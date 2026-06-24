@@ -1,5 +1,4 @@
 import type { Currency } from '../../api/types'
-import { ButtonGroup } from '../../ui/ButtonGroup'
 import { Stepper } from '../../ui/Stepper'
 import type { CartItem } from './cart'
 import styles from './CartRow.module.css'
@@ -34,15 +33,17 @@ export function CartRow({ item, currencies, onChange, onRemove }: Props) {
           onChange={(e) => onChange({ price: e.target.value.replace(',', '.') })}
         />
         {currencies.length > 0 && (
-          <ButtonGroup
-            size="sm"
-            value={item.currencyId}
-            onChange={(id) => onChange({ currencyId: id })}
-            options={currencies.map((c) => ({
-              value: c.currency_id,
-              label: c.currency_sign || c.currency_name,
-            }))}
-          />
+          <select
+            className={styles.currency}
+            value={item.currencyId ?? ''}
+            onChange={(e) => onChange({ currencyId: Number(e.target.value) })}
+          >
+            {currencies.map((c) => (
+              <option key={c.currency_id} value={c.currency_id}>
+                {c.currency_sign || c.currency_name}
+              </option>
+            ))}
+          </select>
         )}
       </div>
     </div>

@@ -5,7 +5,9 @@ import {
   getRegistration,
   listInventories,
   listRegistrations,
+  updateInventory,
   updateInventoryStatus,
+  updateRegistration,
   updateRegistrationStatus,
 } from '../../api/endpoints'
 import type { Inventory, ProductRegistration } from '../../api/types'
@@ -14,6 +16,7 @@ import type { CartItem } from '../orders/cart'
 // Общий вид документа (инвентаризация/приёмка нормализуются в него).
 export type DocItemView = {
   id: number
+  productId: number | null
   name: string
   article: string | null
   quantity: number
@@ -51,6 +54,7 @@ export type DocKind = {
   list: (page: number, pageSize: number) => Promise<{ items: DocView[]; total: number }>
   get: (id: number) => Promise<DocView>
   create: (state: ComposerState) => Promise<void>
+  update: (id: number, state: ComposerState) => Promise<void>
   updateStatus: (id: number, statusId: number) => Promise<DocView>
 }
 
@@ -66,6 +70,7 @@ function normInventory(r: Inventory): DocView {
     createdAt: r.inventory_created_at ?? null,
     items: r.items.map((it) => ({
       id: it.inventory_item_id,
+      productId: it.inventory_item_product_id ?? null,
       name: it.inventory_item_name,
       article: it.inventory_item_article,
       quantity: it.inventory_item_quantity,
@@ -87,6 +92,7 @@ function normRegistration(r: ProductRegistration): DocView {
     createdAt: r.product_registration_created_at ?? null,
     items: r.items.map((it) => ({
       id: it.product_registration_item_id,
+      productId: it.product_registration_item_product_id ?? null,
       name: it.product_registration_item_name,
       article: it.product_registration_item_article,
       quantity: it.product_registration_item_quantity,
@@ -128,6 +134,12 @@ export const INVENTORY_KIND: DocKind = {
       save_contact: s.saveContact,
       items: s.items.map((it) => itemBody(it, 'inventory_item')),
     }).then(() => undefined),
+  update: (id, s) =>
+    updateInventory(id, {
+      inventory_establishment_id: s.establishmentId,
+      inventory_supplier: s.supplier,
+      items: s.items.map((it) => itemBody(it, 'inventory_item')),
+    }).then(() => undefined),
   updateStatus: (id, statusId) => updateInventoryStatus(id, statusId).then((r) => normInventory(r.item)),
 }
 
@@ -150,6 +162,12 @@ export const REGISTRATION_KIND: DocKind = {
       product_registration_establishment_id: s.establishmentId,
       product_registration_supplier: s.supplier,
       save_contact: s.saveContact,
+      items: s.items.map((it) => itemBody(it, 'product_registration_item')),
+    }).then(() => undefined),
+  update: (id, s) =>
+    updateRegistration(id, {
+      product_registration_establishment_id: s.establishmentId,
+      product_registration_supplier: s.supplier,
       items: s.items.map((it) => itemBody(it, 'product_registration_item')),
     }).then(() => undefined),
   updateStatus: (id, statusId) =>

@@ -9,6 +9,7 @@ import styles from './documents.module.css'
 
 export function DocumentsPage({ kind }: { kind: DocKind }) {
   const [creating, setCreating] = useState(false)
+  const [editDoc, setEditDoc] = useState<DocView | null>(null)
   const [viewingId, setViewingId] = useState<number | null>(null)
   const [docs, setDocs] = useState<DocView[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,14 +28,37 @@ export function DocumentsPage({ kind }: { kind: DocKind }) {
   }, [kind])
 
   useEffect(() => {
-    if (!creating && viewingId == null) reload()
-  }, [creating, viewingId, reload])
+    if (!creating && viewingId == null && editDoc == null) reload()
+  }, [creating, viewingId, editDoc, reload])
 
-  if (creating) {
-    return <DocumentComposer kind={kind} onCancel={() => setCreating(false)} onCreated={() => setCreating(false)} />
+  if (creating || editDoc) {
+    return (
+      <DocumentComposer
+        kind={kind}
+        editDoc={editDoc}
+        onCancel={() => {
+          setCreating(false)
+          setEditDoc(null)
+        }}
+        onCreated={() => {
+          setCreating(false)
+          setEditDoc(null)
+        }}
+      />
+    )
   }
   if (viewingId != null) {
-    return <DocumentDetail kind={kind} id={viewingId} onBack={() => setViewingId(null)} />
+    return (
+      <DocumentDetail
+        kind={kind}
+        id={viewingId}
+        onBack={() => setViewingId(null)}
+        onEdit={(doc) => {
+          setViewingId(null)
+          setEditDoc(doc)
+        }}
+      />
+    )
   }
 
   return (

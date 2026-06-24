@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy import delete
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.inventories import Inventory, InventoryItem
@@ -44,6 +45,17 @@ class InventoryRepository:
     def update(self, row: Inventory, data: dict) -> Inventory:
         for field_name, field_value in data.items():
             setattr(row, field_name, field_value)
+        self.db.commit()
+        self.db.refresh(row)
+        return self.get_by_id(row.inventory_id)
+
+    def update_with_items(self, row: Inventory, data: dict, items: list[dict]) -> Inventory:
+        for field_name, field_value in data.items():
+            setattr(row, field_name, field_value)
+        self.db.execute(delete(InventoryItem).where(InventoryItem.inventory_item_inventory_id == row.inventory_id))
+        self.db.flush()
+        for item in items:
+            self.db.add(InventoryItem(**item, inventory_item_inventory_id=row.inventory_id))
         self.db.commit()
         self.db.refresh(row)
         return self.get_by_id(row.inventory_id)

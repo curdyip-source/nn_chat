@@ -1,11 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useReference } from '../../data/ReferenceContext'
+import { Button } from '../../ui/Button'
 import { StatusSelect } from '../../ui/StatusSelect'
 import { formatAmount, formatDateTime } from '../../lib/format'
 import type { DocKind, DocView } from './docKind'
 import styles from './documents.module.css'
 
-export function DocumentDetail({ kind, id, onBack }: { kind: DocKind; id: number; onBack: () => void }) {
+export function DocumentDetail({
+  kind,
+  id,
+  onBack,
+  onEdit,
+}: {
+  kind: DocKind
+  id: number
+  onBack: () => void
+  onEdit: (doc: DocView) => void
+}) {
   const ref = useReference()
   const statusOptions = ref
     .statusesByType(kind.statusType)
@@ -59,6 +70,11 @@ export function DocumentDetail({ kind, id, onBack }: { kind: DocKind; id: number
         </button>
         {doc && <h1 className={styles.title}>{kind.singular} №{doc.id}</h1>}
         {saving && <span className="dim">Сохранение…</span>}
+        {doc && (
+          <Button variant="secondary" style={{ marginLeft: 'auto' }} onClick={() => onEdit(doc)}>
+            ✏️ Редактировать
+          </Button>
+        )}
       </header>
 
       <div className={styles.scroll}>

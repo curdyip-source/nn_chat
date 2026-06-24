@@ -17,6 +17,7 @@ export function OrdersPage() {
   const orderStatuses = ref.statusesByType('orders')
 
   const [creating, setCreating] = useState(false)
+  const [editOrder, setEditOrder] = useState<Order | null>(null)
   const [viewingId, setViewingId] = useState<number | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,15 +39,36 @@ export function OrdersPage() {
   }, [statusFilter, debouncedSearch])
 
   useEffect(() => {
-    if (!creating && viewingId == null) reload()
-  }, [creating, viewingId, reload])
+    if (!creating && viewingId == null && editOrder == null) reload()
+  }, [creating, viewingId, editOrder, reload])
 
-  if (creating) {
-    return <OrderCreate onCancel={() => setCreating(false)} onCreated={() => setCreating(false)} />
+  if (creating || editOrder) {
+    return (
+      <OrderCreate
+        editOrder={editOrder}
+        onCancel={() => {
+          setCreating(false)
+          setEditOrder(null)
+        }}
+        onCreated={() => {
+          setCreating(false)
+          setEditOrder(null)
+        }}
+      />
+    )
   }
 
   if (viewingId != null) {
-    return <OrderDetail orderId={viewingId} onBack={() => setViewingId(null)} />
+    return (
+      <OrderDetail
+        orderId={viewingId}
+        onBack={() => setViewingId(null)}
+        onEdit={(order) => {
+          setViewingId(null)
+          setEditOrder(order)
+        }}
+      />
+    )
   }
 
   return (

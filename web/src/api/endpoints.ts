@@ -213,6 +213,9 @@ export function getInventory(id: number) {
 export function createInventory(payload: unknown) {
   return apiRequest<{ item: Inventory }>('/inventories', { method: 'POST', body: payload })
 }
+export function updateInventory(id: number, payload: unknown) {
+  return apiRequest<{ item: Inventory }>(`/inventories/${id}`, { method: 'PUT', body: payload })
+}
 export function updateInventoryStatus(id: number, statusId: number) {
   return apiRequest<{ item: Inventory }>(`/inventories/${id}/status`, {
     method: 'PUT',
@@ -231,6 +234,9 @@ export function getRegistration(id: number) {
 }
 export function createRegistration(payload: unknown) {
   return apiRequest<{ item: ProductRegistration }>('/product-registrations', { method: 'POST', body: payload })
+}
+export function updateRegistration(id: number, payload: unknown) {
+  return apiRequest<{ item: ProductRegistration }>(`/product-registrations/${id}`, { method: 'PUT', body: payload })
 }
 export function updateRegistrationStatus(id: number, statusId: number) {
   return apiRequest<{ item: ProductRegistration }>(`/product-registrations/${id}/status`, {

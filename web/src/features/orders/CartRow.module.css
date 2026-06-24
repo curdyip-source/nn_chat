@@ -56,3 +56,30 @@
 .priceMissing {
   border-color: rgba(255, 159, 10, 0.6);
 }
+
+.currency {
+  height: 42px;
+  background-color: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 0 30px 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  /* убираем нативный вид, чтобы border-radius совпал с полем цены/количества */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23ffffff' stroke-opacity='0.6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+}
+.currency:focus {
+  border-color: var(--focus);
+}
+.currency option {
+  background: #17171a;
+  color: var(--text);
+}

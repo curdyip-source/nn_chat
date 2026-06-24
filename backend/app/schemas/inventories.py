@@ -22,5 +22,12 @@ class InventoryCreatePayload(BaseModel):
     items: list[InventoryItemCreatePayload] = Field(min_length=1)
 
 
+class InventoryUpdatePayload(BaseModel):
+    inventory_establishment_id: int = Field(ge=1)
+    inventory_supplier: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    inventory_status_id: Optional[int] = Field(default=None, ge=1)
+    items: list[InventoryItemCreatePayload] = Field(min_length=1)
+
+
 class InventoryStatusUpdatePayload(BaseModel):
     inventory_status_id: int = Field(ge=1)
