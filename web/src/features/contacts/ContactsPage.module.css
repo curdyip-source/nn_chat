@@ -1,0 +1,84 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px 32px 0;
+}
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 24px;
+}
+.header {
+  margin-bottom: 16px;
+}
+.title {
+  margin: 0 0 4px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.filters > :nth-child(1) {
+  width: 280px;
+  flex: 0 0 auto;
+}
+.filters > :nth-child(2) {
+  flex: 1;
+  min-width: 200px;
+  max-width: 420px;
+}
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.pageInfo {
+  color: var(--text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.error {
+  background: rgba(255, 69, 58, 0.14);
+  border: 1px solid rgba(255, 69, 58, 0.3);
+  color: var(--danger);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+.empty {
+  color: var(--text-dim);
+  padding: 40px;
+  text-align: center;
+  border: 1px dashed var(--stroke);
+  border-radius: var(--r-lg);
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.row {
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+.name {
+  font-weight: 600;
+}
+.meta {
+  margin-top: 3px;
+  color: var(--text-dim);
+  font-size: 13px;
+}

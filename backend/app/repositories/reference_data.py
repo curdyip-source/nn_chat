@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from sqlalchemy import asc, desc, or_
+from sqlalchemy import asc, desc, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.reference_data import Currency, Establishment, OrderMethod, Product, Status
@@ -106,6 +106,16 @@ class ProductRepository:
     def get_by_article(self, product_article: str) -> Product | None:
         return self.db.query(Product).options(joinedload(Product.owner)).filter(Product.product_article == product_article).first()
 
+    def find_by_exact_name(self, product_name: str) -> list[Product]:
+        normalized = product_name.strip().lower()
+        return (
+            self.db.query(Product)
+            .options(joinedload(Product.owner))
+            .filter(func.lower(func.trim(Product.product_name)) == normalized)
+            .order_by(Product.product_id)
+            .all()
+        )
+
     def list(self, *, search: str | None = None, page: int = 1, page_size: int = 20, sort_by: str = "product_id", sort_order: str = "desc") -> tuple[list[Product], int]:
         query = self.db.query(Product).options(joinedload(Product.owner))
         if search:
@@ -145,3 +155,7 @@ class ProductRepository:
         self.db.commit()
         self.db.refresh(row)
         return self.get_by_id(row.product_id)
+
+    def delete(self, row: Product) -> None:
+        self.db.delete(row)
+        self.db.commit()

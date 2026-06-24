@@ -1,0 +1,198 @@
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.orderBlock {
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 32px 48px minmax(140px, 1.2fr) minmax(180px, 1.8fr) 190px 44px 120px minmax(100px, auto);
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 14px;
+  background: var(--surface-2);
+}
+
+.orderTotal {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.totalLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+}
+
+.expandBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  width: 24px;
+  height: 24px;
+}
+.expandBtn:hover {
+  color: var(--text);
+}
+.no {
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.dim {
+  color: var(--text-dim);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.right {
+  text-align: right;
+}
+
+.cellInput {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+}
+.cellInput:hover {
+  border-color: var(--stroke);
+}
+.cellInput:focus {
+  border-color: var(--focus);
+  background: var(--surface);
+}
+
+.expand {
+  padding: 10px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.infoLabel {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+  flex: 0 0 auto;
+}
+.infoInput {
+  flex: 1;
+  height: 38px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  color: var(--text);
+  padding: 0 12px;
+  font-size: 14px;
+  outline: none;
+}
+.infoInput:hover {
+  border-color: var(--stroke);
+}
+.infoInput:focus {
+  border-color: var(--focus);
+}
+.infoInput::placeholder {
+  color: var(--text-dim);
+}
+.infoInput:focus {
+  border-color: var(--focus);
+}
+
+.itemRow {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 70px 100px 64px 190px 100px 30px;
+  gap: 8px;
+  align-items: center;
+}
+.itemName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+}
+.qty,
+.price,
+.curr {
+  height: 36px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-sm);
+  padding: 0 10px;
+  font-size: 14px;
+  outline: none;
+}
+.qty {
+  -moz-appearance: textfield;
+}
+.qty::-webkit-outer-spin-button,
+.qty::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.curr {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+.qty:focus,
+.price:focus,
+.curr:focus {
+  border-color: var(--focus);
+}
+.itemStatus {
+  margin-left: 24px;
+}
+.itemSum {
+  text-align: right;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.delBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 11px;
+}
+.delBtn:hover {
+  background: rgba(255, 69, 58, 0.16);
+  color: var(--danger);
+}
+
+.rowError {
+  margin-top: 8px;
+  color: var(--danger);
+  font-size: 13px;
+}

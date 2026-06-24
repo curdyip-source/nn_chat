@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
-from app.schemas.inventories import InventoryCreatePayload, InventoryStatusUpdatePayload
-from app.services.inventories import create_inventory, get_inventory, list_inventories, update_inventory_status
+from app.schemas.inventories import InventoryCreatePayload, InventoryStatusUpdatePayload, InventoryUpdatePayload
+from app.services.inventories import create_inventory, get_inventory, list_inventories, update_inventory, update_inventory_status
 
 router = APIRouter(prefix="/inventories", tags=["inventories"])
 
@@ -22,6 +22,11 @@ def get_inventory_route(inventory_id: int, _: dict = Depends(get_current_user), 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_inventory_route(payload: InventoryCreatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     return {"item": create_inventory(db, payload, current_user)}
+
+
+@router.put("/{inventory_id}")
+def update_inventory_route(inventory_id: int, payload: InventoryUpdatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return {"item": update_inventory(db, inventory_id, payload, current_user)}
 
 
 @router.put("/{inventory_id}/status")

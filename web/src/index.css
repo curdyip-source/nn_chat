@@ -1,0 +1,97 @@
+/* ===== NufNaf admin — тёмная тема (паритет с iOS-приложением) ===== */
+:root {
+  /* Фон и поверхности */
+  --bg: #000000;
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-2: rgba(255, 255, 255, 0.08);
+  --surface-3: rgba(255, 255, 255, 0.12);
+  --stroke: rgba(255, 255, 255, 0.10);
+  --stroke-strong: rgba(255, 255, 255, 0.18);
+
+  /* Текст */
+  --text: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.72);
+  --text-dim: rgba(255, 255, 255, 0.46);
+  --danger: rgba(255, 69, 58, 0.95);
+  --success: #16a34a;
+
+  /* Акцент / первичная кнопка (как в приложении — белая на чёрном) */
+  --accent: #ffffff;
+  --accent-text: #000000;
+  --focus: #3b82f6;
+
+  /* Поля ввода */
+  --input-bg: rgba(255, 255, 255, 0.96);
+  --input-text: rgba(0, 0, 0, 0.92);
+  --input-placeholder: rgba(0, 0, 0, 0.5);
+
+  /* Радиусы */
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 20px;
+  --r-xl: 26px;
+
+  /* Отступы / типографика */
+  --gap: 14px;
+  --pad: 20px;
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Rounded', 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Утилиты-хелперы */
+.muted {
+  color: var(--text-muted);
+}
+.dim {
+  color: var(--text-dim);
+}

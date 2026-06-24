@@ -9,7 +9,7 @@ from openpyxl import load_workbook
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.exc import IntegrityError
 
-from app.core.audit_types import ENTITY_TYPE_PRODUCT, EVENT_TYPE_PRODUCT_CREATE, EVENT_TYPE_PRODUCT_UPDATE
+from app.core.audit_types import ENTITY_TYPE_PRODUCT, EVENT_TYPE_PRODUCT_CREATE, EVENT_TYPE_PRODUCT_DELETE, EVENT_TYPE_PRODUCT_UPDATE
 from app.models.reference_data import Product
 from app.repositories.reference_data import ProductRepository, ReferenceDataRepository
 from app.schemas.common import build_pagination, model_to_dict
@@ -336,9 +336,9 @@ class ReferenceDataService:
                 if existing_status is None:
                     continue
                 existing_statuses[key] = existing_status
-                expected_color = item.get("status_color")
-                if existing_status.status_color != expected_color:
-                    self.repository.update_row(existing_status, {"status_color": expected_color})
+                # Цвет дефолтных статусов задаётся только при создании (в create_status выше).
+                # Существующие статусы не трогаем — иначе цвет, выставленный в админке,
+                # затирался бы при каждом обращении к справочникам и не доезжал до приложения.
 
             for status_type, status_name in OBSOLETE_DEFAULT_STATUSES:
                 obsolete_status = self.repository.get_status_by_type_and_name(status_type, status_name)
@@ -450,6 +450,27 @@ class ReferenceDataService:
             "filters": {"search": search, "sort_by": sort_by, "sort_order": sort_order},
         }
 
+    def match_products_by_name(self, names: list[str]) -> dict:
+        # Сопоставление списка наименований с номенклатурой (для импорта документа в заказ).
+        # Точное совпадение по имени -> matched; несколько точных -> candidates;
+        # ни одного -> подсказки по подстроке (candidates), matched=None.
+        self.ensure_seed_data()
+        results = []
+        for raw in names:
+            name = (raw or "").strip()
+            if not name:
+                results.append({"query": raw, "matched": None, "candidates": []})
+                continue
+            exact = self.product_repository.find_by_exact_name(name)
+            if len(exact) == 1:
+                results.append({"query": raw, "matched": serialize_product(exact[0]), "candidates": []})
+            elif len(exact) > 1:
+                results.append({"query": raw, "matched": None, "candidates": [serialize_product(p) for p in exact]})
+            else:
+                suggestions, _ = self.product_repository.list(search=name, page=1, page_size=5)
+                results.append({"query": raw, "matched": None, "candidates": [serialize_product(p) for p in suggestions]})
+        return {"results": results}
+
     def get_product_or_404(self, product_id: int):
         row = self.product_repository.get_by_id(product_id)
         if row is None:
@@ -475,6 +496,12 @@ class ReferenceDataService:
         row = self.product_repository.update(row, data)
         log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_PRODUCT, entity_id=row.product_id, event_type=EVENT_TYPE_PRODUCT_UPDATE, event_payload={"changed_fields": sorted(data.keys())})
         return serialize_product(row)
+
+    def delete_product(self, product_id: int, current_user: dict) -> None:
+        row = self.get_product_or_404(product_id)
+        article = row.product_article
+        self.product_repository.delete(row)
+        log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_PRODUCT, entity_id=product_id, event_type=EVENT_TYPE_PRODUCT_DELETE, event_payload={"product_article": article})
 
     def import_products_from_xlsx(self, *, content: bytes, filename: str | None, current_user: dict) -> dict:
         if filename and not filename.lower().endswith(".xlsx"):
@@ -562,8 +589,16 @@ def create_product(db: Session, payload: ProductCreatePayload, current_user: dic
     return ReferenceDataService(db).create_product(payload, current_user)
 
 
+def match_products_by_name(db: Session, names: list[str]) -> dict:
+    return ReferenceDataService(db).match_products_by_name(names)
+
+
 def update_product(db: Session, product_id: int, payload: ProductUpdatePayload, current_user: dict) -> dict:
     return ReferenceDataService(db).update_product(product_id, payload, current_user)
+
+
+def delete_product(db: Session, product_id: int, current_user: dict) -> None:
+    return ReferenceDataService(db).delete_product(product_id, current_user)
 
 
 def import_products_from_xlsx(db: Session, *, content: bytes, filename: str | None, current_user: dict) -> dict:

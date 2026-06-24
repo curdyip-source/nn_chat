@@ -1,0 +1,98 @@
+.dropzone {
+  border: 2px dashed var(--stroke-strong);
+  border-radius: var(--r-lg);
+  padding: 40px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+.dropzone:hover {
+  border-color: var(--focus);
+  background: var(--surface);
+}
+.dropIcon {
+  font-size: 30px;
+  margin-bottom: 10px;
+}
+.dropTitle {
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.error {
+  margin-top: 14px;
+  color: var(--danger);
+  font-size: 13.5px;
+}
+
+.summary {
+  margin-right: auto;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.fileName {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--stroke);
+  background: var(--surface);
+}
+.ok {
+  border-color: rgba(52, 199, 89, 0.3);
+  background: rgba(52, 199, 89, 0.06);
+}
+.bad {
+  border-color: rgba(255, 159, 10, 0.35);
+  background: rgba(255, 159, 10, 0.06);
+}
+
+.rowMain {
+  flex: 1;
+  min-width: 0;
+}
+.rowName {
+  font-weight: 600;
+}
+.rowMeta {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  margin-top: 2px;
+}
+.matched {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--success);
+}
+.pickerWrap {
+  margin-top: 8px;
+}
+
+.remove {
+  background: var(--surface-2);
+  border: none;
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.remove:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}

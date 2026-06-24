@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy import delete
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.product_registrations import ProductRegistration, ProductRegistrationItem
@@ -44,6 +45,21 @@ class ProductRegistrationRepository:
     def update(self, row: ProductRegistration, data: dict) -> ProductRegistration:
         for field_name, field_value in data.items():
             setattr(row, field_name, field_value)
+        self.db.commit()
+        self.db.refresh(row)
+        return self.get_by_id(row.product_registration_id)
+
+    def update_with_items(self, row: ProductRegistration, data: dict, items: list[dict]) -> ProductRegistration:
+        for field_name, field_value in data.items():
+            setattr(row, field_name, field_value)
+        self.db.execute(
+            delete(ProductRegistrationItem).where(
+                ProductRegistrationItem.product_registration_item_product_registration_id == row.product_registration_id
+            )
+        )
+        self.db.flush()
+        for item in items:
+            self.db.add(ProductRegistrationItem(**item, product_registration_item_product_registration_id=row.product_registration_id))
         self.db.commit()
         self.db.refresh(row)
         return self.get_by_id(row.product_registration_id)

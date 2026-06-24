@@ -1,0 +1,131 @@
+.layout {
+  display: grid;
+  grid-template-columns: 248px 1fr;
+  height: 100%;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--stroke);
+  padding: 20px 14px;
+  gap: 18px;
+  background: #0a0a0b;
+}
+
+.brand {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  padding: 4px 10px;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--r-md);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+}
+.navItem:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+.navActive {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.navIcon {
+  font-size: 17px;
+}
+.soon {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  padding: 2px 7px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.userBox {
+  border-top: 1px solid var(--stroke);
+  padding-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.userName {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logout {
+  background: var(--surface-2);
+  border: 1px solid var(--stroke);
+  color: var(--text-muted);
+  border-radius: var(--r-sm);
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.logout:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.noSidebar {
+  grid-template-columns: 1fr;
+}
+
+.main {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.restoreMenu {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  background: var(--surface-3);
+  border: 1px solid var(--stroke);
+  border-left: none;
+  color: var(--text);
+  border-radius: 0 12px 12px 0;
+  padding: 16px 9px;
+  font-size: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+.restoreMenu:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.placeholder {
+  max-width: 520px;
+  padding: 28px 32px;
+}
+.placeholder h2 {
+  margin: 0 0 8px;
+}
