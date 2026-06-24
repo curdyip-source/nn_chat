@@ -10,7 +10,10 @@ import { useDebouncedValue } from '../../ui/useDebouncedValue'
 import { formatDateTime } from '../../lib/format'
 import { OrderCreate } from './OrderCreate'
 import { OrderDetail } from './OrderDetail'
+import { OrdersTable } from './OrdersTable'
 import styles from './OrdersPage.module.css'
+
+type View = 'list' | 'table'
 
 export function OrdersPage() {
   const ref = useReference()
@@ -23,6 +26,7 @@ export function OrdersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [view, setView] = useState<View>('list')
   const [statusFilter, setStatusFilter] = useState<number | null>(null)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search.trim(), 300)
@@ -78,9 +82,20 @@ export function OrdersPage() {
           <h1 className={styles.title}>Заказы</h1>
           <p className="muted">Последние заказы и создание нового</p>
         </div>
-        <Button variant="primary" onClick={() => setCreating(true)}>
-          + Создать заказ
-        </Button>
+        <div className={styles.headerActions}>
+          <ButtonGroup<View>
+            size="sm"
+            value={view}
+            onChange={(v) => v && setView(v)}
+            options={[
+              { value: 'list', label: 'Список' },
+              { value: 'table', label: 'Таблица' },
+            ]}
+          />
+          <Button variant="primary" onClick={() => setCreating(true)}>
+            + Создать заказ
+          </Button>
+        </div>
       </header>
 
       <div className={styles.filters}>
@@ -110,6 +125,8 @@ export function OrdersPage() {
         <div className="dim">Загрузка…</div>
       ) : orders.length === 0 ? (
         <div className={styles.empty}>Заказов не найдено</div>
+      ) : view === 'table' ? (
+        <OrdersTable orders={orders} onChanged={reload} />
       ) : (
         <div className={styles.list}>
           {orders.map((o) => (
