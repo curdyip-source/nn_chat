@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { LayoutProvider, useLayout } from './LayoutContext'
 import { AuditPage } from '../features/audit/AuditPage'
 import { ChatPage } from '../features/chat/ChatPage'
+import { ContactsPage } from '../features/contacts/ContactsPage'
 import { DocumentsPage } from '../features/documents/DocumentsPage'
 import { INVENTORY_KIND, REGISTRATION_KIND } from '../features/documents/docKind'
 import { OrdersPage } from '../features/orders/OrdersPage'
@@ -25,6 +26,7 @@ const SECTIONS: Section[] = [
   { key: 'products', label: 'Товары', icon: '🏷️', render: () => <ProductsPage />, ready: true },
   { key: 'inventory', label: 'Инвентаризации', icon: '📊', render: () => <DocumentsPage kind={INVENTORY_KIND} />, ready: true },
   { key: 'registrations', label: 'Приёмки', icon: '📥', render: () => <DocumentsPage kind={REGISTRATION_KIND} />, ready: true },
+  { key: 'contacts', label: 'Контрагенты', icon: '👥', render: () => <ContactsPage />, ready: true },
   { key: 'reference', label: 'Справочники', icon: '⚙️', render: () => <ReferencePage />, ready: true },
   { key: 'users', label: 'Пользователи', icon: '👤', render: () => <UsersPage />, ready: true },
   { key: 'audit', label: 'Аудит', icon: '📜', render: () => <AuditPage />, ready: true },

@@ -78,7 +78,9 @@ export type Contact = {
   contact_type: 'buyer' | 'supplier'
   contact_info?: string | null
   contact_establishment_id?: number | null
+  contact_establishment_name?: string | null
   contact_order_method_id?: number | null
+  contact_order_method_name?: string | null
   contact_order_sub_method?: string | null
 }
 

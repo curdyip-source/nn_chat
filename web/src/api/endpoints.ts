@@ -169,6 +169,19 @@ export function searchContacts(
   return apiRequest<Paginated<Contact>>(`/contacts?${q}`, { signal })
 }
 
+export function listContacts(
+  contactType: 'buyer' | 'supplier',
+  opts: { search?: string; page?: number; pageSize?: number } = {},
+) {
+  const q = new URLSearchParams({
+    contact_type: contactType,
+    page: String(opts.page ?? 1),
+    page_size: String(opts.pageSize ?? 50),
+  })
+  if (opts.search) q.set('search', opts.search)
+  return apiRequest<Paginated<Contact>>(`/contacts?${q}`)
+}
+
 // ---------- Orders ----------
 
 export function listOrders(
