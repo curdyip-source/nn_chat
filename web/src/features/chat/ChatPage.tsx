@@ -54,6 +54,12 @@ export function ChatPage() {
     return () => window.clearInterval(id)
   }, [loadLatest])
 
+  // При первой отрисовке ленты прокручиваем к последнему сообщению (вниз).
+  useEffect(() => {
+    if (!loading) scrollToBottom()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
+
   const loadOlder = () => {
     const oldest = messages[0]?.message_id
     if (!oldest) return

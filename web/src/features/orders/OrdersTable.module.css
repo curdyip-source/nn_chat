@@ -169,6 +169,9 @@
 .curr:focus {
   border-color: var(--focus);
 }
+.itemStatus {
+  margin-left: 24px;
+}
 .itemSum {
   text-align: right;
   font-weight: 600;

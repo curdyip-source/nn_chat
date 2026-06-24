@@ -204,9 +204,11 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
                   </option>
                 ))}
               </select>
-              {itemStatusOptions.length > 0 && (
-                <StatusSelect size="sm" value={d.statusId} options={itemStatusOptions} onChange={(sid) => patchDraft(d.uid, { statusId: sid })} />
-              )}
+              <span className={styles.itemStatus}>
+                {itemStatusOptions.length > 0 && (
+                  <StatusSelect size="sm" value={d.statusId} options={itemStatusOptions} onChange={(sid) => patchDraft(d.uid, { statusId: sid })} />
+                )}
+              </span>
               <span className={styles.itemSum}>
                 {formatAmount((Number(d.price) || 0) * d.quantity)}
                 {currencySign(d.currencyId)}
