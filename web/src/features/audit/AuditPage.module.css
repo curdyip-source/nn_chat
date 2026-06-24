@@ -1,5 +1,14 @@
 .page {
-  width: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px 32px 0;
+}
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 24px;
 }
 .header {
   margin-bottom: 20px;
@@ -11,11 +20,7 @@
   letter-spacing: -0.5px;
 }
 .filters {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
   margin-bottom: 18px;
-  max-width: 640px;
 }
 .error {
   background: rgba(255, 69, 58, 0.14);
@@ -36,37 +41,48 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 .row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   background: var(--surface);
   border: 1px solid var(--stroke);
   border-radius: var(--r-md);
-  padding: 12px 14px;
+  padding: 11px 14px;
 }
-.rowTop {
+.icon {
+  font-size: 18px;
+  line-height: 1.4;
+  flex: 0 0 auto;
+}
+.body {
+  min-width: 0;
+  flex: 1;
+}
+.line {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 6px;
+  font-size: 14.5px;
 }
-.event {
+.actor {
   font-weight: 700;
-  font-size: 14px;
+}
+.action {
+  color: var(--text-muted);
+}
+.actionError {
+  color: var(--danger);
+}
+.target {
+  font-weight: 600;
+  color: var(--text);
 }
 .time {
   color: var(--text-dim);
   font-size: 12.5px;
-  flex: 0 0 auto;
-}
-.rowMeta {
-  color: var(--text-muted);
-  font-size: 13px;
   margin-top: 3px;
-}
-.payload {
-  color: var(--text-dim);
-  font-size: 12.5px;
-  margin-top: 6px;
-  word-break: break-word;
 }

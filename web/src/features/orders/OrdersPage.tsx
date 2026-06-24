@@ -83,6 +83,7 @@ export function OrdersPage() {
       </div>
 
       {error && <div className={styles.error}>{error}</div>}
+      <div className={styles.scroll}>
       {loading ? (
         <div className="dim">Загрузка…</div>
       ) : orders.length === 0 ? (
@@ -110,6 +111,7 @@ export function OrdersPage() {
           ))}
         </div>
       )}
+      </div>
     </div>
   )
 }

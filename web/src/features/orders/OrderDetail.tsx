@@ -101,6 +101,7 @@ export function OrderDetail({ orderId, onBack }: { orderId: number; onBack: () =
         {saving && <span className="dim">Сохранение…</span>}
       </header>
 
+      <div className={styles.scroll}>
       {error && <div className={styles.error}>{error}</div>}
       {loading ? (
         <div className="dim">Загрузка…</div>
@@ -176,6 +177,7 @@ export function OrderDetail({ orderId, onBack }: { orderId: number; onBack: () =
           </section>
         </>
       )}
+      </div>
     </div>
   )
 }

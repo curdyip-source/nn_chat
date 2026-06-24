@@ -133,6 +133,7 @@ export function OrderCreate({
         />
       </div>
 
+      <div className={styles.scroll}>
       {step === 'info' ? (
         <div className={styles.section}>
           <div className={styles.clientField}>
@@ -265,6 +266,7 @@ export function OrderCreate({
       )}
 
       {error && <div className={styles.error}>{error}</div>}
+      </div>
 
       <footer className={styles.footer}>
         <div className={styles.total}>

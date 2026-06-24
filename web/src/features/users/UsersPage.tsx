@@ -67,6 +67,7 @@ export function UsersPage() {
       </div>
 
       {error && <div className={styles.error}>{error}</div>}
+      <div className={styles.scroll}>
       {loading ? (
         <div className="dim">Загрузка…</div>
       ) : users.length === 0 ? (
@@ -116,6 +117,7 @@ export function UsersPage() {
           ))}
         </div>
       )}
+      </div>
     </div>
   )
 }
