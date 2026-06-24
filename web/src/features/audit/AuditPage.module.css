@@ -81,6 +81,15 @@
   font-weight: 600;
   color: var(--text);
 }
+.details {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.details li {
+  margin: 2px 0;
+}
 .time {
   color: var(--text-dim);
   font-size: 12.5px;

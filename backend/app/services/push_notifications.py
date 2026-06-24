@@ -45,7 +45,7 @@ def send_push_notification_event(
         )
         return 0
 
-    title, body = build_notification_content(message_type=message_type, sender_name=sender_name, message_text=message_text)
+    title, body = build_notification_content(message_type=message_type, sender_name=sender_name, message_text=message_text, entity_id=entity_id)
     return _dispatch_to_devices(db, devices=targets, title=title, body=body, event_type=message_type, entity_id=entity_id)
 
 
@@ -200,16 +200,17 @@ def build_apns_provider_token() -> str:
     )
 
 
-def build_notification_content(*, message_type: str, sender_name: str, message_text: str | None) -> tuple[str, str]:
+def build_notification_content(*, message_type: str, sender_name: str, message_text: str | None, entity_id: int | None = None) -> tuple[str, str]:
     normalized_sender_name = sender_name.strip() or "Пользователь"
     normalized_text = (message_text or "").strip()
+    number = f" №{entity_id}" if entity_id else ""
 
     if message_type == "order":
-        return "Новый заказ", f"{normalized_sender_name} создал новый заказ"
+        return f"Новый заказ{number}", f"{normalized_sender_name} создал заказ{number}"
     if message_type == "inventory":
-        return "Новая инвентаризация", f"{normalized_sender_name} создал новую инвентаризацию"
+        return f"Новая инвентаризация{number}", f"{normalized_sender_name} создал инвентаризацию{number}"
     if message_type == "product_registration":
-        return "Новая приемка", f"{normalized_sender_name} создал новую приемку"
+        return f"Новая приемка{number}", f"{normalized_sender_name} создал приемку{number}"
     if normalized_text:
         return "Новое сообщение", f"{normalized_sender_name}: {normalized_text}"
     return "Новое сообщение", f"Новое сообщение от {normalized_sender_name}"

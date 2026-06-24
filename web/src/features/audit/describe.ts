@@ -90,6 +90,63 @@ export function describeAuditEvent(ev: AuditEvent): AuditView {
   return { icon: GROUP_ICONS[group] ?? '•', title, target, isError }
 }
 
+// ----- Детализация изменения заказа (order.update) -----
+
+const ORDER_FIELD_LABELS: Record<string, string> = {
+  order_customer: 'клиент',
+  order_status: 'статус заказа',
+  order_establishment_name: 'склад',
+  order_method_name: 'способ',
+  order_sub_method: 'подспособ',
+  order_contact_method: 'связь',
+  order_info: 'информация',
+}
+
+const ITEM_FIELD_LABELS: Record<string, string> = {
+  order_item_name: 'наименование',
+  order_item_article: 'артикул',
+  order_item_quantity: 'кол-во',
+  order_item_price: 'цена',
+  order_item_status: 'статус',
+  order_item_note: 'заметка',
+  order_item_source_establishment_name: 'откуда',
+  order_item_destination_establishment_name: 'куда',
+}
+
+function fmtVal(v: unknown): string {
+  if (v === null || v === undefined || v === '') return '—'
+  return String(v)
+}
+
+type Change = { from?: unknown; to?: unknown }
+
+export function describeOrderUpdate(payload: Record<string, unknown> | null): string[] {
+  if (!payload) return []
+  const lines: string[] = []
+  const cf = (payload.changed_fields ?? {}) as Record<string, Change>
+  for (const [field, label] of Object.entries(ORDER_FIELD_LABELS)) {
+    const ch = cf[field]
+    if (ch) lines.push(`${label}: «${fmtVal(ch.from)}» → «${fmtVal(ch.to)}»`)
+  }
+  const items = (payload.items ?? {}) as {
+    added?: { after?: Record<string, unknown> }[]
+    removed?: { before?: Record<string, unknown> }[]
+    updated?: { changes?: Record<string, Change>; after?: Record<string, unknown>; before?: Record<string, unknown> }[]
+  }
+  for (const a of items.added ?? []) lines.push(`➕ добавлен товар «${fmtVal(a.after?.order_item_name)}»`)
+  for (const r of items.removed ?? []) lines.push(`➖ убран товар «${fmtVal(r.before?.order_item_name)}»`)
+  for (const u of items.updated ?? []) {
+    const name = fmtVal(u.after?.order_item_name ?? u.before?.order_item_name)
+    const parts: string[] = []
+    for (const [field, label] of Object.entries(ITEM_FIELD_LABELS)) {
+      const ch = u.changes?.[field]
+      if (ch) parts.push(`${label} ${fmtVal(ch.from)}→${fmtVal(ch.to)}`)
+    }
+    if (parts.length) lines.push(`«${name}»: ${parts.join(', ')}`)
+  }
+  return lines
+}
+
 // Быстрые фильтры по типу сущности.
 export const AUDIT_QUICK_FILTERS: { label: string; entityType: string | null }[] = [
   { label: 'Все', entityType: null },
