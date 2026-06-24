@@ -1,32 +1,24 @@
 .table {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 10px;
+}
+
+.orderBlock {
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
 }
 
 .row {
   display: grid;
-  grid-template-columns: 32px 56px minmax(160px, 1.5fr) 1fr 200px 60px 150px;
+  grid-template-columns: 32px 56px minmax(160px, 1.5fr) 1fr 200px 56px 150px;
   gap: 10px;
   align-items: center;
-  background: var(--surface);
-  border: 1px solid var(--stroke);
-  border-radius: var(--r-sm);
   padding: 8px 12px;
   font-size: 14px;
-}
-
-.head {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: var(--bg);
-  border: none;
-  color: var(--text-dim);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  padding: 4px 12px 8px;
+  background: var(--surface-2);
 }
 
 .expandBtn {
@@ -63,6 +55,7 @@
   color: var(--text);
   padding: 6px 8px;
   font-size: 14px;
+  font-weight: 600;
   outline: none;
 }
 .cellInput:hover {
@@ -70,21 +63,47 @@
 }
 .cellInput:focus {
   border-color: var(--focus);
-  background: var(--surface-2);
+  background: var(--surface);
 }
 
 .expand {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--stroke);
-  border-radius: var(--r-sm);
-  padding: 10px 12px 12px 42px;
+  padding: 10px 14px 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.infoLabel {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+  flex: 0 0 auto;
+}
+.infoInput {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 14px;
+  outline: none;
+}
+.infoInput:focus {
+  border-color: var(--focus);
+}
+
 .itemRow {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) 72px 100px 70px 200px 110px;
+  grid-template-columns: minmax(160px, 1fr) 70px 100px 64px 190px 100px 30px;
   gap: 8px;
   align-items: center;
 }
@@ -129,8 +148,27 @@
   font-weight: 600;
   font-size: 13.5px;
 }
-.expandActions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 6px;
+.delBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 11px;
+}
+.delBtn:hover {
+  background: rgba(255, 69, 58, 0.16);
+  color: var(--danger);
+}
+
+.addRow {
+  margin-top: 8px;
+  max-width: 360px;
+}
+
+.rowError {
+  margin-top: 8px;
+  color: var(--danger);
+  font-size: 13px;
 }

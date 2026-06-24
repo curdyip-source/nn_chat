@@ -135,7 +135,12 @@ export function OrdersPage() {
       ) : orders.length === 0 ? (
         <div className={styles.empty}>Заказов не найдено</div>
       ) : view === 'table' ? (
-        <OrdersTable orders={orders} onChanged={reload} />
+        <OrdersTable
+          orders={orders}
+          onOrderPatched={(o) =>
+            setOrders((prev) => prev.map((x) => (x.order_id === o.order_id ? o : x)))
+          }
+        />
       ) : (
         <div className={styles.list}>
           {orders.map((o) => (

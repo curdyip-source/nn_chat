@@ -17,7 +17,7 @@ function defaultItems(order: Order): OrderUpdateItem[] {
 /** Собирает payload PUT /orders из заказа с точечными правками. */
 export function orderToUpdate(
   order: Order,
-  overrides: { customer?: string; statusId?: number; items?: OrderUpdateItem[] } = {},
+  overrides: { customer?: string; info?: string; statusId?: number; items?: OrderUpdateItem[] } = {},
 ): OrderUpdate {
   return {
     order_establishment_id: order.order_establishment_id!,
@@ -25,7 +25,7 @@ export function orderToUpdate(
     order_sub_method: order.order_sub_method ?? null,
     order_contact_method: order.order_contact_method ?? null,
     order_customer: overrides.customer ?? order.order_customer,
-    order_info: order.order_info,
+    order_info: overrides.info ?? order.order_info,
     order_status_id: overrides.statusId ?? order.order_status_id!,
     items: overrides.items ?? defaultItems(order),
   }
