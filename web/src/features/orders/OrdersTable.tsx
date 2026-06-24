@@ -130,6 +130,13 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
     if (info !== order.order_info) void persist({ info })
   }
 
+  const totals = new Map<string, number>()
+  for (const d of drafts) {
+    const sign = currencySign(d.currencyId) || '—'
+    totals.set(sign, (totals.get(sign) ?? 0) + (Number(d.price) || 0) * d.quantity)
+  }
+  const totalText = [...totals.entries()].map(([s, v]) => `${formatAmount(v)}${s}`).join(' · ')
+
   return (
     <div className={styles.orderBlock}>
       <div className={styles.row}>
@@ -142,6 +149,10 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
         <StatusSelect size="sm" value={order.order_status_id} options={orderStatusOptions} onChange={changeStatus} />
         <span className={styles.right}>{drafts.length}</span>
         <span className={styles.dim}>{formatDateTime(order.order_created_at)}</span>
+        <span className={styles.orderTotal}>
+          <span className={styles.totalLabel}>Итого</span>
+          {totalText || '—'}
+        </span>
       </div>
 
       {expanded && (
@@ -155,6 +166,13 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
               onChange={(e) => setInfo(e.target.value)}
               onBlur={saveInfo}
             />
+            <Button
+              variant="secondary"
+              style={{ height: 38, minHeight: 38, padding: '0 16px', flex: '0 0 auto' }}
+              onClick={() => setAddOpen(true)}
+            >
+              + Товар
+            </Button>
           </div>
 
           {drafts.map((d) => (
@@ -194,12 +212,6 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
               </button>
             </div>
           ))}
-
-          <div className={styles.addRow}>
-            <Button variant="secondary" onClick={() => setAddOpen(true)}>
-              + Товар
-            </Button>
-          </div>
 
           {error && <div className={styles.rowError}>{error}</div>}
         </div>

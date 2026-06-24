@@ -13,12 +13,28 @@
 
 .row {
   display: grid;
-  grid-template-columns: 32px 56px minmax(160px, 1.5fr) 1fr 200px 56px 150px;
+  grid-template-columns: 32px 50px minmax(150px, 1.4fr) 0.9fr 190px 46px 130px minmax(110px, auto);
   gap: 10px;
   align-items: center;
   padding: 8px 12px;
   font-size: 14px;
   background: var(--surface-2);
+}
+
+.orderTotal {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.totalLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
 }
 
 .expandBtn {
@@ -89,13 +105,23 @@
 }
 .infoInput {
   flex: 1;
-  background: var(--surface-2);
-  border: 1px solid var(--stroke);
+  height: 38px;
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: var(--r-sm);
   color: var(--text);
-  padding: 8px 10px;
+  padding: 0 12px;
   font-size: 14px;
   outline: none;
+}
+.infoInput:hover {
+  border-color: var(--stroke);
+}
+.infoInput:focus {
+  border-color: var(--focus);
+}
+.infoInput::placeholder {
+  color: var(--text-dim);
 }
 .infoInput:focus {
   border-color: var(--focus);
@@ -160,11 +186,6 @@
 .delBtn:hover {
   background: rgba(255, 69, 58, 0.16);
   color: var(--danger);
-}
-
-.addRow {
-  margin-top: 8px;
-  max-width: 360px;
 }
 
 .rowError {
