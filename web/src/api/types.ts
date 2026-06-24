@@ -119,6 +119,10 @@ export type OrderItem = {
   order_item_supplier?: string | null
   order_item_note?: string | null
   order_item_currency_id?: number | null
+  order_item_source_establishment_id?: number | null
+  order_item_source_establishment_name?: string | null
+  order_item_destination_establishment_id?: number | null
+  order_item_destination_establishment_name?: string | null
 }
 
 export type Order = {
@@ -149,6 +153,8 @@ export type OrderUpdateItem = {
   order_item_currency_id?: number | null
   order_item_supplier?: string | null
   order_item_note?: string | null
+  order_item_source_establishment_id?: number | null
+  order_item_destination_establishment_id?: number | null
 }
 
 export type OrderUpdate = {

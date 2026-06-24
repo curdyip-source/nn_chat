@@ -5,6 +5,8 @@ import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
 import { StatusSelect } from '../../ui/StatusSelect'
 import { formatAmount, formatDateTime } from '../../lib/format'
+import { ItemStatusExtraModal } from './ItemStatusExtraModal'
+import { statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
 import styles from './OrderDetail.module.css'
 
 function buildUpdatePayload(order: Order): OrderUpdate {
@@ -26,6 +28,8 @@ function buildUpdatePayload(order: Order): OrderUpdate {
       order_item_currency_id: it.order_item_currency_id ?? null,
       order_item_supplier: it.order_item_supplier ?? null,
       order_item_note: it.order_item_note ?? null,
+      order_item_source_establishment_id: it.order_item_source_establishment_id ?? null,
+      order_item_destination_establishment_id: it.order_item_destination_establishment_id ?? null,
     })),
   }
 }
@@ -49,6 +53,7 @@ export function OrderDetail({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [pendingExtra, setPendingExtra] = useState<{ itemId: number; statusId: number; mode: ExtraMode } | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -77,13 +82,18 @@ export function OrderDetail({
     }
   }
 
-  const changeItemStatus = async (itemId: number, statusId: number) => {
+  const applyItemStatus = async (itemId: number, statusId: number, extra?: ItemExtra) => {
     if (!order) return
     setSaving(true)
     setError(null)
     const payload = buildUpdatePayload(order)
     const idx = order.items.findIndex((it) => it.order_item_id === itemId)
-    if (idx >= 0) payload.items[idx].order_item_status_id = statusId
+    if (idx >= 0) {
+      payload.items[idx].order_item_status_id = statusId
+      if (extra?.supplier !== undefined) payload.items[idx].order_item_supplier = extra.supplier
+      if (extra?.sourceEstablishmentId !== undefined) payload.items[idx].order_item_source_establishment_id = extra.sourceEstablishmentId
+      if (extra?.destinationEstablishmentId !== undefined) payload.items[idx].order_item_destination_establishment_id = extra.destinationEstablishmentId
+    }
     try {
       const { item } = await updateOrder(order.order_id, payload)
       setOrder(item)
@@ -92,6 +102,13 @@ export function OrderDetail({
     } finally {
       setSaving(false)
     }
+  }
+
+  const changeItemStatus = (itemId: number, statusId: number) => {
+    const name = itemStatusOptions.find((o) => o.id === statusId)?.label
+    const mode = statusExtraMode(name)
+    if (mode) setPendingExtra({ itemId, statusId, mode })
+    else void applyItemStatus(itemId, statusId)
   }
 
   const totals = new Map<string, number>()
@@ -192,6 +209,27 @@ export function OrderDetail({
         </>
       )}
       </div>
+
+      {pendingExtra && order && (() => {
+        const it = order.items.find((x) => x.order_item_id === pendingExtra.itemId)
+        const initial: ItemExtra = {
+          supplier: it?.order_item_supplier ?? null,
+          sourceEstablishmentId: it?.order_item_source_establishment_id ?? null,
+          destinationEstablishmentId: it?.order_item_destination_establishment_id ?? null,
+        }
+        return (
+          <ItemStatusExtraModal
+            mode={pendingExtra.mode}
+            initial={initial}
+            onCancel={() => setPendingExtra(null)}
+            onConfirm={(extra) => {
+              const { itemId, statusId } = pendingExtra
+              setPendingExtra(null)
+              void applyItemStatus(itemId, statusId, extra)
+            }}
+          />
+        )
+      })()}
     </div>
   )
 }

@@ -51,6 +51,9 @@ export function OrderCreate({
           price: it.order_item_price,
           currencyId: it.order_item_currency_id ?? null,
           statusId: it.order_item_status_id ?? null,
+          supplier: it.order_item_supplier ?? null,
+          sourceEstablishmentId: it.order_item_source_establishment_id ?? null,
+          destinationEstablishmentId: it.order_item_destination_establishment_id ?? null,
         }))
       : [],
   )
@@ -108,6 +111,9 @@ export function OrderCreate({
       order_item_price: (Number(it.price) || 0).toFixed(2),
       order_item_status_id: it.statusId ?? null,
       order_item_currency_id: it.currencyId,
+      order_item_supplier: it.supplier ?? null,
+      order_item_source_establishment_id: it.sourceEstablishmentId ?? null,
+      order_item_destination_establishment_id: it.destinationEstablishmentId ?? null,
     }))
     try {
       if (editOrder) {

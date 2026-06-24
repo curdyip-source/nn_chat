@@ -10,6 +10,9 @@ export type CartItem = {
   price: string // строка для аккуратного ввода десятичных
   currencyId: number | null
   statusId?: number | null // статус позиции (для заказов; сохраняется при редактировании)
+  supplier?: string | null
+  sourceEstablishmentId?: number | null
+  destinationEstablishmentId?: number | null
 }
 
 export function newUid(): string {

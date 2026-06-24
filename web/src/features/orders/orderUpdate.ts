@@ -11,6 +11,8 @@ function defaultItems(order: Order): OrderUpdateItem[] {
     order_item_currency_id: it.order_item_currency_id ?? null,
     order_item_supplier: it.order_item_supplier ?? null,
     order_item_note: it.order_item_note ?? null,
+    order_item_source_establishment_id: it.order_item_source_establishment_id ?? null,
+    order_item_destination_establishment_id: it.order_item_destination_establishment_id ?? null,
   }))
 }
 

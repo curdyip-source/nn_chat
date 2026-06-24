@@ -7,6 +7,8 @@ import { StatusSelect } from '../../ui/StatusSelect'
 import { formatAmount, formatDateTime } from '../../lib/format'
 import { AddItemModal } from './AddItemModal'
 import { newUid } from './cart'
+import { ItemStatusExtraModal } from './ItemStatusExtraModal'
+import { statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
 import { orderToUpdate } from './orderUpdate'
 import styles from './OrdersTable.module.css'
 
@@ -19,6 +21,9 @@ type ItemDraft = {
   price: string
   currencyId: number | null
   statusId: number | null
+  supplier: string | null
+  sourceEstablishmentId: number | null
+  destinationEstablishmentId: number | null
 }
 
 function toApiItem(d: ItemDraft): OrderUpdateItem {
@@ -30,6 +35,9 @@ function toApiItem(d: ItemDraft): OrderUpdateItem {
     order_item_price: (Number(d.price) || 0).toFixed(2),
     order_item_status_id: d.statusId,
     order_item_currency_id: d.currencyId,
+    order_item_supplier: d.supplier,
+    order_item_source_establishment_id: d.sourceEstablishmentId,
+    order_item_destination_establishment_id: d.destinationEstablishmentId,
   }
 }
 
@@ -58,6 +66,7 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
 
   const [expanded, setExpanded] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
+  const [pendingExtra, setPendingExtra] = useState<{ uid: string; statusId: number; mode: ExtraMode } | null>(null)
   const [customer, setCustomer] = useState(order.order_customer)
   const [info, setInfo] = useState(order.order_info)
   const [error, setError] = useState('')
@@ -71,6 +80,9 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
       price: it.order_item_price,
       currencyId: it.order_item_currency_id ?? null,
       statusId: it.order_item_status_id ?? null,
+      supplier: it.order_item_supplier ?? null,
+      sourceEstablishmentId: it.order_item_source_establishment_id ?? null,
+      destinationEstablishmentId: it.order_item_destination_establishment_id ?? null,
     })),
   )
   const timer = useRef<number | null>(null)
@@ -102,10 +114,17 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
   const addProduct = (p: Product, price: string, quantity: number) => {
     const next = [
       ...drafts,
-      { uid: newUid(), productId: p.product_id, article: p.product_article, name: p.product_name, quantity, price, currencyId: defaultCurrencyId, statusId: null },
+      { uid: newUid(), productId: p.product_id, article: p.product_article, name: p.product_name, quantity, price, currencyId: defaultCurrencyId, statusId: null, supplier: null, sourceEstablishmentId: null, destinationEstablishmentId: null },
     ]
     setDrafts(next)
     void persist({ drafts: next })
+  }
+
+  const onItemStatus = (d: ItemDraft, sid: number) => {
+    const name = itemStatusOptions.find((o) => o.id === sid)?.label
+    const mode = statusExtraMode(name)
+    if (mode) setPendingExtra({ uid: d.uid, statusId: sid, mode })
+    else patchDraft(d.uid, { statusId: sid })
   }
   const removeItem = (uid: string) => {
     if (drafts.length <= 1) {
@@ -206,7 +225,7 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
               </select>
               <span className={styles.itemStatus}>
                 {itemStatusOptions.length > 0 && (
-                  <StatusSelect size="sm" value={d.statusId} options={itemStatusOptions} onChange={(sid) => patchDraft(d.uid, { statusId: sid })} />
+                  <StatusSelect size="sm" value={d.statusId} options={itemStatusOptions} onChange={(sid) => onItemStatus(d, sid)} />
                 )}
               </span>
               <span className={styles.itemSum}>
@@ -224,6 +243,23 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
       )}
 
       <AddItemModal open={addOpen} onClose={() => setAddOpen(false)} onAdd={addProduct} />
+
+      {pendingExtra && (() => {
+        const d = drafts.find((x) => x.uid === pendingExtra.uid)
+        if (!d) return null
+        const initial: ItemExtra = { supplier: d.supplier, sourceEstablishmentId: d.sourceEstablishmentId, destinationEstablishmentId: d.destinationEstablishmentId }
+        return (
+          <ItemStatusExtraModal
+            mode={pendingExtra.mode}
+            initial={initial}
+            onCancel={() => setPendingExtra(null)}
+            onConfirm={(extra) => {
+              patchDraft(pendingExtra.uid, { statusId: pendingExtra.statusId, ...extra })
+              setPendingExtra(null)
+            }}
+          />
+        )
+      })()}
     </div>
   )
 }
