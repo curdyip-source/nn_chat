@@ -210,6 +210,36 @@ export type ProductRegistration = {
   items: ProductRegistrationItem[]
 }
 
+// ----- Чат -----
+
+export type MessageAttachment = {
+  attachment_id: number
+  attachment_kind: 'photo' | 'file'
+  attachment_original_filename: string
+  attachment_mime_type: string
+  attachment_size_bytes?: number | null
+}
+
+export type ChatMessage = {
+  message_id: number
+  message_type: string
+  message_text: string | null
+  message_owner_user_id: number
+  message_owner_user_login: string | null
+  message_owner_first_name?: string | null
+  message_owner_second_name?: string | null
+  message_order_id?: number | null
+  message_inventory_id?: number | null
+  message_product_registration_id?: number | null
+  message_status?: string | null
+  message_status_color?: string | null
+  message_created_at: string | null
+  attachments: MessageAttachment[]
+  order?: Order | null
+  inventory?: Inventory | null
+  product_registration?: ProductRegistration | null
+}
+
 export type AuditEvent = {
   audit_event_id: number
   actor_user_id: number | null

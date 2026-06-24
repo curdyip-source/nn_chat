@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { LayoutProvider, useLayout } from './LayoutContext'
 import { AuditPage } from '../features/audit/AuditPage'
+import { ChatPage } from '../features/chat/ChatPage'
 import { DocumentsPage } from '../features/documents/DocumentsPage'
 import { INVENTORY_KIND, REGISTRATION_KIND } from '../features/documents/docKind'
 import { OrdersPage } from '../features/orders/OrdersPage'
@@ -27,17 +28,8 @@ const SECTIONS: Section[] = [
   { key: 'reference', label: 'Справочники', icon: '⚙️', render: () => <ReferencePage />, ready: true },
   { key: 'users', label: 'Пользователи', icon: '👤', render: () => <UsersPage />, ready: true },
   { key: 'audit', label: 'Аудит', icon: '📜', render: () => <AuditPage />, ready: true },
-  { key: 'chat', label: 'Чат', icon: '💬', render: () => <Placeholder name="Чат" />, ready: false },
+  { key: 'chat', label: 'Чат', icon: '💬', render: () => <ChatPage />, ready: true },
 ]
-
-function Placeholder({ name }: { name: string }) {
-  return (
-    <div className={styles.placeholder}>
-      <h2>{name}</h2>
-      <p className="muted">Этот раздел будет перенесён на новый интерфейс следующим шагом.</p>
-    </div>
-  )
-}
 
 export function AppShell() {
   return (

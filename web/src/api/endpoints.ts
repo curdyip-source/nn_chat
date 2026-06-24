@@ -2,6 +2,7 @@ import { apiRequest } from './client'
 import type {
   AuditEvent,
   AuthResponse,
+  ChatMessage,
   Contact,
   Currency,
   Establishment,
@@ -199,6 +200,32 @@ export function updateOrderStatus(orderId: number, statusId: number) {
 
 export function updateOrder(orderId: number, payload: OrderUpdate) {
   return apiRequest<{ item: Order }>(`/orders/${orderId}`, { method: 'PUT', body: payload })
+}
+
+// ---------- Chat ----------
+
+export function listMessages(opts: { beforeMessageId?: number; pageSize?: number } = {}) {
+  const q = new URLSearchParams({ page: '1', page_size: String(opts.pageSize ?? 50) })
+  if (opts.beforeMessageId) q.set('before_message_id', String(opts.beforeMessageId))
+  return apiRequest<Paginated<ChatMessage>>(`/messages?${q}`)
+}
+
+export function sendMessage(text: string) {
+  return apiRequest<{ item: ChatMessage }>('/messages', {
+    method: 'POST',
+    body: { message_type: 'message', message_text: text, attachments: [], mentioned_user_ids: [] },
+  })
+}
+
+export function editMessage(messageId: number, text: string) {
+  return apiRequest<{ item: ChatMessage }>(`/messages/${messageId}`, {
+    method: 'PUT',
+    body: { message_text: text },
+  })
+}
+
+export function deleteMessage(messageId: number) {
+  return apiRequest<void>(`/messages/${messageId}`, { method: 'DELETE' })
 }
 
 // ---------- Inventories ----------
