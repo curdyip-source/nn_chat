@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_admin
-from app.schemas.reference_data import ProductCreatePayload, ProductUpdatePayload
-from app.services.reference_data import create_product, get_product_import_job, import_products_from_xlsx, list_products, update_product
+from app.schemas.reference_data import ProductCreatePayload, ProductMatchPayload, ProductUpdatePayload
+from app.services.reference_data import create_product, get_product_import_job, import_products_from_xlsx, list_products, match_products_by_name, update_product
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -25,6 +25,11 @@ def get_products(
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_product_route(payload: ProductCreatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     return {"item": create_product(db, payload, current_user)}
+
+
+@router.post("/match")
+def match_products_route(payload: ProductMatchPayload, _: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return match_products_by_name(db, payload.names)
 
 
 @router.put("/{product_id}")

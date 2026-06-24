@@ -31,6 +31,10 @@ class ProductCreatePayload(BaseModel):
     product_cost_usd: Decimal = Field(ge=0, decimal_places=2, max_digits=12)
 
 
+class ProductMatchPayload(BaseModel):
+    names: list[str] = Field(min_length=1, max_length=2000)
+
+
 class ProductUpdatePayload(BaseModel):
     product_article: Optional[str] = Field(default=None, min_length=1, max_length=100)
     product_name: Optional[str] = Field(default=None, min_length=1, max_length=500)

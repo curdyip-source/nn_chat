@@ -1,0 +1,59 @@
+.group {
+  display: grid;
+  /* auto-fit (а не auto-fill) — при малом числе кнопок они растягиваются на всю ширину блока */
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--stroke);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease,
+    transform 0.06s ease;
+}
+.chip:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.chip:active {
+  transform: scale(0.97);
+}
+.chip.sm {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+.active:hover {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--accent-text);
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}

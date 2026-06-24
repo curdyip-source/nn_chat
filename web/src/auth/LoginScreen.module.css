@@ -1,0 +1,58 @@
+.screen {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(
+      1200px 600px at 50% -10%,
+      rgba(59, 130, 246, 0.12),
+      transparent 60%
+    ),
+    var(--bg);
+}
+
+.card {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: rgba(18, 18, 20, 0.9);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-xl);
+  padding: 32px 28px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.logo {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.sub {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.error {
+  background: rgba(255, 69, 58, 0.14);
+  border: 1px solid rgba(255, 69, 58, 0.3);
+  color: var(--danger);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  font-size: 13.5px;
+}
+
+.note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  text-align: center;
+}

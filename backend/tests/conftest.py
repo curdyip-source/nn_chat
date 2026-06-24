@@ -3,13 +3,22 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
 from app.main import app
 from app.models import User
+
+
+def _make_sqlite_unicode_aware(engine) -> None:
+    # Встроенный SQLite lower() работает только с ASCII; в проде (PostgreSQL)
+    # lower() — Unicode-aware. Регистрируем питоновский lower(), чтобы тесты
+    # отражали продовое поведение для кириллицы.
+    @event.listens_for(engine, "connect")
+    def _register(dbapi_connection, _record):  # noqa: ANN001
+        dbapi_connection.create_function("lower", 1, lambda v: v.lower() if isinstance(v, str) else v)
 
 
 @pytest.fixture()
@@ -19,6 +28,7 @@ def db_session() -> Generator[Session, None, None]:
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    _make_sqlite_unicode_aware(engine)
     TestingSessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, expire_on_commit=False)
     Base.metadata.create_all(bind=engine)
 
@@ -42,6 +52,7 @@ def integration_db_session(integration_db_url: str) -> Generator[Session, None, 
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    _make_sqlite_unicode_aware(engine)
     TestingSessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, expire_on_commit=False)
     Base.metadata.create_all(bind=engine)
 

@@ -450,6 +450,27 @@ class ReferenceDataService:
             "filters": {"search": search, "sort_by": sort_by, "sort_order": sort_order},
         }
 
+    def match_products_by_name(self, names: list[str]) -> dict:
+        # Сопоставление списка наименований с номенклатурой (для импорта документа в заказ).
+        # Точное совпадение по имени -> matched; несколько точных -> candidates;
+        # ни одного -> подсказки по подстроке (candidates), matched=None.
+        self.ensure_seed_data()
+        results = []
+        for raw in names:
+            name = (raw or "").strip()
+            if not name:
+                results.append({"query": raw, "matched": None, "candidates": []})
+                continue
+            exact = self.product_repository.find_by_exact_name(name)
+            if len(exact) == 1:
+                results.append({"query": raw, "matched": serialize_product(exact[0]), "candidates": []})
+            elif len(exact) > 1:
+                results.append({"query": raw, "matched": None, "candidates": [serialize_product(p) for p in exact]})
+            else:
+                suggestions, _ = self.product_repository.list(search=name, page=1, page_size=5)
+                results.append({"query": raw, "matched": None, "candidates": [serialize_product(p) for p in suggestions]})
+        return {"results": results}
+
     def get_product_or_404(self, product_id: int):
         row = self.product_repository.get_by_id(product_id)
         if row is None:
@@ -560,6 +581,10 @@ def list_products(db: Session, *, search: str | None = None, page: int = 1, page
 
 def create_product(db: Session, payload: ProductCreatePayload, current_user: dict) -> dict:
     return ReferenceDataService(db).create_product(payload, current_user)
+
+
+def match_products_by_name(db: Session, names: list[str]) -> dict:
+    return ReferenceDataService(db).match_products_by_name(names)
 
 
 def update_product(db: Session, product_id: int, payload: ProductUpdatePayload, current_user: dict) -> dict:
