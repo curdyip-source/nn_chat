@@ -8,6 +8,7 @@ import type {
   OrderUpdate,
   Paginated,
   Product,
+  ProductImportJob,
   ReferenceData,
   SetupStatus,
   User,
@@ -48,12 +49,41 @@ export function searchProducts(search: string, signal?: AbortSignal) {
   return apiRequest<Paginated<Product>>(`/products?${q}`, { signal })
 }
 
+export function listProducts(opts: { search?: string; page?: number; pageSize?: number } = {}) {
+  const q = new URLSearchParams({
+    page: String(opts.page ?? 1),
+    page_size: String(opts.pageSize ?? 50),
+  })
+  if (opts.search) q.set('search', opts.search)
+  return apiRequest<Paginated<Product>>(`/products?${q}`)
+}
+
 export function createProduct(input: {
   product_article: string
   product_name: string
   product_cost_usd: string
 }) {
   return apiRequest<{ item: Product }>('/products', { method: 'POST', body: input })
+}
+
+export function updateProduct(
+  productId: number,
+  patch: { product_article?: string; product_name?: string; product_cost_usd?: string },
+) {
+  return apiRequest<{ item: Product }>(`/products/${productId}`, { method: 'PUT', body: patch })
+}
+
+export function importProductsXlsx(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return apiRequest<{ item: ProductImportJob }>('/products/import-xlsx', {
+    method: 'POST',
+    body: form,
+  })
+}
+
+export function getProductImportJob(jobId: string) {
+  return apiRequest<{ item: ProductImportJob }>(`/products/import-xlsx/${jobId}`)
 }
 
 /** Сопоставление списка наименований с номенклатурой (для Excel-импорта в заказ). */

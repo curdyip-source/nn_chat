@@ -59,6 +59,19 @@ export type Product = {
   product_cost_usd: string
 }
 
+export type ProductImportJob = {
+  job_id: string
+  status: 'queued' | 'running' | 'completed' | 'failed'
+  filename: string | null
+  created: number
+  updated: number
+  skipped: number
+  processed: number
+  total_rows: number
+  total_products: number
+  error_message: string | null
+}
+
 export type Contact = {
   contact_id: number
   contact_name: string

@@ -1,0 +1,44 @@
+.dropzone {
+  border: 2px dashed var(--stroke-strong);
+  border-radius: var(--r-lg);
+  padding: 36px 24px;
+  text-align: center;
+  cursor: pointer;
+}
+.dropzone:hover {
+  border-color: var(--focus);
+  background: var(--surface);
+}
+.icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+.title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.error {
+  margin-top: 12px;
+  color: var(--danger);
+  font-size: 13.5px;
+}
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+  padding: 12px 0;
+}
+.status {
+  font-size: 17px;
+  font-weight: 700;
+}
+.counts {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.result {
+  margin-top: 6px;
+  font-size: 14px;
+}
