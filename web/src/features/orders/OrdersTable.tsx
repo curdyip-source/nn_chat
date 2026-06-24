@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
-import { searchProducts, updateOrder, updateOrderStatus } from '../../api/endpoints'
+import { updateOrder, updateOrderStatus } from '../../api/endpoints'
 import type { Order, OrderUpdateItem, Product } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
-import { SearchSelect } from '../../ui/SearchSelect'
+import { Button } from '../../ui/Button'
 import { StatusSelect } from '../../ui/StatusSelect'
 import { formatAmount, formatDateTime } from '../../lib/format'
+import { AddItemModal } from './AddItemModal'
 import { newUid } from './cart'
 import { orderToUpdate } from './orderUpdate'
 import styles from './OrdersTable.module.css'
@@ -56,6 +57,7 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
   const currencySign = (id: number | null) => ref.currencies.find((c) => c.currency_id === id)?.currency_sign ?? ''
 
   const [expanded, setExpanded] = useState(true)
+  const [addOpen, setAddOpen] = useState(false)
   const [customer, setCustomer] = useState(order.order_customer)
   const [info, setInfo] = useState(order.order_info)
   const [error, setError] = useState('')
@@ -97,10 +99,10 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
     setDrafts(next)
     scheduleSave(next)
   }
-  const addProduct = (p: Product) => {
+  const addProduct = (p: Product, price: string, quantity: number) => {
     const next = [
       ...drafts,
-      { uid: newUid(), productId: p.product_id, article: p.product_article, name: p.product_name, quantity: 1, price: p.product_cost_usd, currencyId: defaultCurrencyId, statusId: null },
+      { uid: newUid(), productId: p.product_id, article: p.product_article, name: p.product_name, quantity, price, currencyId: defaultCurrencyId, statusId: null },
     ]
     setDrafts(next)
     void persist({ drafts: next })
@@ -194,23 +196,16 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
           ))}
 
           <div className={styles.addRow}>
-            <SearchSelect<Product>
-              placeholder="+ Добавить товар…"
-              search={(q, signal) => searchProducts(q, signal).then((r) => r.items)}
-              getKey={(p) => p.product_id}
-              renderItem={(p) => (
-                <span>
-                  {p.product_name}
-                  <span className="dim"> · {p.product_article}</span>
-                </span>
-              )}
-              onSelect={addProduct}
-            />
+            <Button variant="secondary" onClick={() => setAddOpen(true)}>
+              + Товар
+            </Button>
           </div>
 
           {error && <div className={styles.rowError}>{error}</div>}
         </div>
       )}
+
+      <AddItemModal open={addOpen} onClose={() => setAddOpen(false)} onAdd={addProduct} />
     </div>
   )
 }
