@@ -81,7 +81,7 @@ jobs:
       - name: Build and push frontend image
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend
+          context: ./web
           push: true
           tags: |
             ${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.release_tag }}
