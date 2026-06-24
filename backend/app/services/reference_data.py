@@ -336,9 +336,9 @@ class ReferenceDataService:
                 if existing_status is None:
                     continue
                 existing_statuses[key] = existing_status
-                expected_color = item.get("status_color")
-                if existing_status.status_color != expected_color:
-                    self.repository.update_row(existing_status, {"status_color": expected_color})
+                # Цвет дефолтных статусов задаётся только при создании (в create_status выше).
+                # Существующие статусы не трогаем — иначе цвет, выставленный в админке,
+                # затирался бы при каждом обращении к справочникам и не доезжал до приложения.
 
             for status_type, status_name in OBSOLETE_DEFAULT_STATUSES:
                 obsolete_status = self.repository.get_status_by_type_and_name(status_type, status_name)

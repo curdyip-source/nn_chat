@@ -70,16 +70,26 @@
   background: var(--surface-2);
 }
 .headRow {
-  background: transparent;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
   border: none;
+  border-radius: 0;
   color: var(--text-dim);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  padding-bottom: 2px;
+  padding: 4px 14px 8px;
 }
 .headRow:hover {
-  background: transparent;
+  background: var(--bg);
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0 4px;
 }
 .article {
   font-weight: 600;
