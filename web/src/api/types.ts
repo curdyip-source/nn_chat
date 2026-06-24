@@ -162,6 +162,54 @@ export type OrderUpdate = {
   items: OrderUpdateItem[]
 }
 
+// ----- Инвентаризации -----
+
+export type InventoryItem = {
+  inventory_item_id: number
+  inventory_item_product_id?: number | null
+  inventory_item_name: string
+  inventory_item_article: string | null
+  inventory_item_quantity: number
+  inventory_item_cost: string
+  inventory_item_currency_id?: number | null
+}
+
+export type Inventory = {
+  inventory_id: number
+  inventory_establishment_id?: number | null
+  inventory_establishment_name?: string | null
+  inventory_supplier?: string | null
+  inventory_status_id?: number | null
+  inventory_status?: string | null
+  inventory_status_color?: string | null
+  inventory_created_at?: string | null
+  items: InventoryItem[]
+}
+
+// ----- Приёмки -----
+
+export type ProductRegistrationItem = {
+  product_registration_item_id: number
+  product_registration_item_product_id?: number | null
+  product_registration_item_name: string
+  product_registration_item_article: string | null
+  product_registration_item_quantity: number
+  product_registration_item_cost: string
+  product_registration_item_currency_id?: number | null
+}
+
+export type ProductRegistration = {
+  product_registration_id: number
+  product_registration_establishment_id?: number | null
+  product_registration_establishment_name?: string | null
+  product_registration_supplier?: string | null
+  product_registration_status_id?: number | null
+  product_registration_status?: string | null
+  product_registration_status_color?: string | null
+  product_registration_created_at?: string | null
+  items: ProductRegistrationItem[]
+}
+
 export type AuditEvent = {
   audit_event_id: number
   actor_user_id: number | null

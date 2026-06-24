@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { AuditPage } from '../features/audit/AuditPage'
+import { DocumentsPage } from '../features/documents/DocumentsPage'
+import { INVENTORY_KIND, REGISTRATION_KIND } from '../features/documents/docKind'
 import { OrdersPage } from '../features/orders/OrdersPage'
 import { ProductsPage } from '../features/products/ProductsPage'
 import { ReferencePage } from '../features/reference/ReferencePage'
@@ -19,7 +21,8 @@ type Section = {
 const SECTIONS: Section[] = [
   { key: 'orders', label: 'Заказы', icon: '📦', render: () => <OrdersPage />, ready: true },
   { key: 'products', label: 'Товары', icon: '🏷️', render: () => <ProductsPage />, ready: true },
-  { key: 'inventory', label: 'Инвентаризации', icon: '📊', render: () => <Placeholder name="Инвентаризации" />, ready: false },
+  { key: 'inventory', label: 'Инвентаризации', icon: '📊', render: () => <DocumentsPage kind={INVENTORY_KIND} />, ready: true },
+  { key: 'registrations', label: 'Приёмки', icon: '📥', render: () => <DocumentsPage kind={REGISTRATION_KIND} />, ready: true },
   { key: 'reference', label: 'Справочники', icon: '⚙️', render: () => <ReferencePage />, ready: true },
   { key: 'users', label: 'Пользователи', icon: '👤', render: () => <UsersPage />, ready: true },
   { key: 'audit', label: 'Аудит', icon: '📜', render: () => <AuditPage />, ready: true },

@@ -5,6 +5,7 @@ import type {
   Contact,
   Currency,
   Establishment,
+  Inventory,
   Order,
   OrderCreate,
   OrderMethod,
@@ -12,6 +13,7 @@ import type {
   Paginated,
   Product,
   ProductImportJob,
+  ProductRegistration,
   ReferenceData,
   SetupStatus,
   Status,
@@ -197,6 +199,44 @@ export function updateOrderStatus(orderId: number, statusId: number) {
 
 export function updateOrder(orderId: number, payload: OrderUpdate) {
   return apiRequest<{ item: Order }>(`/orders/${orderId}`, { method: 'PUT', body: payload })
+}
+
+// ---------- Inventories ----------
+
+export function listInventories(opts: { page?: number; pageSize?: number } = {}) {
+  const q = new URLSearchParams({ page: String(opts.page ?? 1), page_size: String(opts.pageSize ?? 30) })
+  return apiRequest<Paginated<Inventory>>(`/inventories?${q}`)
+}
+export function getInventory(id: number) {
+  return apiRequest<{ item: Inventory }>(`/inventories/${id}`)
+}
+export function createInventory(payload: unknown) {
+  return apiRequest<{ item: Inventory }>('/inventories', { method: 'POST', body: payload })
+}
+export function updateInventoryStatus(id: number, statusId: number) {
+  return apiRequest<{ item: Inventory }>(`/inventories/${id}/status`, {
+    method: 'PUT',
+    body: { inventory_status_id: statusId },
+  })
+}
+
+// ---------- Product registrations (приёмки) ----------
+
+export function listRegistrations(opts: { page?: number; pageSize?: number } = {}) {
+  const q = new URLSearchParams({ page: String(opts.page ?? 1), page_size: String(opts.pageSize ?? 30) })
+  return apiRequest<Paginated<ProductRegistration>>(`/product-registrations?${q}`)
+}
+export function getRegistration(id: number) {
+  return apiRequest<{ item: ProductRegistration }>(`/product-registrations/${id}`)
+}
+export function createRegistration(payload: unknown) {
+  return apiRequest<{ item: ProductRegistration }>('/product-registrations', { method: 'POST', body: payload })
+}
+export function updateRegistrationStatus(id: number, statusId: number) {
+  return apiRequest<{ item: ProductRegistration }>(`/product-registrations/${id}/status`, {
+    method: 'PUT',
+    body: { product_registration_status_id: statusId },
+  })
 }
 
 // ---------- Users ----------
