@@ -137,6 +137,10 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
   }
   const totalText = [...totals.entries()].map(([s, v]) => `${formatAmount(v)}${s}`).join(' · ')
 
+  const metaText = [order.order_establishment_name, order.order_method_name, order.order_sub_method, order.order_contact_method]
+    .filter(Boolean)
+    .join(' · ')
+
   return (
     <div className={styles.orderBlock}>
       <div className={styles.row}>
@@ -145,7 +149,7 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
         </button>
         <span className={styles.no}>{order.order_id}</span>
         <input className={styles.cellInput} value={customer} onChange={(e) => setCustomer(e.target.value)} onBlur={saveCustomer} />
-        <span className={styles.dim}>{order.order_establishment_name}</span>
+        <span className={styles.dim} title={metaText}>{metaText}</span>
         <StatusSelect size="sm" value={order.order_status_id} options={orderStatusOptions} onChange={changeStatus} />
         <span className={styles.right}>{drafts.length}</span>
         <span className={styles.dim}>{formatDateTime(order.order_created_at)}</span>

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listOrders } from '../../api/endpoints'
 import type { Order } from '../../api/types'
-import { useLayout } from '../../app/LayoutContext'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
 import { ButtonGroup } from '../../ui/ButtonGroup'
@@ -46,14 +45,6 @@ export function OrdersPage() {
   useEffect(() => {
     if (!creating && viewingId == null && editOrder == null) reload()
   }, [creating, viewingId, editOrder, reload])
-
-  // Полноэкранный табличный режим: прячем меню, когда показана сама таблица.
-  const { setSidebarHidden } = useLayout()
-  useEffect(() => {
-    const full = view === 'table' && !creating && editOrder == null && viewingId == null
-    setSidebarHidden(full)
-    return () => setSidebarHidden(false)
-  }, [view, creating, editOrder, viewingId, setSidebarHidden])
 
   if (creating || editOrder) {
     return (
