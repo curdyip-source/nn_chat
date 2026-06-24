@@ -90,19 +90,53 @@
 }
 .row {
   display: grid;
-  grid-template-columns: 180px 1fr 130px;
-  gap: 14px;
+  grid-template-columns: 180px 1fr 130px 36px;
+  gap: 10px;
   align-items: center;
   width: 100%;
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--stroke);
   border-radius: var(--r-sm);
-  padding: 11px 14px;
+  padding: 6px 10px;
   font-size: 14px;
 }
-.row:hover {
+.saving {
+  opacity: 0.6;
+}
+.cellInput {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text);
+  padding: 7px 9px;
+  font-size: 14px;
+  outline: none;
+}
+.cellInput:hover {
+  border-color: var(--stroke);
+}
+.cellInput:focus {
+  border-color: var(--focus);
   background: var(--surface-2);
+}
+.rightInput {
+  text-align: right;
+  font-weight: 600;
+}
+.delBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 12px;
+}
+.delBtn:hover {
+  background: rgba(255, 69, 58, 0.16);
+  color: var(--danger);
 }
 .headRow {
   position: sticky;

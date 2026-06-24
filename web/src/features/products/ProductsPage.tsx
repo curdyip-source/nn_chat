@@ -4,9 +4,9 @@ import type { Product } from '../../api/types'
 import { Button } from '../../ui/Button'
 import { TextInput } from '../../ui/Field'
 import { useDebouncedValue } from '../../ui/useDebouncedValue'
-import { formatAmount } from '../../lib/format'
 import { ImportXlsxModal } from './ImportXlsxModal'
 import { ProductFormModal } from './ProductFormModal'
+import { ProductRow } from './ProductRow'
 import styles from './ProductsPage.module.css'
 
 const PAGE_SIZE = 50
@@ -20,13 +20,11 @@ export function ProductsPage() {
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search.trim(), 300)
 
-  const [editing, setEditing] = useState<Product | null>(null)
   const [creating, setCreating] = useState(false)
   const [importing, setImporting] = useState(false)
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  // Сброс на первую страницу при изменении поиска.
   useEffect(() => {
     setPage(1)
   }, [debouncedSearch])
@@ -50,7 +48,7 @@ export function ProductsPage() {
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Товары</h1>
-          <p className="muted">Номенклатура{total ? ` · ${total}` : ''}: поиск, создание и импорт</p>
+          <p className="muted">Номенклатура{total ? ` · ${total}` : ''} · правьте прямо в таблице</p>
         </div>
         <div className={styles.headerActions}>
           <Button variant="secondary" onClick={() => setImporting(true)}>
@@ -105,20 +103,16 @@ export function ProductsPage() {
               <span>Артикул</span>
               <span>Наименование</span>
               <span className={styles.right}>Цена, USD</span>
+              <span />
             </div>
             {products.map((p) => (
-              <button key={p.product_id} className={styles.row} onClick={() => setEditing(p)}>
-                <span className={styles.article}>{p.product_article}</span>
-                <span className={styles.name}>{p.product_name}</span>
-                <span className={styles.right}>{formatAmount(Number(p.product_cost_usd) || 0)}</span>
-              </button>
+              <ProductRow key={p.product_id} product={p} onChanged={load} onError={(m) => setError(m || null)} />
             ))}
           </div>
         )}
       </div>
 
       <ProductFormModal open={creating} product={null} onClose={() => setCreating(false)} onSaved={load} />
-      <ProductFormModal open={editing != null} product={editing} onClose={() => setEditing(null)} onSaved={load} />
       <ImportXlsxModal open={importing} onClose={() => setImporting(false)} onDone={load} />
     </div>
   )

@@ -91,11 +91,35 @@
   color: var(--text);
 }
 
+.noSidebar {
+  grid-template-columns: 1fr;
+}
+
 .main {
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.restoreMenu {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  background: var(--surface-3);
+  border: 1px solid var(--stroke);
+  border-left: none;
+  color: var(--text);
+  border-radius: 0 12px 12px 0;
+  padding: 16px 9px;
+  font-size: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+.restoreMenu:hover {
+  background: var(--accent);
+  color: var(--accent-text);
 }
 
 .placeholder {

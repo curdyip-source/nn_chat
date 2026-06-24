@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listOrders } from '../../api/endpoints'
 import type { Order } from '../../api/types'
+import { useLayout } from '../../app/LayoutContext'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
 import { ButtonGroup } from '../../ui/ButtonGroup'
@@ -46,6 +47,14 @@ export function OrdersPage() {
     if (!creating && viewingId == null && editOrder == null) reload()
   }, [creating, viewingId, editOrder, reload])
 
+  // Полноэкранный табличный режим: прячем меню, когда показана сама таблица.
+  const { setSidebarHidden } = useLayout()
+  useEffect(() => {
+    const full = view === 'table' && !creating && editOrder == null && viewingId == null
+    setSidebarHidden(full)
+    return () => setSidebarHidden(false)
+  }, [view, creating, editOrder, viewingId, setSidebarHidden])
+
   if (creating || editOrder) {
     return (
       <OrderCreate
@@ -80,22 +89,22 @@ export function OrdersPage() {
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Заказы</h1>
-          <p className="muted">Последние заказы и создание нового</p>
+          <div className={styles.viewToggle}>
+            <ButtonGroup<View>
+              columns={2}
+              size="sm"
+              value={view}
+              onChange={(v) => v && setView(v)}
+              options={[
+                { value: 'list', label: 'Список' },
+                { value: 'table', label: 'Таблица' },
+              ]}
+            />
+          </div>
         </div>
-        <div className={styles.headerActions}>
-          <ButtonGroup<View>
-            size="sm"
-            value={view}
-            onChange={(v) => v && setView(v)}
-            options={[
-              { value: 'list', label: 'Список' },
-              { value: 'table', label: 'Таблица' },
-            ]}
-          />
-          <Button variant="primary" onClick={() => setCreating(true)}>
-            + Создать заказ
-          </Button>
-        </div>
+        <Button variant="primary" onClick={() => setCreating(true)}>
+          + Создать заказ
+        </Button>
       </header>
 
       <div className={styles.filters}>
