@@ -1,9 +1,11 @@
 import { apiRequest } from './client'
 import type {
+  AuditEvent,
   AuthResponse,
   Contact,
   Order,
   OrderCreate,
+  OrderUpdate,
   Paginated,
   Product,
   ReferenceData,
@@ -87,11 +89,65 @@ export function searchContacts(
 
 // ---------- Orders ----------
 
-export function listOrders(page = 1, pageSize = 20) {
-  const q = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+export function listOrders(
+  opts: { page?: number; pageSize?: number; statusId?: number | null; search?: string } = {},
+) {
+  const q = new URLSearchParams({
+    page: String(opts.page ?? 1),
+    page_size: String(opts.pageSize ?? 30),
+  })
+  if (opts.statusId != null) q.set('status_id', String(opts.statusId))
+  if (opts.search) q.set('search', opts.search)
   return apiRequest<Paginated<Order>>(`/orders?${q}`)
 }
 
 export function createOrder(payload: OrderCreate) {
   return apiRequest<{ item: Order }>('/orders', { method: 'POST', body: payload })
+}
+
+export function getOrder(orderId: number) {
+  return apiRequest<{ item: Order }>(`/orders/${orderId}`)
+}
+
+export function updateOrderStatus(orderId: number, statusId: number) {
+  return apiRequest<{ item: Order }>(`/orders/${orderId}/status`, {
+    method: 'PUT',
+    body: { order_status_id: statusId },
+  })
+}
+
+export function updateOrder(orderId: number, payload: OrderUpdate) {
+  return apiRequest<{ item: Order }>(`/orders/${orderId}`, { method: 'PUT', body: payload })
+}
+
+// ---------- Users ----------
+
+export function listUsers(opts: { search?: string; page?: number; pageSize?: number } = {}) {
+  const q = new URLSearchParams({
+    page: String(opts.page ?? 1),
+    page_size: String(opts.pageSize ?? 100),
+  })
+  if (opts.search) q.set('search', opts.search)
+  return apiRequest<Paginated<User>>(`/users?${q}`)
+}
+
+export function updateUser(
+  userId: number,
+  patch: Partial<Pick<User, 'user_active' | 'user_admin'>>,
+) {
+  return apiRequest<{ item: User }>(`/users/${userId}`, { method: 'PUT', body: patch })
+}
+
+// ---------- Audit ----------
+
+export function listAuditEvents(
+  opts: { entityType?: string; eventType?: string; page?: number; pageSize?: number } = {},
+) {
+  const q = new URLSearchParams({
+    page: String(opts.page ?? 1),
+    page_size: String(opts.pageSize ?? 50),
+  })
+  if (opts.entityType) q.set('entity_type', opts.entityType)
+  if (opts.eventType) q.set('event_type', opts.eventType)
+  return apiRequest<Paginated<AuditEvent>>(`/audit-events?${q}`)
 }

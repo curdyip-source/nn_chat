@@ -1,0 +1,71 @@
+.root {
+  position: relative;
+  display: inline-block;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.chip:disabled {
+  opacity: 0.6;
+}
+.sm {
+  padding: 3px 9px;
+  font-size: 11.5px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.caret {
+  font-size: 9px;
+  opacity: 0.7;
+  margin-left: 1px;
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 180px;
+  background: #17171a;
+  border: 1px solid var(--stroke-strong);
+  border-radius: var(--r-md);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  padding: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+.option:hover {
+  background: var(--surface-2);
+}
+.active {
+  background: var(--surface);
+}

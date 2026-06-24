@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import delete
+from sqlalchemy import delete, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.orders import Order, OrderComment, OrderCommentAttachment, OrderItem
@@ -27,8 +27,22 @@ class OrderRepository:
     def get_by_id(self, order_id: int) -> Order | None:
         return self._base_query().filter(Order.order_id == order_id).first()
 
-    def list(self, *, page: int = 1, page_size: int = 20) -> tuple[list[Order], int]:
+    def list(
+        self,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        status_id: int | None = None,
+        search: str | None = None,
+    ) -> tuple[list[Order], int]:
         query = self._base_query()
+        if status_id is not None:
+            query = query.filter(Order.order_status_id == status_id)
+        if search:
+            like_value = f"%{search.strip()}%"
+            query = query.filter(
+                or_(Order.order_customer.ilike(like_value), Order.order_info.ilike(like_value))
+            )
         total = query.count()
         items = (
             query.order_by(Order.order_created_at.desc(), Order.order_id.desc())

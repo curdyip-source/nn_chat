@@ -1,39 +1,52 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listOrders } from '../../api/endpoints'
 import type { Order } from '../../api/types'
+import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
+import { ButtonGroup } from '../../ui/ButtonGroup'
+import { TextInput } from '../../ui/Field'
 import { StatusChip } from '../../ui/StatusChip'
+import { useDebouncedValue } from '../../ui/useDebouncedValue'
+import { formatDateTime } from '../../lib/format'
 import { OrderCreate } from './OrderCreate'
+import { OrderDetail } from './OrderDetail'
 import styles from './OrdersPage.module.css'
 
 export function OrdersPage() {
+  const ref = useReference()
+  const orderStatuses = ref.statusesByType('orders')
+
   const [creating, setCreating] = useState(false)
+  const [viewingId, setViewingId] = useState<number | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [statusFilter, setStatusFilter] = useState<number | null>(null)
+  const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search.trim(), 300)
+
   const reload = useCallback(() => {
     setLoading(true)
-    listOrders(1, 30)
+    listOrders({ statusId: statusFilter, search: debouncedSearch })
       .then((res) => {
         setOrders(res.items)
         setError(null)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [statusFilter, debouncedSearch])
 
   useEffect(() => {
-    if (!creating) reload()
-  }, [creating, reload])
+    if (!creating && viewingId == null) reload()
+  }, [creating, viewingId, reload])
 
   if (creating) {
-    return (
-      <OrderCreate
-        onCancel={() => setCreating(false)}
-        onCreated={() => setCreating(false)}
-      />
-    )
+    return <OrderCreate onCancel={() => setCreating(false)} onCreated={() => setCreating(false)} />
+  }
+
+  if (viewingId != null) {
+    return <OrderDetail orderId={viewingId} onBack={() => setViewingId(null)} />
   }
 
   return (
@@ -48,29 +61,52 @@ export function OrdersPage() {
         </Button>
       </header>
 
+      <div className={styles.filters}>
+        <TextInput
+          placeholder="Поиск по клиенту или информации…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {orderStatuses.length > 0 && (
+          <ButtonGroup
+            deselectable
+            size="sm"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={orderStatuses.map((s) => ({
+              value: s.status_id,
+              label: s.status_status,
+              dot: s.status_color ?? undefined,
+            }))}
+          />
+        )}
+      </div>
+
       {error && <div className={styles.error}>{error}</div>}
       {loading ? (
         <div className="dim">Загрузка…</div>
       ) : orders.length === 0 ? (
-        <div className={styles.empty}>Заказов пока нет</div>
+        <div className={styles.empty}>Заказов не найдено</div>
       ) : (
         <div className={styles.list}>
           {orders.map((o) => (
-            <div key={o.order_id} className={styles.card}>
+            <button key={o.order_id} className={styles.card} onClick={() => setViewingId(o.order_id)}>
               <div className={styles.cardTop}>
                 <span className={styles.orderNo}>№{o.order_id}</span>
                 <span className={styles.customer}>{o.order_customer}</span>
-                {o.order_status && (
-                  <StatusChip label={o.order_status} color={o.order_status_color} />
-                )}
+                {o.order_status && <StatusChip label={o.order_status} color={o.order_status_color} />}
               </div>
               <div className={styles.cardMeta}>
-                {[o.order_establishment_name, o.order_method_name]
+                {[
+                  o.order_establishment_name,
+                  o.order_method_name,
+                  o.items?.length ? `${o.items.length} поз.` : null,
+                  formatDateTime(o.order_created_at),
+                ]
                   .filter(Boolean)
                   .join(' · ')}
-                {o.items?.length ? ` · ${o.items.length} поз.` : ''}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}

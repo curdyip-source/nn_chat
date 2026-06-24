@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { AuditPage } from '../features/audit/AuditPage'
 import { OrdersPage } from '../features/orders/OrdersPage'
+import { UsersPage } from '../features/users/UsersPage'
 import styles from './AppShell.module.css'
 
 type Section = {
@@ -17,6 +19,8 @@ const SECTIONS: Section[] = [
   { key: 'products', label: 'Товары', icon: '🏷️', render: () => <Placeholder name="Товары" />, ready: false },
   { key: 'inventory', label: 'Инвентаризации', icon: '📊', render: () => <Placeholder name="Инвентаризации" />, ready: false },
   { key: 'reference', label: 'Справочники', icon: '⚙️', render: () => <Placeholder name="Справочники" />, ready: false },
+  { key: 'users', label: 'Пользователи', icon: '👤', render: () => <UsersPage />, ready: true },
+  { key: 'audit', label: 'Аудит', icon: '📜', render: () => <AuditPage />, ready: true },
   { key: 'chat', label: 'Чат', icon: '💬', render: () => <Placeholder name="Чат" />, ready: false },
 ]
 

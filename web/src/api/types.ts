@@ -95,24 +95,69 @@ export type OrderCreate = {
 
 export type OrderItem = {
   order_item_id: number
+  order_item_product_id?: number | null
   order_item_name: string
   order_item_article: string | null
   order_item_quantity: number
   order_item_price: string
+  order_item_status_id?: number | null
   order_item_status?: string | null
   order_item_status_color?: string | null
+  order_item_supplier?: string | null
+  order_item_note?: string | null
+  order_item_currency_id?: number | null
 }
 
 export type Order = {
   order_id: number
+  order_establishment_id?: number | null
+  order_establishment_name?: string | null
+  order_method_id?: number | null
+  order_method_name?: string | null
+  order_sub_method?: string | null
+  order_contact_method?: string | null
   order_customer: string
   order_info: string
+  order_status_id?: number | null
   order_status?: string | null
   order_status_color?: string | null
-  order_establishment_name?: string | null
-  order_method_name?: string | null
+  order_owner_user_login?: string | null
   order_created_at?: string | null
   items: OrderItem[]
+}
+
+export type OrderUpdateItem = {
+  product_id?: number | null
+  product_article?: string | null
+  product_name?: string | null
+  order_item_quantity: number
+  order_item_price: string
+  order_item_status_id?: number | null
+  order_item_currency_id?: number | null
+  order_item_supplier?: string | null
+  order_item_note?: string | null
+}
+
+export type OrderUpdate = {
+  order_establishment_id: number
+  order_method_id: number
+  order_sub_method?: string | null
+  order_contact_method?: string | null
+  order_customer: string
+  order_info: string
+  order_status_id: number
+  items: OrderUpdateItem[]
+}
+
+export type AuditEvent = {
+  audit_event_id: number
+  actor_user_id: number | null
+  actor_user_login: string | null
+  entity_type: string
+  entity_id: number | null
+  event_type: string
+  event_payload: Record<string, unknown> | null
+  created_at: string | null
 }
 
 export type Paginated<T> = {
