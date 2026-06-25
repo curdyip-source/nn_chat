@@ -65,7 +65,7 @@ body {
   color: var(--text);
   font-family: var(--font);
   /* Лёгкий глобальный зум — весь интерфейс чуть компактнее (шрифты в проекте в px). */
-  zoom: 0.7;
+  zoom: 0.8;
   font-size: 15px;
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
