@@ -477,10 +477,26 @@ class ReferenceDataService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Товар не найден")
         return row
 
+    def _generate_unique_article(self) -> str:
+        # Уникальный авто-артикул для товаров, созданных без указания артикула.
+        for _ in range(20):
+            candidate = f"AUTO-{uuid4().hex[:8].upper()}"
+            if self.product_repository.get_by_article(candidate) is None:
+                return candidate
+        return f"AUTO-{uuid4().hex.upper()}"
+
     def create_product(self, payload: ProductCreatePayload, current_user: dict) -> dict:
-        if self.product_repository.get_by_article(payload.product_article) is not None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Товар с таким артикулом уже существует")
-        row = self.product_repository.create({**model_to_dict(payload), "product_owner_user_id": current_user["user_id"]})
+        data = model_to_dict(payload)
+        article = (data.get("product_article") or "").strip()
+        if article:
+            if self.product_repository.get_by_article(article) is not None:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Товар с таким артикулом уже существует")
+            data["product_article"] = article
+        else:
+            data["product_article"] = self._generate_unique_article()
+        if data.get("product_cost_usd") is None:
+            data["product_cost_usd"] = Decimal("0")
+        row = self.product_repository.create({**data, "product_owner_user_id": current_user["user_id"]})
         log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_PRODUCT, entity_id=row.product_id, event_type=EVENT_TYPE_PRODUCT_CREATE, event_payload={"product_article": row.product_article})
         return serialize_product(row)
 

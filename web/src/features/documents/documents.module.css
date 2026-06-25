@@ -184,9 +184,10 @@
   justify-content: space-between;
   gap: 16px;
   padding: 14px 32px;
-  background: rgba(10, 10, 11, 0.92);
+  background: var(--surface-solid);
   backdrop-filter: blur(10px);
-  border-top: 1px solid var(--stroke);
+  border-top: 1px solid var(--stroke-strong);
+  box-shadow: 0 -6px 20px var(--shadow);
 }
 .total {
   color: var(--text-muted);

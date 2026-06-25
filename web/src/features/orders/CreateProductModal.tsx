@@ -60,7 +60,7 @@ export function CreateProductModal({ open, defaultName, onClose, onCreated }: Pr
           <Button
             variant="primary"
             loading={busy}
-            disabled={!article.trim() || !name.trim()}
+            disabled={!name.trim()}
             onClick={submit}
           >
             Создать и добавить
@@ -69,11 +69,15 @@ export function CreateProductModal({ open, defaultName, onClose, onCreated }: Pr
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <Field label="Артикул">
-          <TextInput value={article} onChange={(e) => setArticle(e.target.value)} autoFocus />
-        </Field>
         <Field label="Наименование">
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} />
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        </Field>
+        <Field label="Артикул (необязательно)">
+          <TextInput
+            value={article}
+            onChange={(e) => setArticle(e.target.value)}
+            placeholder="авто, если пусто"
+          />
         </Field>
         <Field label="Цена (USD)">
           <TextInput

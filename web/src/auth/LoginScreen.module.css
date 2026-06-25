@@ -37,9 +37,10 @@
   gap: 11px;
 }
 .brandLogo {
-  height: 34px;
+  height: 30px;
   width: auto;
   display: block;
+  transform: translateY(-1px);
 }
 .logo {
   font-size: 28px;

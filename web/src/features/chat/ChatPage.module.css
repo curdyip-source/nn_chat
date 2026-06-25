@@ -28,7 +28,9 @@
   min-height: 0;
   overflow-y: auto;
   display: flex;
-  flex-direction: column;
+  /* Инверсия ленты: якорь внизу, новые сообщения снизу над полем ввода,
+     лента растёт вверх. Браузер сам держит позицию у низа — не зависит от zoom. */
+  flex-direction: column-reverse;
   gap: 8px;
   padding: 6px 2px;
 }

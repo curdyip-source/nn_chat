@@ -25,10 +25,11 @@ export function ChatPage() {
   const [editText, setEditText] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // В column-reverse низ ленты (новейшее сообщение) — это scrollTop = 0.
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
       const el = scrollRef.current
-      if (el) el.scrollTop = el.scrollHeight
+      if (el) el.scrollTop = 0
     })
   }
 
@@ -122,14 +123,7 @@ export function ChatPage() {
           <div className="dim">Загрузка…</div>
         ) : (
           <>
-            {hasMore && (
-              <div className={styles.loadMore}>
-                <Button variant="ghost" onClick={loadOlder}>
-                  Загрузить раньше
-                </Button>
-              </div>
-            )}
-            {messages.map((m) => {
+            {[...messages].reverse().map((m) => {
               const own = m.message_owner_user_id === user?.user_id
               const author = [m.message_owner_first_name, m.message_owner_second_name].filter(Boolean).join(' ') || m.message_owner_user_login || 'Пользователь'
               return (
@@ -184,6 +178,13 @@ export function ChatPage() {
                 </div>
               )
             })}
+            {hasMore && (
+              <div className={styles.loadMore}>
+                <Button variant="ghost" onClick={loadOlder}>
+                  Загрузить раньше
+                </Button>
+              </div>
+            )}
           </>
         )}
       </div>

@@ -26,9 +26,10 @@ class CurrencyPayload(BaseModel):
 
 
 class ProductCreatePayload(BaseModel):
-    product_article: str = Field(min_length=1, max_length=100)
+    # Обязательно только наименование. Пустой/неуказанный артикул — авто-генерация на сервере.
     product_name: str = Field(min_length=1, max_length=500)
-    product_cost_usd: Decimal = Field(ge=0, decimal_places=2, max_digits=12)
+    product_article: Optional[str] = Field(default=None, max_length=100)
+    product_cost_usd: Decimal = Field(default=Decimal("0"), ge=0, decimal_places=2, max_digits=12)
 
 
 class ProductMatchPayload(BaseModel):

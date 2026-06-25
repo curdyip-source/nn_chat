@@ -19,6 +19,11 @@ type Props<T> = {
   /** Слот, который показывается, когда поиск ничего не нашёл (например «создать товар»). */
   renderEmptyAction?: (query: string) => ReactNode
   autoFocus?: boolean
+  /**
+   * Вставка списка: если в буфере 2+ непустых строк, вместо ввода в поле
+   * вызывается этот колбэк со списком строк (например, для массового добавления товаров).
+   */
+  onBulkPaste?: (lines: string[]) => void
 }
 
 export function SearchSelect<T>({
@@ -33,6 +38,7 @@ export function SearchSelect<T>({
   clearOnSelect = true,
   renderEmptyAction,
   autoFocus,
+  onBulkPaste,
 }: Props<T>) {
   const controlled = value !== undefined
   const [internalQuery, setInternalQuery] = useState('')
@@ -99,6 +105,20 @@ export function SearchSelect<T>({
         autoFocus={autoFocus}
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => !skipNextSearch.current && debounced.length >= minChars && setOpen(true)}
+        onPaste={(e) => {
+          if (!onBulkPaste) return
+          const lines = e.clipboardData
+            .getData('text')
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter(Boolean)
+          if (lines.length >= 2) {
+            e.preventDefault()
+            setQuery('')
+            setOpen(false)
+            onBulkPaste(lines)
+          }
+        }}
       />
       {loading && <span className={styles.loader} />}
       {showDropdown && (

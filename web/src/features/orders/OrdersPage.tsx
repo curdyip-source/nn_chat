@@ -139,7 +139,7 @@ export function OrdersPage() {
         </div>
         {orderStatuses.length > 0 && (
           <MultiButtonGroup
-            size="sm"
+            size="xs"
             value={statusFilter}
             onChange={setStatusFilter}
             options={orderStatuses.map((s) => ({
@@ -151,7 +151,7 @@ export function OrdersPage() {
         )}
         {orderMethods.length > 0 && (
           <MultiButtonGroup
-            size="sm"
+            size="xs"
             value={methodFilter}
             onChange={setMethodFilter}
             options={orderMethods.map((m) => ({
