@@ -27,7 +27,6 @@
   flex-wrap: wrap;
 }
 .filters > :nth-child(1) {
-  width: 280px;
   flex: 0 0 auto;
 }
 .filters > :nth-child(2) {

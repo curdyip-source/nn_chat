@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { listContacts } from '../../api/endpoints'
 import type { Contact } from '../../api/types'
 import { Button } from '../../ui/Button'
-import { ButtonGroup } from '../../ui/ButtonGroup'
+import { SegmentedControl } from '../../ui/SegmentedControl'
 import { TextInput } from '../../ui/Field'
 import { useDebouncedValue } from '../../ui/useDebouncedValue'
 import styles from './ContactsPage.module.css'
@@ -44,14 +44,12 @@ export function ContactsPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>Контрагенты{total ? ` · ${total}` : ''}</h1>
-        <p className="muted">Покупатели и поставщики из заказов и документов</p>
       </header>
 
       <div className={styles.filters}>
-        <ButtonGroup<Tab>
-          columns={2}
+        <SegmentedControl<Tab>
           value={tab}
-          onChange={(t) => t && setTab(t)}
+          onChange={setTab}
           options={[
             { value: 'buyer', label: 'Покупатели' },
             { value: 'supplier', label: 'Поставщики' },

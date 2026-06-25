@@ -23,19 +23,7 @@
   align-items: center;
   gap: 14px;
 }
-.filterGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.filterLabel {
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-.filtersTop > :first-child {
+.filtersTop > input {
   flex: 1;
   max-width: 480px;
 }
@@ -88,11 +76,6 @@
   gap: 12px;
   flex: 0 0 auto;
 }
-.viewToggle {
-  width: 220px;
-  margin-top: 10px;
-}
-
 .error {
   background: rgba(255, 69, 58, 0.14);
   border: 1px solid rgba(255, 69, 58, 0.3);

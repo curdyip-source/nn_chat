@@ -3,8 +3,8 @@ import { listOrders } from '../../api/endpoints'
 import type { Order } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
-import { ButtonGroup } from '../../ui/ButtonGroup'
 import { MultiButtonGroup } from '../../ui/MultiButtonGroup'
+import { SegmentedControl } from '../../ui/SegmentedControl'
 import { TextInput } from '../../ui/Field'
 import { StatusChip } from '../../ui/StatusChip'
 import { useDebouncedValue } from '../../ui/useDebouncedValue'
@@ -92,21 +92,7 @@ export function OrdersPage() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Заказы</h1>
-          <div className={styles.viewToggle}>
-            <ButtonGroup<View>
-              columns={2}
-              size="sm"
-              value={view}
-              onChange={(v) => v && setView(v)}
-              options={[
-                { value: 'list', label: 'Список' },
-                { value: 'table', label: 'Таблица' },
-              ]}
-            />
-          </div>
-        </div>
+        <h1 className={styles.title}>Заказы</h1>
         <Button variant="primary" onClick={() => setCreating(true)}>
           + Создать заказ
         </Button>
@@ -114,6 +100,14 @@ export function OrdersPage() {
 
       <div className={styles.filters}>
         <div className={styles.filtersTop}>
+          <SegmentedControl<View>
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'list', label: 'Список' },
+              { value: 'table', label: 'Таблица' },
+            ]}
+          />
           <TextInput
             placeholder="Поиск по клиенту или информации…"
             value={search}
@@ -144,33 +138,27 @@ export function OrdersPage() {
           </div>
         </div>
         {orderStatuses.length > 0 && (
-          <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>Статус</span>
-            <MultiButtonGroup
-              size="sm"
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={orderStatuses.map((s) => ({
-                value: s.status_id,
-                label: s.status_status,
-                dot: s.status_color ?? undefined,
-              }))}
-            />
-          </div>
+          <MultiButtonGroup
+            size="sm"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={orderStatuses.map((s) => ({
+              value: s.status_id,
+              label: s.status_status,
+              dot: s.status_color ?? undefined,
+            }))}
+          />
         )}
         {orderMethods.length > 0 && (
-          <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>Способ</span>
-            <MultiButtonGroup
-              size="sm"
-              value={methodFilter}
-              onChange={setMethodFilter}
-              options={orderMethods.map((m) => ({
-                value: m.order_method_id,
-                label: m.order_method_name,
-              }))}
-            />
-          </div>
+          <MultiButtonGroup
+            size="sm"
+            value={methodFilter}
+            onChange={setMethodFilter}
+            options={orderMethods.map((m) => ({
+              value: m.order_method_id,
+              label: m.order_method_name,
+            }))}
+          />
         )}
       </div>
 
