@@ -20,8 +20,43 @@
   letter-spacing: -0.5px;
 }
 .filters {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   margin-bottom: 18px;
+}
+.filters > :first-child {
+  flex: 1;
   max-width: 420px;
+}
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.pageInfo {
+  color: var(--text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.pageInput {
+  width: 56px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-sm);
+  padding: 6px 8px;
+  font-size: 14px;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.pageInput::-webkit-outer-spin-button,
+.pageInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 .error {
   background: rgba(255, 69, 58, 0.14);

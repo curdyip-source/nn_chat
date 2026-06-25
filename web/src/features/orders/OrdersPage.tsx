@@ -4,6 +4,7 @@ import type { Order } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
 import { ButtonGroup } from '../../ui/ButtonGroup'
+import { MultiButtonGroup } from '../../ui/MultiButtonGroup'
 import { TextInput } from '../../ui/Field'
 import { StatusChip } from '../../ui/StatusChip'
 import { useDebouncedValue } from '../../ui/useDebouncedValue'
@@ -15,32 +16,45 @@ import styles from './OrdersPage.module.css'
 
 type View = 'list' | 'table'
 
+const PAGE_SIZE = 100
+
 export function OrdersPage() {
   const ref = useReference()
   const orderStatuses = ref.statusesByType('orders')
+  const orderMethods = ref.order_methods
 
   const [creating, setCreating] = useState(false)
   const [editOrder, setEditOrder] = useState<Order | null>(null)
   const [viewingId, setViewingId] = useState<number | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const [view, setView] = useState<View>('list')
-  const [statusFilter, setStatusFilter] = useState<number | null>(null)
+  const [statusFilter, setStatusFilter] = useState<number[]>([])
+  const [methodFilter, setMethodFilter] = useState<number[]>([])
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search.trim(), 300)
 
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter, methodFilter, debouncedSearch])
+
   const reload = useCallback(() => {
     setLoading(true)
-    listOrders({ statusId: statusFilter, search: debouncedSearch })
+    listOrders({ statusIds: statusFilter, methodIds: methodFilter, search: debouncedSearch, page, pageSize: PAGE_SIZE })
       .then((res) => {
         setOrders(res.items)
+        setTotal(res.pagination?.total ?? res.items.length)
         setError(null)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
-  }, [statusFilter, debouncedSearch])
+  }, [statusFilter, methodFilter, debouncedSearch, page])
 
   useEffect(() => {
     if (!creating && viewingId == null && editOrder == null) reload()
@@ -99,23 +113,64 @@ export function OrdersPage() {
       </header>
 
       <div className={styles.filters}>
-        <TextInput
-          placeholder="Поиск по клиенту или информации…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        {orderStatuses.length > 0 && (
-          <ButtonGroup
-            deselectable
-            size="sm"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            options={orderStatuses.map((s) => ({
-              value: s.status_id,
-              label: s.status_status,
-              dot: s.status_color ?? undefined,
-            }))}
+        <div className={styles.filtersTop}>
+          <TextInput
+            placeholder="Поиск по клиенту или информации…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
+          <div className={styles.pager}>
+            <Button variant="secondary" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
+              ←
+            </Button>
+            <span className={styles.pageInfo}>
+              Стр.{' '}
+              <input
+                className={styles.pageInput}
+                type="number"
+                min={1}
+                max={totalPages}
+                value={page}
+                onChange={(e) => {
+                  const n = Number(e.target.value)
+                  if (n >= 1 && n <= totalPages) setPage(n)
+                }}
+              />{' '}
+              из {totalPages}
+            </span>
+            <Button variant="secondary" disabled={page >= totalPages || loading} onClick={() => setPage((p) => p + 1)}>
+              →
+            </Button>
+          </div>
+        </div>
+        {orderStatuses.length > 0 && (
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>Статус</span>
+            <MultiButtonGroup
+              size="sm"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={orderStatuses.map((s) => ({
+                value: s.status_id,
+                label: s.status_status,
+                dot: s.status_color ?? undefined,
+              }))}
+            />
+          </div>
+        )}
+        {orderMethods.length > 0 && (
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>Способ</span>
+            <MultiButtonGroup
+              size="sm"
+              value={methodFilter}
+              onChange={setMethodFilter}
+              options={orderMethods.map((m) => ({
+                value: m.order_method_id,
+                label: m.order_method_name,
+              }))}
+            />
+          </div>
         )}
       </div>
 

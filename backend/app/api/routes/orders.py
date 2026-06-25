@@ -15,10 +15,11 @@ def get_orders(
     db: Session = Depends(get_db),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    status_id: int | None = Query(default=None, ge=1),
+    status_id: list[int] | None = Query(default=None),
+    method_id: list[int] | None = Query(default=None),
     search: str | None = Query(default=None),
 ) -> dict:
-    return list_orders(db, page=page, page_size=page_size, status_id=status_id, search=search)
+    return list_orders(db, page=page, page_size=page_size, status_ids=status_id, method_ids=method_id, search=search)
 
 
 @router.get("/{order_id}")

@@ -185,13 +185,14 @@ export function listContacts(
 // ---------- Orders ----------
 
 export function listOrders(
-  opts: { page?: number; pageSize?: number; statusId?: number | null; search?: string } = {},
+  opts: { page?: number; pageSize?: number; statusIds?: number[]; methodIds?: number[]; search?: string } = {},
 ) {
   const q = new URLSearchParams({
     page: String(opts.page ?? 1),
     page_size: String(opts.pageSize ?? 30),
   })
-  if (opts.statusId != null) q.set('status_id', String(opts.statusId))
+  for (const id of opts.statusIds ?? []) q.append('status_id', String(id))
+  for (const id of opts.methodIds ?? []) q.append('method_id', String(id))
   if (opts.search) q.set('search', opts.search)
   return apiRequest<Paginated<Order>>(`/orders?${q}`)
 }

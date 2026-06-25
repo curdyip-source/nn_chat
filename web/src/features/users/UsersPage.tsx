@@ -6,19 +6,30 @@ import { TextInput } from '../../ui/Field'
 import { useDebouncedValue } from '../../ui/useDebouncedValue'
 import styles from './UsersPage.module.css'
 
+const PAGE_SIZE = 100
+
 export function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [savingId, setSavingId] = useState<number | null>(null)
   const debouncedSearch = useDebouncedValue(search.trim(), 300)
 
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch])
+
   const reload = useCallback(() => {
     setLoading(true)
-    listUsers({ search: debouncedSearch })
+    listUsers({ search: debouncedSearch, page, pageSize: PAGE_SIZE })
       .then((res) => {
         setError(null)
+        setTotal(res.pagination?.total ?? res.items.length)
         // Неподтверждённые — наверх.
         setUsers(
           [...res.items].sort(
@@ -28,7 +39,7 @@ export function UsersPage() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
-  }, [debouncedSearch])
+  }, [debouncedSearch, page])
 
   useEffect(reload, [reload])
 
@@ -64,6 +75,29 @@ export function UsersPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <div className={styles.pager}>
+          <Button variant="secondary" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
+            ←
+          </Button>
+          <span className={styles.pageInfo}>
+            Стр.{' '}
+            <input
+              className={styles.pageInput}
+              type="number"
+              min={1}
+              max={totalPages}
+              value={page}
+              onChange={(e) => {
+                const n = Number(e.target.value)
+                if (n >= 1 && n <= totalPages) setPage(n)
+              }}
+            />{' '}
+            из {totalPages}
+          </span>
+          <Button variant="secondary" disabled={page >= totalPages || loading} onClick={() => setPage((p) => p + 1)}>
+            →
+          </Button>
+        </div>
       </div>
 
       {error && <div className={styles.error}>{error}</div>}

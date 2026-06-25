@@ -7,7 +7,7 @@ import { TextInput } from '../../ui/Field'
 import { useDebouncedValue } from '../../ui/useDebouncedValue'
 import styles from './ContactsPage.module.css'
 
-const PAGE_SIZE = 50
+const PAGE_SIZE = 100
 type Tab = 'buyer' | 'supplier'
 
 export function ContactsPage() {
