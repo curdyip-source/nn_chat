@@ -11,6 +11,7 @@ import { OrdersPage } from '../features/orders/OrdersPage'
 import { ProductsPage } from '../features/products/ProductsPage'
 import { ReferencePage } from '../features/reference/ReferencePage'
 import { UsersPage } from '../features/users/UsersPage'
+import logoUrl from '../assets/general-title-logo.png'
 import styles from './AppShell.module.css'
 
 type Section = {
@@ -51,7 +52,10 @@ function AppShellInner() {
     <div className={[styles.layout, sidebarHidden ? styles.noSidebar : ''].join(' ')}>
       {!sidebarHidden && (
         <aside className={styles.sidebar}>
-          <div className={styles.brand}>NufNaf</div>
+          <div className={styles.brand}>
+            <img src={logoUrl} alt="" className={styles.brandLogo} />
+            <span>NufNaf</span>
+          </div>
           <nav className={styles.nav}>
             {SECTIONS.map((s) => (
               <button

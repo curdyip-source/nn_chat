@@ -14,10 +14,18 @@
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.5px;
   padding: 4px 10px;
+}
+.brandLogo {
+  height: 26px;
+  width: auto;
+  display: block;
 }
 
 .nav {

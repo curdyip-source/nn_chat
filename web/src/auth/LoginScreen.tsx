@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from '../ui/Button'
 import { Field, TextInput } from '../ui/Field'
 import { useAuth } from './AuthContext'
+import logoUrl from '../assets/general-title-logo.png'
 import styles from './LoginScreen.module.css'
 
 export function LoginScreen() {
@@ -28,7 +29,10 @@ export function LoginScreen() {
     <div className={styles.screen}>
       <form className={styles.card} onSubmit={submit}>
         <div className={styles.brand}>
-          <span className={styles.logo}>NufNaf</span>
+          <div className={styles.brandRow}>
+            <img src={logoUrl} alt="" className={styles.brandLogo} />
+            <span className={styles.logo}>NufNaf</span>
+          </div>
           <span className={styles.sub}>Панель администратора</span>
         </div>
 

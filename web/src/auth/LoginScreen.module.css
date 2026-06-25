@@ -31,6 +31,16 @@
   gap: 4px;
   margin-bottom: 6px;
 }
+.brandRow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.brandLogo {
+  height: 34px;
+  width: auto;
+  display: block;
+}
 .logo {
   font-size: 28px;
   font-weight: 800;
