@@ -206,11 +206,11 @@ def build_notification_content(*, message_type: str, sender_name: str, message_t
     number = f" №{entity_id}" if entity_id else ""
 
     if message_type == "order":
-        return f"Новый заказ{number}", f"{normalized_sender_name} создал заказ{number}"
+        return "Новый заказ", f"{normalized_sender_name} создал заказ{number}"
     if message_type == "inventory":
-        return f"Новая инвентаризация{number}", f"{normalized_sender_name} создал инвентаризацию{number}"
+        return "Новая инвентаризация", f"{normalized_sender_name} создал инвентаризацию{number}"
     if message_type == "product_registration":
-        return f"Новая приемка{number}", f"{normalized_sender_name} создал приемку{number}"
+        return "Новая приемка", f"{normalized_sender_name} создал приемку{number}"
     if normalized_text:
         return "Новое сообщение", f"{normalized_sender_name}: {normalized_text}"
     return "Новое сообщение", f"Новое сообщение от {normalized_sender_name}"
