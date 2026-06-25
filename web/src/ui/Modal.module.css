@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--scrim);
   backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
@@ -15,10 +15,10 @@
   max-height: 88vh;
   display: flex;
   flex-direction: column;
-  background: #121214;
+  background: var(--surface-solid);
   border: 1px solid var(--stroke);
   border-radius: var(--r-xl);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 24px 60px var(--shadow-strong);
   overflow: hidden;
 }
 

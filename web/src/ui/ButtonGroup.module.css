@@ -41,7 +41,7 @@
   border-color: var(--accent);
 }
 .active:hover {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--accent-hover);
   color: var(--accent-text);
 }
 

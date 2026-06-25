@@ -80,6 +80,6 @@
   border-color: var(--focus);
 }
 .currency option {
-  background: #17171a;
+  background: var(--surface-solid);
   color: var(--text);
 }

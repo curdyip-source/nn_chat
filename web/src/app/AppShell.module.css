@@ -10,7 +10,7 @@
   border-right: 1px solid var(--stroke);
   padding: 20px 14px;
   gap: 18px;
-  background: #0a0a0b;
+  background: var(--sidebar-bg);
 }
 
 .brand {
@@ -115,7 +115,7 @@
   border-radius: 0 12px 12px 0;
   padding: 16px 9px;
   font-size: 16px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 6px 20px var(--shadow);
 }
 .restoreMenu:hover {
   background: var(--accent);
