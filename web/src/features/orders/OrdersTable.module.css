@@ -129,7 +129,7 @@
 
 .itemRow {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) 70px 100px 64px 190px 100px 30px;
+  grid-template-columns: 13px minmax(160px, 1fr) 70px 100px 64px 190px 100px 30px;
   gap: 8px;
   align-items: center;
 }
@@ -170,7 +170,26 @@
   border-color: var(--focus);
 }
 .itemStatus {
-  margin-left: 54px;
+  margin-left: 8px;
+  /* Чип статуса + мелкая подпись (откуда→куда / поставщик) укладываются по высоте
+     в строку (её высоту задаёт инпут цены, 36px) — общая высота не растёт. */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  height: 36px;
+}
+.itemStatusExtra {
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1.15;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
 }
 .itemSum {
   text-align: right;

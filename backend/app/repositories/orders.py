@@ -34,6 +34,7 @@ class OrderRepository:
         page_size: int = 20,
         status_ids: list[int] | None = None,
         method_ids: list[int] | None = None,
+        establishment_ids: list[int] | None = None,
         search: str | None = None,
     ) -> tuple[list[Order], int]:
         query = self._base_query()
@@ -41,6 +42,8 @@ class OrderRepository:
             query = query.filter(Order.order_status_id.in_(status_ids))
         if method_ids:
             query = query.filter(Order.order_method_id.in_(method_ids))
+        if establishment_ids:
+            query = query.filter(Order.order_establishment_id.in_(establishment_ids))
         if search:
             like_value = f"%{search.strip()}%"
             query = query.filter(

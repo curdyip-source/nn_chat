@@ -92,6 +92,7 @@ export function OrderCreate({
     if (c.contact_establishment_id) setEstablishmentId(c.contact_establishment_id)
     if (c.contact_order_method_id) setMethodId(c.contact_order_method_id)
     setSubMethod(c.contact_order_sub_method ?? null)
+    setContactMethod(c.contact_contact_method ?? null)
   }
 
   const addProduct = (p: Product) =>

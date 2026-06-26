@@ -1,14 +1,16 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { updateOrder, updateOrderStatus } from '../../api/endpoints'
 import type { Order, OrderUpdateItem, Product } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
+import { Checkbox } from '../../ui/Checkbox'
 import { StatusSelect } from '../../ui/StatusSelect'
 import { formatAmount, formatDateTime } from '../../lib/format'
 import { AddItemModal } from './AddItemModal'
 import { newUid } from './cart'
 import { ItemStatusExtraModal } from './ItemStatusExtraModal'
-import { statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
+import { showsMovement, showsSupplier, statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
+import { useOrderSelection, type BulkApplyFn, type BulkRemoveFn } from './orderSelection'
 import { orderToUpdate } from './orderUpdate'
 import styles from './OrdersTable.module.css'
 
@@ -63,6 +65,17 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
   const orderStatusOptions = ref.statusesByType('orders').map((s) => ({ id: s.status_id, label: s.status_status, color: s.status_color }))
   const itemStatusOptions = ref.statusesByType('order_products').map((s) => ({ id: s.status_id, label: s.status_status, color: s.status_color }))
   const currencySign = (id: number | null) => ref.currencies.find((c) => c.currency_id === id)?.currency_sign ?? ''
+  const establishmentName = (id: number | null) => ref.establishments.find((e) => e.establishment_id === id)?.establishment_name ?? '—'
+
+  // Подпись под статусом: для перемещения «Склад → Склад», для заказа поставщику/заказано — поставщик.
+  const itemExtraLabel = (d: ItemDraft): string | null => {
+    const name = itemStatusOptions.find((o) => o.id === d.statusId)?.label
+    if (showsMovement(name) && d.sourceEstablishmentId != null && d.destinationEstablishmentId != null) {
+      return `${establishmentName(d.sourceEstablishmentId)} → ${establishmentName(d.destinationEstablishmentId)}`
+    }
+    if (showsSupplier(name) && d.supplier) return d.supplier
+    return null
+  }
 
   const [expanded, setExpanded] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
@@ -111,14 +124,57 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
     setDrafts(next)
     scheduleSave(next)
   }
+  const defaultItemStatusId = itemStatusOptions.find((o) => o.label === 'Не обработан')?.id ?? null
   const addProduct = (p: Product, price: string, quantity: number) => {
     const next = [
       ...drafts,
-      { uid: newUid(), productId: p.product_id, article: p.product_article, name: p.product_name, quantity, price, currencyId: defaultCurrencyId, statusId: null, supplier: null, sourceEstablishmentId: null, destinationEstablishmentId: null },
+      { uid: newUid(), productId: p.product_id, article: p.product_article, name: p.product_name, quantity, price, currencyId: defaultCurrencyId, statusId: defaultItemStatusId, supplier: null, sourceEstablishmentId: null, destinationEstablishmentId: null },
     ]
     setDrafts(next)
     void persist({ drafts: next })
   }
+
+  // Массовое применение статуса к отмеченным позициям (из шапки страницы).
+  const selection = useOrderSelection()
+  const applyBulkRef = useRef<BulkApplyFn>(() => {})
+  applyBulkRef.current = (uids, statusId, extra) => {
+    setDrafts((prev) => {
+      const next = prev.map((d) =>
+        uids.includes(d.uid)
+          ? {
+              ...d,
+              statusId,
+              supplier: extra.supplier !== undefined ? extra.supplier : d.supplier,
+              sourceEstablishmentId: extra.sourceEstablishmentId !== undefined ? extra.sourceEstablishmentId : d.sourceEstablishmentId,
+              destinationEstablishmentId: extra.destinationEstablishmentId !== undefined ? extra.destinationEstablishmentId : d.destinationEstablishmentId,
+            }
+          : d,
+      )
+      void persist({ drafts: next })
+      return next
+    })
+  }
+  useEffect(() => {
+    const fn: BulkApplyFn = (uids, s, e) => applyBulkRef.current(uids, s, e)
+    selection.registerApply(order.order_id, fn)
+    return () => selection.unregisterApply(order.order_id)
+  }, [order.order_id, selection.registerApply, selection.unregisterApply])
+
+  const removeBulkRef = useRef<BulkRemoveFn>(() => {})
+  removeBulkRef.current = (uids) => {
+    setDrafts((prev) => {
+      const next = prev.filter((d) => !uids.includes(d.uid))
+      // Заказ не может остаться без позиций — если выделены все, эту строку пропускаем.
+      if (next.length === 0) return prev
+      void persist({ drafts: next })
+      return next
+    })
+  }
+  useEffect(() => {
+    const fn: BulkRemoveFn = (uids) => removeBulkRef.current(uids)
+    selection.registerRemove(order.order_id, fn)
+    return () => selection.unregisterRemove(order.order_id)
+  }, [order.order_id, selection.registerRemove, selection.unregisterRemove])
 
   const onItemStatus = (d: ItemDraft, sid: number) => {
     const name = itemStatusOptions.find((o) => o.id === sid)?.label
@@ -200,6 +256,11 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
 
           {drafts.map((d) => (
             <div key={d.uid} className={styles.itemRow}>
+              <Checkbox
+                checked={selection.isSelected(order.order_id, d.uid)}
+                onChange={() => selection.toggle(order.order_id, d.uid)}
+                title="Отметить для массового статуса"
+              />
               <span className={styles.itemName} title={d.name}>
                 {d.name}
               </span>
@@ -226,6 +287,11 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
               <span className={styles.itemStatus}>
                 {itemStatusOptions.length > 0 && (
                   <StatusSelect size="sm" value={d.statusId} options={itemStatusOptions} onChange={(sid) => onItemStatus(d, sid)} />
+                )}
+                {itemExtraLabel(d) && (
+                  <span className={styles.itemStatusExtra} title={itemExtraLabel(d) ?? ''}>
+                    {itemExtraLabel(d)}
+                  </span>
                 )}
               </span>
               <span className={styles.itemSum}>

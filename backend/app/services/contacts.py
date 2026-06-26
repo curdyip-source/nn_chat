@@ -20,7 +20,7 @@ def list_contacts(db: Session, *, contact_type: str, search: str | None = None, 
     return {"items": [serialize_contact(item) for item in items], "pagination": build_pagination(page, page_size, total)}
 
 
-def create_or_get_contact(db: Session, *, contact_type: str, contact_name: str, contact_info: str | None = None, contact_establishment_id: int | None = None, contact_order_method_id: int | None = None, contact_order_sub_method: str | None = None, current_user: dict | None = None) -> dict | None:
+def create_or_get_contact(db: Session, *, contact_type: str, contact_name: str, contact_info: str | None = None, contact_establishment_id: int | None = None, contact_order_method_id: int | None = None, contact_order_sub_method: str | None = None, contact_contact_method: str | None = None, current_user: dict | None = None) -> dict | None:
     normalized_name = _normalize_text(contact_name)
     if normalized_name is None:
         return None
@@ -32,17 +32,24 @@ def create_or_get_contact(db: Session, *, contact_type: str, contact_name: str, 
         "contact_establishment_id": contact_establishment_id,
         "contact_order_method_id": contact_order_method_id,
         "contact_order_sub_method": _normalize_text(contact_order_sub_method),
+        "contact_contact_method": _normalize_text(contact_contact_method),
         "contact_owner_user_id": current_user["user_id"] if current_user is not None else None,
     }
 
     repository = ContactRepository(db)
     existing = repository.find_exact(data=data)
     if existing is not None:
+        # Способ связи — изменяемый атрибут клиента, а не часть его «личности»:
+        # при совпадении обновляем его, а не плодим дубликаты. Пустое значение
+        # (заказ без способа связи) не затирает уже сохранённый способ.
+        new_contact_method = data["contact_contact_method"]
+        if new_contact_method is not None and new_contact_method != existing.contact_contact_method:
+            existing = repository.update(existing, {"contact_contact_method": new_contact_method})
         return serialize_contact(existing)
     return serialize_contact(repository.create(data))
 
 
-def save_buyer_contact_from_order(db: Session, *, order_customer: str, order_info: str | None, order_establishment_id: int, order_method_id: int, order_sub_method: str | None, current_user: dict) -> dict | None:
+def save_buyer_contact_from_order(db: Session, *, order_customer: str, order_info: str | None, order_establishment_id: int, order_method_id: int, order_sub_method: str | None, order_contact_method: str | None = None, current_user: dict) -> dict | None:
     return create_or_get_contact(
         db,
         contact_type="buyer",
@@ -51,6 +58,7 @@ def save_buyer_contact_from_order(db: Session, *, order_customer: str, order_inf
         contact_establishment_id=order_establishment_id,
         contact_order_method_id=order_method_id,
         contact_order_sub_method=order_sub_method,
+        contact_contact_method=order_contact_method,
         current_user=current_user,
     )
 

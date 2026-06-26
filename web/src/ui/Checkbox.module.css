@@ -1,0 +1,25 @@
+.box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  border: 1.5px solid var(--stroke-strong);
+  background: var(--surface-2);
+  color: var(--accent-text);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.box:hover {
+  border-color: var(--accent);
+}
+.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.box:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

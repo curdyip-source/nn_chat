@@ -1,17 +1,15 @@
 .row {
-  background: var(--surface);
-  border: 1px solid var(--stroke);
-  border-radius: var(--r-md);
-  padding: 12px 14px;
-}
-
-.head {
   display: flex;
   align-items: center;
   gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
 }
 .name {
   flex: 1;
+  min-width: 0;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -34,9 +32,8 @@
 .controls {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 .price {

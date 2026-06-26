@@ -28,6 +28,7 @@ class Contact(Base):
         index=True,
     )
     contact_order_sub_method: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    contact_contact_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
     contact_owner_user_id: Mapped[int | None] = mapped_column(
         SQL_ID_TYPE,
         ForeignKey("users.user_id", ondelete="SET NULL"),

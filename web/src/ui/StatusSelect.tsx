@@ -21,7 +21,7 @@ type Props = {
  *  в портал с fixed-позицией, чтобы не обрезалась overflow-родителями (таблица). */
 export function StatusSelect({ value, options, onChange, saving, size = 'md' }: Props) {
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number; maxHeight: number } | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const current = options.find((o) => o.id === value)
@@ -29,7 +29,20 @@ export function StatusSelect({ value, options, onChange, saving, size = 'md' }: 
 
   const openMenu = () => {
     const rect = triggerRef.current?.getBoundingClientRect()
-    if (rect) setPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right })
+    if (!rect) return
+    const gap = 6
+    const margin = 8
+    const right = window.innerWidth - rect.right
+    const spaceBelow = window.innerHeight - rect.bottom - gap - margin
+    const spaceAbove = rect.top - gap - margin
+    // Раскрываемся вниз, если снизу хватает места (или его больше, чем сверху),
+    // иначе — вверх. maxHeight подгоняем под доступное место, чтобы список не уходил
+    // за край экрана и его можно было прокрутить внутри.
+    if (spaceBelow >= 220 || spaceBelow >= spaceAbove) {
+      setPos({ top: rect.bottom + gap, right, maxHeight: Math.min(320, spaceBelow) })
+    } else {
+      setPos({ bottom: window.innerHeight - rect.top + gap, right, maxHeight: Math.min(320, spaceAbove) })
+    }
     setOpen(true)
   }
 
@@ -40,13 +53,18 @@ export function StatusSelect({ value, options, onChange, saving, size = 'md' }: 
       if (triggerRef.current?.contains(t) || dropdownRef.current?.contains(t)) return
       setOpen(false)
     }
+    // Скролл закрывает меню — но НЕ внутренний скролл самого списка (capture ловит и его).
+    const onScroll = (e: Event) => {
+      if (dropdownRef.current?.contains(e.target as Node)) return
+      setOpen(false)
+    }
     const close = () => setOpen(false)
     document.addEventListener('mousedown', onDocClick)
-    window.addEventListener('scroll', close, true)
+    window.addEventListener('scroll', onScroll, true)
     window.addEventListener('resize', close)
     return () => {
       document.removeEventListener('mousedown', onDocClick)
-      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('scroll', onScroll, true)
       window.removeEventListener('resize', close)
     }
   }, [open])
@@ -71,7 +89,15 @@ export function StatusSelect({ value, options, onChange, saving, size = 'md' }: 
           <div
             ref={dropdownRef}
             className={styles.dropdown}
-            style={{ position: 'fixed', top: pos.top, right: pos.right }}
+            style={{
+              position: 'fixed',
+              // Явно задаём обе оси: иначе при раскрытии вверх остаётся top из CSS-класса
+              // (top: calc(100% + 6px)) и fixed-элемент сплющивается между top и bottom.
+              top: pos.top != null ? pos.top : 'auto',
+              bottom: pos.bottom != null ? pos.bottom : 'auto',
+              right: pos.right,
+              maxHeight: pos.maxHeight,
+            }}
           >
             {options.map((o) => (
               <button

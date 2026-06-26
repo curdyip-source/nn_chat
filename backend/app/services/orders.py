@@ -209,8 +209,8 @@ class OrderService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Заказ не найден")
         return row
 
-    def list_orders(self, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, search: str | None = None) -> dict:
-        rows, total = self.repository.list(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, search=search)
+    def list_orders(self, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, establishment_ids: list[int] | None = None, search: str | None = None) -> dict:
+        rows, total = self.repository.list(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, search=search)
         return {"items": [serialize_order(item) for item in rows], "pagination": build_pagination(page, page_size, total)}
 
     def create_order(self, payload: OrderCreatePayload, current_user: dict) -> dict:
@@ -283,6 +283,7 @@ class OrderService:
                 order_establishment_id=payload.order_establishment_id,
                 order_method_id=payload.order_method_id,
                 order_sub_method=normalized_order_sub_method,
+                order_contact_method=normalized_order_contact_method,
                 current_user=current_user,
             )
         message = self.message_repository.create(
@@ -526,8 +527,8 @@ class OrderService:
         return source_establishment_id, destination_establishment_id
 
 
-def list_orders(db: Session, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, search: str | None = None) -> dict:
-    return OrderService(db).list_orders(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, search=search)
+def list_orders(db: Session, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, establishment_ids: list[int] | None = None, search: str | None = None) -> dict:
+    return OrderService(db).list_orders(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, search=search)
 
 
 def get_order(db: Session, order_id: int) -> dict:

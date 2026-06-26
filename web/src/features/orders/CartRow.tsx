@@ -14,14 +14,9 @@ export function CartRow({ item, currencies, onChange, onRemove }: Props) {
   const priceMissing = !item.price.trim()
   return (
     <div className={styles.row}>
-      <div className={styles.head}>
-        <div className={styles.name} title={item.name}>
-          {item.name}
-          {item.article && <span className="dim"> · {item.article}</span>}
-        </div>
-        <button className={styles.remove} onClick={onRemove} title="Убрать">
-          ✕
-        </button>
+      <div className={styles.name} title={item.name}>
+        {item.name}
+        {item.article && <span className="dim"> · {item.article}</span>}
       </div>
       <div className={styles.controls}>
         <Stepper value={item.quantity} onChange={(q) => onChange({ quantity: q })} />
@@ -46,6 +41,9 @@ export function CartRow({ item, currencies, onChange, onRemove }: Props) {
           </select>
         )}
       </div>
+      <button className={styles.remove} onClick={onRemove} title="Убрать">
+        ✕
+      </button>
     </div>
   )
 }

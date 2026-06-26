@@ -74,3 +74,10 @@ class ContactRepository:
         self.db.commit()
         self.db.refresh(row)
         return self.get_by_id(row.contact_id)
+
+    def update(self, row: Contact, data: dict) -> Contact:
+        for key, value in data.items():
+            setattr(row, key, value)
+        self.db.commit()
+        self.db.refresh(row)
+        return self.get_by_id(row.contact_id)

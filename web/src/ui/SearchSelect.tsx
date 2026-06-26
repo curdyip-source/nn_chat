@@ -49,15 +49,14 @@ export function SearchSelect<T>({
   const [items, setItems] = useState<T[]>([])
   const [loading, setLoading] = useState(false)
   const debounced = useDebouncedValue(query.trim(), 220)
-  const skipNextSearch = useRef(false)
+  // Ищем/открываем выпадашку только в ответ на ручной ввод. Программная подстановка
+  // текста (выбор контакта подставляет его имя; ремоунт при смене вкладки) не должна
+  // заново запускать поиск — иначе окно с результатами всплывает само собой.
+  const typingRef = useRef(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // После выбора родитель подставляет текст (имя контакта) — не открываем поиск заново.
-    if (skipNextSearch.current) {
-      skipNextSearch.current = false
-      return
-    }
+    if (!typingRef.current) return
     if (debounced.length < minChars) {
       setItems([])
       setLoading(false)
@@ -87,9 +86,21 @@ export function SearchSelect<T>({
   }, [])
 
   const handleSelect = (item: T) => {
+    typingRef.current = false
+    // WebKit/Safari: выбор синхронно подменяет DOM (выпадашка закрывается, на месте
+    // инпута появляется чип/новый элемент). На один физический клик Safari при этом
+    // диспатчит ВТОРОЙ, «фантомный» click по элементу, который оказался под курсором
+    // после ре-рендера (например по кнопке удаления только что выбранного товара) —
+    // он тут же сбрасывал выбор. Глотаем ровно один следующий click за текущий тик.
+    const swallow = (e: MouseEvent) => {
+      e.stopPropagation()
+      e.preventDefault()
+    }
+    document.addEventListener('click', swallow, true)
+    setTimeout(() => document.removeEventListener('click', swallow, true), 0)
+
     onSelect(item)
-    if (controlled) skipNextSearch.current = true
-    else if (clearOnSelect) setInternalQuery('')
+    if (!controlled && clearOnSelect) setInternalQuery('')
     setOpen(false)
   }
 
@@ -103,8 +114,11 @@ export function SearchSelect<T>({
         value={query}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        onChange={(e) => setQuery(e.target.value)}
-        onFocus={() => !skipNextSearch.current && debounced.length >= minChars && setOpen(true)}
+        onChange={(e) => {
+          typingRef.current = true
+          setQuery(e.target.value)
+        }}
+        onFocus={() => debounced.length >= minChars && items.length > 0 && setOpen(true)}
         onPaste={(e) => {
           if (!onBulkPaste) return
           const lines = e.clipboardData
@@ -114,6 +128,7 @@ export function SearchSelect<T>({
             .filter(Boolean)
           if (lines.length >= 2) {
             e.preventDefault()
+            typingRef.current = false
             setQuery('')
             setOpen(false)
             onBulkPaste(lines)

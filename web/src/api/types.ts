@@ -82,6 +82,7 @@ export type Contact = {
   contact_order_method_id?: number | null
   contact_order_method_name?: string | null
   contact_order_sub_method?: string | null
+  contact_contact_method?: string | null
 }
 
 // ----- Создание заказа -----
