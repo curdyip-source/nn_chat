@@ -32,14 +32,90 @@
 }
 .filtersTop > input {
   flex: 1;
-  max-width: 480px;
+  min-width: 160px;
+  max-width: 360px;
+}
+
+.dateFilter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.dateInput {
+  height: 40px;
+  width: 112px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 0 10px;
+  font-size: 14px;
+  text-align: center;
+  outline: none;
+  color-scheme: dark;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+/* Нативное поле даты прижимает значение влево из-за иконки календаря справа —
+   центрируем содержимое и убираем лишний внутренний отступ слева. */
+.dateInput::-webkit-datetime-edit {
+  text-align: center;
+  padding: 0;
+}
+.dateInput::-webkit-calendar-picker-indicator {
+  margin: 0;
+  padding-left: 2px;
+}
+.dateInput:focus {
+  border-color: var(--focus);
+}
+.dateDash {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.dateClear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background 0.14s ease, opacity 0.14s ease;
+}
+.dateClear:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.dateClear:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* Панель «Статус · Удалить · тугл» — центрируется в свободном месте между
+   инпутом поиска и блоком пагинации (два auto-отступа делят зазор пополам). */
+.midPanel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 .bulkActions {
   display: flex;
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
-  margin-left: 18px;
+}
+.expandToggle {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
 }
 .bulkDelete {
   padding: 5px 14px;
@@ -88,6 +164,29 @@
   margin: 0;
 }
 
+.grandTotal {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 12px 12px 0 0;
+  margin-bottom: 12px;
+  border-top: 1px solid var(--stroke);
+}
+.grandTotalLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+}
+.grandTotalValue {
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .header {
   display: flex;
   align-items: flex-start;
@@ -123,49 +222,4 @@
   text-align: center;
   border: 1px dashed var(--stroke);
   border-radius: var(--r-lg);
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.card {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: var(--surface);
-  border: 1px solid var(--stroke);
-  border-radius: var(--r-md);
-  padding: 14px 16px;
-  transition: background 0.14s ease, border-color 0.14s ease;
-}
-.card:hover {
-  background: var(--surface-2);
-  border-color: var(--stroke-strong);
-}
-.card:active {
-  transform: scale(0.995);
-}
-.cardTop {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.orderNo {
-  font-weight: 700;
-  color: var(--text-muted);
-}
-.customer {
-  font-weight: 600;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.cardMeta {
-  margin-top: 6px;
-  color: var(--text-dim);
-  font-size: 13px;
 }

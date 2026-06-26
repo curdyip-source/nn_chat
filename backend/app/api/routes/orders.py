@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -19,8 +21,10 @@ def get_orders(
     method_id: list[int] | None = Query(default=None),
     establishment_id: list[int] | None = Query(default=None),
     search: str | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
 ) -> dict:
-    return list_orders(db, page=page, page_size=page_size, status_ids=status_id, method_ids=method_id, establishment_ids=establishment_id, search=search)
+    return list_orders(db, page=page, page_size=page_size, status_ids=status_id, method_ids=method_id, establishment_ids=establishment_id, search=search, date_from=date_from, date_to=date_to)
 
 
 @router.get("/{order_id}")

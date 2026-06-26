@@ -185,7 +185,7 @@ export function listContacts(
 // ---------- Orders ----------
 
 export function listOrders(
-  opts: { page?: number; pageSize?: number; statusIds?: number[]; methodIds?: number[]; establishmentIds?: number[]; search?: string } = {},
+  opts: { page?: number; pageSize?: number; statusIds?: number[]; methodIds?: number[]; establishmentIds?: number[]; search?: string; dateFrom?: string; dateTo?: string } = {},
 ) {
   const q = new URLSearchParams({
     page: String(opts.page ?? 1),
@@ -195,8 +195,12 @@ export function listOrders(
   for (const id of opts.methodIds ?? []) q.append('method_id', String(id))
   for (const id of opts.establishmentIds ?? []) q.append('establishment_id', String(id))
   if (opts.search) q.set('search', opts.search)
-  return apiRequest<Paginated<Order>>(`/orders?${q}`)
+  if (opts.dateFrom) q.set('date_from', opts.dateFrom)
+  if (opts.dateTo) q.set('date_to', opts.dateTo)
+  return apiRequest<Paginated<Order> & { totals?: OrderTotal[] }>(`/orders?${q}`)
 }
+
+export type OrderTotal = { currency_id: number | null; currency_sign: string | null; amount: number }
 
 export function createOrder(payload: OrderCreate) {
   return apiRequest<{ item: Order }>('/orders', { method: 'POST', body: payload })

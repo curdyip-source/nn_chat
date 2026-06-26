@@ -1,5 +1,6 @@
 import logging
 from collections import Counter
+from datetime import date
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -209,9 +210,15 @@ class OrderService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Заказ не найден")
         return row
 
-    def list_orders(self, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, establishment_ids: list[int] | None = None, search: str | None = None) -> dict:
-        rows, total = self.repository.list(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, search=search)
-        return {"items": [serialize_order(item) for item in rows], "pagination": build_pagination(page, page_size, total)}
+    def list_orders(self, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, establishment_ids: list[int] | None = None, search: str | None = None, date_from: date | None = None, date_to: date | None = None) -> dict:
+        rows, total = self.repository.list(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, search=search, date_from=date_from, date_to=date_to)
+        currency_totals = self.repository.totals_by_currency(status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, search=search, date_from=date_from, date_to=date_to)
+        totals = [
+            {"currency_id": currency_id, "currency_sign": currency_sign, "amount": amount}
+            for currency_id, currency_sign, amount in currency_totals
+            if amount
+        ]
+        return {"items": [serialize_order(item) for item in rows], "pagination": build_pagination(page, page_size, total), "totals": totals}
 
     def create_order(self, payload: OrderCreatePayload, current_user: dict) -> dict:
         get_establishment_or_404(self.db, payload.order_establishment_id)
@@ -527,8 +534,8 @@ class OrderService:
         return source_establishment_id, destination_establishment_id
 
 
-def list_orders(db: Session, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, establishment_ids: list[int] | None = None, search: str | None = None) -> dict:
-    return OrderService(db).list_orders(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, search=search)
+def list_orders(db: Session, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, establishment_ids: list[int] | None = None, search: str | None = None, date_from: date | None = None, date_to: date | None = None) -> dict:
+    return OrderService(db).list_orders(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, search=search, date_from=date_from, date_to=date_to)
 
 
 def get_order(db: Session, order_id: int) -> dict:

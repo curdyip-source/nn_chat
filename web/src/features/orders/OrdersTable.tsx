@@ -46,20 +46,34 @@ function toApiItem(d: ItemDraft): OrderUpdateItem {
 export function OrdersTable({
   orders,
   onOrderPatched,
+  onEdit,
+  expandSignal,
 }: {
   orders: Order[]
   onOrderPatched: (order: Order) => void
+  onEdit: (order: Order) => void
+  expandSignal: { expanded: boolean; nonce: number }
 }) {
   return (
     <div className={styles.table}>
       {orders.map((o) => (
-        <OrderRow key={o.order_id} order={o} onOrderPatched={onOrderPatched} />
+        <OrderRow key={o.order_id} order={o} onOrderPatched={onOrderPatched} onEdit={onEdit} expandSignal={expandSignal} />
       ))}
     </div>
   )
 }
 
-function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o: Order) => void }) {
+function OrderRow({
+  order,
+  onOrderPatched,
+  onEdit,
+  expandSignal,
+}: {
+  order: Order
+  onOrderPatched: (o: Order) => void
+  onEdit: (o: Order) => void
+  expandSignal: { expanded: boolean; nonce: number }
+}) {
   const ref = useReference()
   const defaultCurrencyId = ref.defaultCurrency?.currency_id ?? null
   const orderStatusOptions = ref.statusesByType('orders').map((s) => ({ id: s.status_id, label: s.status_status, color: s.status_color }))
@@ -77,7 +91,12 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
     return null
   }
 
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(expandSignal.expanded)
+  // Глобальный тугл сворачивает/разворачивает все блоки; nonce — чтобы повторное
+  // нажатие в то же положение тоже синхронизировало строки, тронутые вручную.
+  useEffect(() => {
+    setExpanded(expandSignal.expanded)
+  }, [expandSignal.expanded, expandSignal.nonce])
   const [addOpen, setAddOpen] = useState(false)
   const [pendingExtra, setPendingExtra] = useState<{ uid: string; statusId: number; mode: ExtraMode } | null>(null)
   const [customer, setCustomer] = useState(order.order_customer)
@@ -232,6 +251,9 @@ function OrderRow({ order, onOrderPatched }: { order: Order; onOrderPatched: (o:
           <span className={styles.totalLabel}>Итого</span>
           {totalText || '—'}
         </span>
+        <button className={styles.editBtn} onClick={() => onEdit(order)} title="Редактировать заказ">
+          ✏️
+        </button>
       </div>
 
       {expanded && (

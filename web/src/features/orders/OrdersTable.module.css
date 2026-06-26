@@ -13,7 +13,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 32px 48px minmax(140px, 1.2fr) minmax(180px, 1.8fr) 190px 44px 120px minmax(100px, auto);
+  grid-template-columns: 32px 48px minmax(140px, 1.2fr) minmax(180px, 1.8fr) 190px 44px 120px minmax(100px, auto) 32px;
   gap: 10px;
   align-items: center;
   padding: 8px 12px;
@@ -47,6 +47,21 @@
 }
 .expandBtn:hover {
   color: var(--text);
+}
+.editBtn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  opacity: 0.7;
+  transition: opacity 0.14s ease, background 0.14s ease;
+}
+.editBtn:hover {
+  opacity: 1;
+  background: var(--surface);
 }
 .no {
   font-weight: 700;

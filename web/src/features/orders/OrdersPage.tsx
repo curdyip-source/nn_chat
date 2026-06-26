@@ -1,25 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { listOrders } from '../../api/endpoints'
+import { listOrders, type OrderTotal } from '../../api/endpoints'
 import type { Order } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
 import { MultiButtonGroup } from '../../ui/MultiButtonGroup'
-import { SegmentedControl } from '../../ui/SegmentedControl'
 import { TextInput } from '../../ui/Field'
 import { Modal } from '../../ui/Modal'
-import { StatusChip } from '../../ui/StatusChip'
 import { StatusSelect } from '../../ui/StatusSelect'
+import { Switch } from '../../ui/Switch'
 import { useDebouncedValue } from '../../ui/useDebouncedValue'
-import { formatDateTime } from '../../lib/format'
+import { formatAmount } from '../../lib/format'
 import { ItemStatusExtraModal } from './ItemStatusExtraModal'
 import { statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
 import { OrderSelectionContext, type BulkApplyFn, type BulkRemoveFn, type OrderSelection } from './orderSelection'
 import { OrderCreate } from './OrderCreate'
-import { OrderDetail } from './OrderDetail'
 import { OrdersTable } from './OrdersTable'
 import styles from './OrdersPage.module.css'
-
-type View = 'list' | 'table'
 
 const PAGE_SIZE = 100
 
@@ -32,19 +28,47 @@ export function OrdersPage() {
 
   const [creating, setCreating] = useState(false)
   const [editOrder, setEditOrder] = useState<Order | null>(null)
-  const [viewingId, setViewingId] = useState<number | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
+  const [totals, setTotals] = useState<OrderTotal[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [view, setView] = useState<View>('list')
   const [statusFilter, setStatusFilter] = useState<number[]>([])
   const [methodFilter, setMethodFilter] = useState<number[]>([])
   const [establishmentFilter, setEstablishmentFilter] = useState<number[]>([])
+  // По умолчанию — весь текущий год: 01.01 … 31.12.
+  const defaultDateFrom = useMemo(() => `${new Date().getFullYear()}-01-01`, [])
+  const defaultDateTo = useMemo(() => `${new Date().getFullYear()}-12-31`, [])
+  const [dateFrom, setDateFrom] = useState(defaultDateFrom)
+  const [dateTo, setDateTo] = useState(defaultDateTo)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search.trim(), 300)
+
+  // Глобальное сворачивание/разворачивание всех блоков. По умолчанию — развёрнуто.
+  const [expandAll, setExpandAll] = useState(true)
+  const [expandNonce, setExpandNonce] = useState(0)
+  const toggleExpandAll = (value: boolean) => {
+    setExpandAll(value)
+    setExpandNonce((n) => n + 1)
+  }
+
+  const hasActiveFilters =
+    statusFilter.length > 0 ||
+    methodFilter.length > 0 ||
+    establishmentFilter.length > 0 ||
+    dateFrom !== defaultDateFrom ||
+    dateTo !== defaultDateTo ||
+    search !== ''
+  const resetAllFilters = () => {
+    setStatusFilter([])
+    setMethodFilter([])
+    setEstablishmentFilter([])
+    setDateFrom(defaultDateFrom)
+    setDateTo(defaultDateTo)
+    setSearch('')
+  }
 
   // --- Массовое выделение позиций (чекбоксы в табличном виде) ---
   const [selected, setSelected] = useState<Record<number, string[]>>({})
@@ -109,28 +133,29 @@ export function OrdersPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [statusFilter, methodFilter, establishmentFilter, debouncedSearch])
+  }, [statusFilter, methodFilter, establishmentFilter, debouncedSearch, dateFrom, dateTo])
 
   // Состав строк меняется (фильтры/страница/режим) — сбрасываем отметки, чтобы uid не зависли.
   useEffect(() => {
     setSelected({})
-  }, [view, statusFilter, methodFilter, establishmentFilter, debouncedSearch, page])
+  }, [statusFilter, methodFilter, establishmentFilter, debouncedSearch, dateFrom, dateTo, page])
 
   const reload = useCallback(() => {
     setLoading(true)
-    listOrders({ statusIds: statusFilter, methodIds: methodFilter, establishmentIds: establishmentFilter, search: debouncedSearch, page, pageSize: PAGE_SIZE })
+    listOrders({ statusIds: statusFilter, methodIds: methodFilter, establishmentIds: establishmentFilter, search: debouncedSearch, dateFrom, dateTo, page, pageSize: PAGE_SIZE })
       .then((res) => {
         setOrders(res.items)
+        setTotals(res.totals ?? [])
         setTotal(res.pagination?.total ?? res.items.length)
         setError(null)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
-  }, [statusFilter, methodFilter, establishmentFilter, debouncedSearch, page])
+  }, [statusFilter, methodFilter, establishmentFilter, debouncedSearch, dateFrom, dateTo, page])
 
   useEffect(() => {
-    if (!creating && viewingId == null && editOrder == null) reload()
-  }, [creating, viewingId, editOrder, reload])
+    if (!creating && editOrder == null) reload()
+  }, [creating, editOrder, reload])
 
   if (creating || editOrder) {
     return (
@@ -148,19 +173,6 @@ export function OrdersPage() {
     )
   }
 
-  if (viewingId != null) {
-    return (
-      <OrderDetail
-        orderId={viewingId}
-        onBack={() => setViewingId(null)}
-        onEdit={(order) => {
-          setViewingId(null)
-          setEditOrder(order)
-        }}
-      />
-    )
-  }
-
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -172,35 +184,63 @@ export function OrdersPage() {
 
       <div className={styles.filters}>
         <div className={styles.filtersTop}>
-          <SegmentedControl<View>
-            value={view}
-            onChange={setView}
-            options={[
-              { value: 'list', label: 'Список' },
-              { value: 'table', label: 'Таблица' },
-            ]}
-          />
+          <button
+            type="button"
+            className={styles.dateClear}
+            disabled={!hasActiveFilters}
+            onClick={resetAllFilters}
+            title="Сбросить все фильтры"
+            aria-label="Сбросить все фильтры"
+          >
+            Сброс
+          </button>
+          <div className={styles.dateFilter}>
+            <input
+              type="date"
+              className={styles.dateInput}
+              value={dateFrom}
+              max={dateTo || undefined}
+              onChange={(e) => setDateFrom(e.target.value)}
+              title="Дата от"
+              aria-label="Дата от"
+            />
+            <span className={styles.dateDash}>—</span>
+            <input
+              type="date"
+              className={styles.dateInput}
+              value={dateTo}
+              min={dateFrom || undefined}
+              onChange={(e) => setDateTo(e.target.value)}
+              title="Дата до"
+              aria-label="Дата до"
+            />
+          </div>
           <TextInput
             placeholder="Поиск по клиенту или информации…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {view === 'table' && itemStatusOptions.length > 0 && (
-            <div className={styles.bulkActions}>
-              <span title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Статус для ${selectionCount} поз.`}>
-                <StatusSelect value={null} options={itemStatusOptions} onChange={onBulkStatus} saving={selectionCount === 0} />
-              </span>
-              <button
-                type="button"
-                className={styles.bulkDelete}
-                disabled={selectionCount === 0}
-                onClick={() => setConfirmDelete(true)}
-                title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Удалить ${selectionCount} поз.`}
-              >
-                Удалить
-              </button>
-            </div>
-          )}
+          <div className={styles.midPanel}>
+            {itemStatusOptions.length > 0 && (
+              <div className={styles.bulkActions}>
+                <span title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Статус для ${selectionCount} поз.`}>
+                  <StatusSelect value={null} options={itemStatusOptions} onChange={onBulkStatus} saving={selectionCount === 0} />
+                </span>
+                <button
+                  type="button"
+                  className={styles.bulkDelete}
+                  disabled={selectionCount === 0}
+                  onClick={() => setConfirmDelete(true)}
+                  title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Удалить ${selectionCount} поз.`}
+                >
+                  Удалить
+                </button>
+              </div>
+            )}
+            <span className={styles.expandToggle} title={expandAll ? 'Свернуть все заказы' : 'Развернуть все заказы'}>
+              <Switch checked={expandAll} onChange={toggleExpandAll} />
+            </span>
+          </div>
           <div className={styles.pager}>
             <Button variant="secondary" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
               ←
@@ -267,38 +307,27 @@ export function OrdersPage() {
         <div className="dim">Загрузка…</div>
       ) : orders.length === 0 ? (
         <div className={styles.empty}>Заказов не найдено</div>
-      ) : view === 'table' ? (
+      ) : (
         <OrderSelectionContext.Provider value={selection}>
           <OrdersTable
             orders={orders}
             onOrderPatched={(o) =>
               setOrders((prev) => prev.map((x) => (x.order_id === o.order_id ? o : x)))
             }
+            onEdit={setEditOrder}
+            expandSignal={{ expanded: expandAll, nonce: expandNonce }}
           />
         </OrderSelectionContext.Provider>
-      ) : (
-        <div className={styles.list}>
-          {orders.map((o) => (
-            <button key={o.order_id} className={styles.card} onClick={() => setViewingId(o.order_id)}>
-              <div className={styles.cardTop}>
-                <span className={styles.orderNo}>№{o.order_id}</span>
-                <span className={styles.customer}>{o.order_customer}</span>
-                {o.order_status && <StatusChip label={o.order_status} color={o.order_status_color} />}
-              </div>
-              <div className={styles.cardMeta}>
-                {[
-                  o.order_establishment_name,
-                  o.order_method_name,
-                  o.items?.length ? `${o.items.length} поз.` : null,
-                  formatDateTime(o.order_created_at),
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </div>
-            </button>
-          ))}
-        </div>
       )}
+      </div>
+
+      <div className={styles.grandTotal}>
+        <span className={styles.grandTotalLabel}>Итого по всем заказам</span>
+        <span className={styles.grandTotalValue}>
+          {totals.length > 0
+            ? totals.map((t) => `${formatAmount(t.amount)}${t.currency_sign ?? ''}`).join(' · ')
+            : '—'}
+        </span>
       </div>
 
       {bulkPending && (
