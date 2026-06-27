@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.config import REFRESH_TOKEN_GRACE_SECONDS
 from app.models.user_sessions import UserSession
 
 
@@ -34,6 +35,43 @@ class SessionRepository:
             self.db.commit()
             return None
         return session
+
+    def get_for_refresh(self, token: str) -> tuple[UserSession, bool] | None:
+        """Resolve a refresh token, accepting the just-rotated previous token within its grace window.
+
+        Returns ``(session, via_prev)`` where ``via_prev`` is True when the token matched the
+        previous (graced) token rather than the current one, or ``None`` if no live session matches.
+        """
+        now = datetime.utcnow()
+
+        session = (
+            self.db.query(UserSession)
+            .options(joinedload(UserSession.user))
+            .filter(UserSession.session_token == token)
+            .first()
+        )
+        if session is not None:
+            if session.session_expires_at <= now:
+                self.db.delete(session)
+                self.db.commit()
+                return None
+            return session, False
+
+        session = (
+            self.db.query(UserSession)
+            .options(joinedload(UserSession.user))
+            .filter(UserSession.session_prev_token == token)
+            .first()
+        )
+        if session is None:
+            return None
+        if session.session_expires_at <= now:
+            self.db.delete(session)
+            self.db.commit()
+            return None
+        if session.session_prev_token_expires_at is None or session.session_prev_token_expires_at <= now:
+            return None
+        return session, True
 
     def get_active_by_id(self, session_id: int) -> UserSession | None:
         session = (
@@ -74,6 +112,12 @@ class SessionRepository:
         return active_sessions
 
     def rotate_token(self, session: UserSession, *, token: str, expires_at: datetime) -> UserSession:
+        if REFRESH_TOKEN_GRACE_SECONDS > 0:
+            session.session_prev_token = session.session_token
+            session.session_prev_token_expires_at = datetime.utcnow() + timedelta(seconds=REFRESH_TOKEN_GRACE_SECONDS)
+        else:
+            session.session_prev_token = None
+            session.session_prev_token_expires_at = None
         session.session_token = token
         session.session_expires_at = expires_at
         self.db.commit()

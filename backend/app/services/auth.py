@@ -127,10 +127,11 @@ def logout_user(db: Session, current_user: dict, session_id: int) -> dict:
 
 def refresh_user_token(db: Session, payload: RefreshTokenPayload) -> dict:
     repository = SessionRepository(db)
-    refresh_session = repository.get_active_by_token(payload.refresh_token)
-    if refresh_session is None:
+    resolved = repository.get_for_refresh(payload.refresh_token)
+    if resolved is None:
         logger.warning("auth.refresh.failed", extra={"event_type": "auth.refresh.failed"})
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token не найден или истек")
+    refresh_session, via_prev = resolved
     if not refresh_session.user.user_active:
         repository.delete_by_id(refresh_session.session_id)
         logger.warning(
@@ -142,6 +143,20 @@ def refresh_user_token(db: Session, payload: RefreshTokenPayload) -> dict:
             },
         )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Пользователь деактивирован")
+
+    # Token matched the graced previous one: a client that never persisted the last rotation
+    # (or sent a concurrent/retried refresh). Re-issue the current token without rotating again —
+    # idempotent within the grace window — so the client converges on the live token.
+    if via_prev:
+        logger.info(
+            "auth.refresh.grace",
+            extra={
+                "event_type": "auth.refresh.grace",
+                "user_id": refresh_session.session_user_id,
+                "session_id": refresh_session.session_id,
+            },
+        )
+        return _build_auth_response(refresh_session.user, refresh_session)
 
     rotated_token = generate_session_token()
     refresh_expires_at = get_session_expires_at()

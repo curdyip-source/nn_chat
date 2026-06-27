@@ -13,6 +13,9 @@ class UserSession(Base):
 
     session_id: Mapped[int] = mapped_column(SQL_ID_TYPE, primary_key=True, index=True)
     session_token: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    # Previous token, kept briefly after rotation so an in-flight/retried refresh still resolves.
+    session_prev_token: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    session_prev_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     session_user_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
     session_created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     session_expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

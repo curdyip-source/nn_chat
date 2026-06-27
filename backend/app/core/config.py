@@ -26,6 +26,10 @@ CORS_ALLOW_HEADERS = ["*"]
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper()
 ACCESS_TOKEN_TTL_MINUTES = int(os.getenv("ACCESS_TOKEN_TTL_MINUTES", "30"))
 REFRESH_TOKEN_TTL_DAYS = int(os.getenv("REFRESH_TOKEN_TTL_DAYS", os.getenv("SESSION_TTL_DAYS", "30")))
+# Grace window during which a just-rotated (previous) refresh token is still accepted.
+# Covers clients that fail to persist the rotated token (suspended/killed mid-refresh)
+# or send a concurrent/retried refresh — without it, destructive rotation logs them out.
+REFRESH_TOKEN_GRACE_SECONDS = int(os.getenv("REFRESH_TOKEN_GRACE_SECONDS", "60"))
 AUTH_TOKEN_SECRET = os.getenv("AUTH_TOKEN_SECRET", "dev-secret-change-me")
 SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()
 SENTRY_ENVIRONMENT = os.getenv("SENTRY_ENVIRONMENT", APP_ENV or "development").strip()
@@ -104,6 +108,9 @@ def validate_runtime_config() -> None:
 
     _validate_positive_ttl("ACCESS_TOKEN_TTL_MINUTES", ACCESS_TOKEN_TTL_MINUTES, 5, 1440)
     _validate_positive_ttl("REFRESH_TOKEN_TTL_DAYS", REFRESH_TOKEN_TTL_DAYS, 1, 365)
+
+    if REFRESH_TOKEN_GRACE_SECONDS < 0 or REFRESH_TOKEN_GRACE_SECONDS > 3600:
+        raise RuntimeError("REFRESH_TOKEN_GRACE_SECONDS must be between 0 and 3600")
 
     if SENTRY_TRACES_SAMPLE_RATE < 0 or SENTRY_TRACES_SAMPLE_RATE > 1:
         raise RuntimeError("SENTRY_TRACES_SAMPLE_RATE must be between 0 and 1")
