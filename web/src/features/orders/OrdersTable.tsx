@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { updateOrder, updateOrderStatus } from '../../api/endpoints'
 import type { Order, OrderUpdateItem, Product } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
@@ -118,6 +118,7 @@ function OrderRow({
     })),
   )
   const timer = useRef<number | null>(null)
+  const saving = useRef(false)
 
   const persist = (overrides: { customer?: string; info?: string; drafts?: ItemDraft[] }) => {
     const body = orderToUpdate(order, {
@@ -125,18 +126,71 @@ function OrderRow({
       info: overrides.info ?? info,
       items: (overrides.drafts ?? drafts).map(toApiItem),
     })
+    saving.current = true
     return updateOrder(order.order_id, body)
       .then((r) => {
         onOrderPatched(r.item)
         setError('')
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось сохранить'))
+      .finally(() => {
+        saving.current = false
+      })
   }
 
   const scheduleSave = (next: ItemDraft[]) => {
     if (timer.current) clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => void persist({ drafts: next }), 500)
+    timer.current = window.setTimeout(() => {
+      timer.current = null
+      void persist({ drafts: next })
+    }, 500)
   }
+
+  // Re-sync local editor state when the server data for this order changes (realtime refetch),
+  // unless the user is mid-edit — otherwise items/price/customer/info edited elsewhere (app,
+  // other devices) would stay stale on the list while only the order-level status updated.
+  const serverSignature = useMemo(
+    () =>
+      JSON.stringify([
+        order.order_customer,
+        order.order_info,
+        order.items.map((it) => [
+          it.order_item_id,
+          it.order_item_name,
+          it.order_item_quantity,
+          it.order_item_price,
+          it.order_item_currency_id,
+          it.order_item_status_id,
+          it.order_item_supplier,
+          it.order_item_source_establishment_id,
+          it.order_item_destination_establishment_id,
+        ]),
+      ]),
+    [order],
+  )
+  const seededSignature = useRef(serverSignature)
+  useEffect(() => {
+    if (serverSignature === seededSignature.current) return
+    if (timer.current || saving.current) return // user has a pending edit; don't clobber it
+    setCustomer(order.order_customer)
+    setInfo(order.order_info)
+    setDrafts(
+      order.items.map((it) => ({
+        uid: newUid(),
+        productId: it.order_item_product_id ?? null,
+        article: it.order_item_article,
+        name: it.order_item_name,
+        quantity: it.order_item_quantity,
+        price: it.order_item_price,
+        currencyId: it.order_item_currency_id ?? null,
+        statusId: it.order_item_status_id ?? null,
+        supplier: it.order_item_supplier ?? null,
+        sourceEstablishmentId: it.order_item_source_establishment_id ?? null,
+        destinationEstablishmentId: it.order_item_destination_establishment_id ?? null,
+      })),
+    )
+    seededSignature.current = serverSignature
+  }, [serverSignature, order])
 
   const patchDraft = (uid: string, patch: Partial<ItemDraft>) => {
     const next = drafts.map((d) => (d.uid === uid ? { ...d, ...patch } : d))
