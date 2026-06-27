@@ -91,12 +91,13 @@ export function ChatPage() {
     const value = text.trim()
     if (!value) return
     setSending(true)
+    setText('') // clear the input immediately; restore it if the send fails
     try {
       const { item } = await sendMessage(value)
-      setText('')
       setMessages((prev) => mergeById(prev, [item]))
       scrollToBottom()
     } catch (e) {
+      setText(value)
       setError(e instanceof Error ? e.message : 'Не удалось отправить')
     } finally {
       setSending(false)
