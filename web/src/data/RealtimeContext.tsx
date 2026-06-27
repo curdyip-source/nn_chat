@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { streamEvents, UnauthorizedError } from '../api/client'
+import { refreshAccessToken, streamEvents, UnauthorizedError } from '../api/client'
 import type { MessageStreamEvent } from '../api/types'
 
 // One app-wide SSE connection to /messages/stream. Pages read `revision` (a debounced counter
@@ -36,8 +36,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
             bumpRevisionDebounced()
           }, controller.signal)
         } catch (err) {
-          // Session expired — page requests will trigger logout; stop reconnecting.
-          if (err instanceof UnauthorizedError) break
+          // Access token expired — refresh and reconnect; only give up if refresh fails
+          // (page requests will then trigger logout).
+          if (err instanceof UnauthorizedError) {
+            const refreshed = await refreshAccessToken()
+            if (!refreshed) break
+            continue
+          }
           // Otherwise it was a dropped connection / abort; fall through to reconnect.
         }
         if (cancelled) break

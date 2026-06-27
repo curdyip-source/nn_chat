@@ -10,6 +10,7 @@ import type { ReactNode } from 'react'
 import {
   getAccessToken,
   setAccessToken,
+  setRefreshToken,
   setUnauthorizedHandler,
   USER_KEY,
 } from '../api/client'
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(() => {
     setAccessToken('')
+    setRefreshToken('')
     storeUser(null)
     setUser(null)
     setStatus('anonymous')
@@ -87,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Войти в админку может только пользователь с правами администратора')
     }
     setAccessToken(res.access_token ?? res.token ?? '')
+    setRefreshToken(res.refresh_token ?? '')
     storeUser(res.user)
     setUser(res.user)
     setStatus('authenticated')

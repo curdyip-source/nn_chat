@@ -3,6 +3,7 @@
 
 const API_BASE = '/api/v1'
 export const TOKEN_KEY = 'admin.accessToken'
+export const REFRESH_KEY = 'admin.refreshToken'
 export const USER_KEY = 'admin.user'
 
 export class ApiError extends Error {
@@ -23,6 +24,7 @@ export class UnauthorizedError extends ApiError {
 }
 
 let accessToken: string = localStorage.getItem(TOKEN_KEY) ?? ''
+let refreshToken: string = localStorage.getItem(REFRESH_KEY) ?? ''
 let onUnauthorized: (() => void) | null = null
 
 export function setAccessToken(token: string) {
@@ -33,6 +35,47 @@ export function setAccessToken(token: string) {
 
 export function getAccessToken(): string {
   return accessToken
+}
+
+export function setRefreshToken(token: string) {
+  refreshToken = token
+  if (token) localStorage.setItem(REFRESH_KEY, token)
+  else localStorage.removeItem(REFRESH_KEY)
+}
+
+let refreshInFlight: Promise<boolean> | null = null
+
+/**
+ * Exchange the refresh token for a fresh access token (and rotated refresh token).
+ * Concurrent callers share one in-flight request so a token rotation isn't raced.
+ * Returns true on success. Keeps the web session (and its SSE stream) alive past the
+ * 30-minute access-token TTL instead of logging the user out.
+ */
+export async function refreshAccessToken(): Promise<boolean> {
+  if (!refreshToken) return false
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const response = await fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        })
+        if (!response.ok) return false
+        const data = await response.json()
+        const newAccess = data?.access_token ?? data?.token ?? ''
+        if (!newAccess) return false
+        setAccessToken(newAccess)
+        if (data?.refresh_token) setRefreshToken(data.refresh_token)
+        return true
+      } catch {
+        return false
+      } finally {
+        refreshInFlight = null
+      }
+    })()
+  }
+  return refreshInFlight
 }
 
 /** Колбэк, который вызовется на любой 401 (обычно — переход на экран логина). */
@@ -48,6 +91,8 @@ type RequestOptions = {
   signal?: AbortSignal
   /** Не дёргать onUnauthorized на 401 (например, для самого логина). */
   silent401?: boolean
+  /** Внутреннее: запрос уже повторялся после обновления токена. */
+  _retried?: boolean
 }
 
 async function parseError(response: Response): Promise<string> {
@@ -68,7 +113,7 @@ export async function apiRequest<T = unknown>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = 'GET', body, raw = false, signal, silent401 = false } = options
+  const { method = 'GET', body, raw = false, signal, silent401 = false, _retried = false } = options
 
   const headers: Record<string, string> = {}
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`
@@ -90,6 +135,10 @@ export async function apiRequest<T = unknown>(
   })
 
   if (response.status === 401) {
+    // Access token likely expired — refresh once and retry before giving up.
+    if (!silent401 && !_retried && (await refreshAccessToken())) {
+      return apiRequest<T>(path, { ...options, _retried: true })
+    }
     if (!silent401 && onUnauthorized) onUnauthorized()
     throw new UnauthorizedError(await parseError(response))
   }
