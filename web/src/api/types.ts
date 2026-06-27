@@ -249,6 +249,13 @@ export type ChatMessage = {
   product_registration?: ProductRegistration | null
 }
 
+/** Realtime event pushed over /messages/stream (SSE). */
+export type MessageStreamEvent = {
+  type: 'created' | 'updated' | 'deleted'
+  message?: ChatMessage | null
+  message_id?: number | null
+}
+
 export type AuditEvent = {
   audit_event_id: number
   actor_user_id: number | null

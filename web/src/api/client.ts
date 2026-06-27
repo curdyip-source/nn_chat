@@ -103,3 +103,45 @@ export async function apiRequest<T = unknown>(
   if (!text) return undefined as T
   return JSON.parse(text) as T
 }
+
+/**
+ * Consume the SSE realtime stream (/messages/stream) via fetch — needed because the native
+ * EventSource can't send the Authorization header. Calls `onEvent` for each parsed event and
+ * resolves when the stream closes. Throws UnauthorizedError on 401 so callers can stop retrying.
+ */
+export async function streamEvents(
+  onEvent: (event: unknown) => void,
+  signal: AbortSignal,
+): Promise<void> {
+  const headers: Record<string, string> = { Accept: 'text/event-stream' }
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+
+  const response = await fetch(`${API_BASE}/messages/stream`, { headers, signal })
+  if (response.status === 401) throw new UnauthorizedError(await parseError(response))
+  if (!response.ok || !response.body) throw new ApiError(response.status, `Ошибка ${response.status}`)
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    let boundary: number
+    while ((boundary = buffer.indexOf('\n\n')) >= 0) {
+      const rawEvent = buffer.slice(0, boundary)
+      buffer = buffer.slice(boundary + 2)
+      const data = rawEvent
+        .split('\n')
+        .filter((line) => line.startsWith('data:'))
+        .map((line) => line.slice('data:'.length).trim())
+        .join('')
+      if (!data) continue // heartbeat/comment
+      try {
+        onEvent(JSON.parse(data))
+      } catch {
+        // ignore malformed event
+      }
+    }
+  }
+}

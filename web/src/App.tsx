@@ -2,6 +2,7 @@ import { AppShell } from './app/AppShell'
 import { AuthProvider, useAuth } from './auth/AuthContext'
 import { LoginScreen } from './auth/LoginScreen'
 import { ReferenceProvider } from './data/ReferenceContext'
+import { RealtimeProvider } from './data/RealtimeContext'
 
 function Root() {
   const { status } = useAuth()
@@ -26,7 +27,9 @@ function Root() {
 
   return (
     <ReferenceProvider>
-      <AppShell />
+      <RealtimeProvider>
+        <AppShell />
+      </RealtimeProvider>
     </ReferenceProvider>
   )
 }

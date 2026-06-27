@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { listOrders, type OrderTotal } from '../../api/endpoints'
 import type { Order } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
+import { useRealtime } from '../../data/RealtimeContext'
 import { Button } from '../../ui/Button'
 import { MultiButtonGroup } from '../../ui/MultiButtonGroup'
 import { TextInput } from '../../ui/Field'
@@ -21,6 +22,7 @@ const PAGE_SIZE = 100
 
 export function OrdersPage() {
   const ref = useReference()
+  const { revision } = useRealtime()
   const orderStatuses = ref.statusesByType('orders')
   const orderMethods = ref.order_methods
   const establishments = ref.establishments
@@ -155,7 +157,7 @@ export function OrdersPage() {
 
   useEffect(() => {
     if (!creating && editOrder == null) reload()
-  }, [creating, editOrder, reload])
+  }, [creating, editOrder, reload, revision])
 
   if (creating || editOrder) {
     return (

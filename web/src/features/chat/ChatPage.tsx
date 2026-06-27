@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { deleteMessage, editMessage, listMessages, sendMessage } from '../../api/endpoints'
 import type { ChatMessage } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
+import { useRealtime } from '../../data/RealtimeContext'
 import { Button } from '../../ui/Button'
 import { StatusChip } from '../../ui/StatusChip'
 import { formatDateTime } from '../../lib/format'
@@ -24,6 +25,7 @@ export function ChatPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const { revision, lastEvent } = useRealtime()
 
   // В column-reverse низ ленты (новейшее сообщение) — это scrollTop = 0.
   const scrollToBottom = () => {
@@ -51,9 +53,23 @@ export function ChatPage() {
 
   useEffect(() => {
     loadLatest(true)
-    const id = window.setInterval(() => loadLatest(false), 20000)
+    // Safety net if the realtime stream is unavailable; realtime drives normal freshness.
+    const id = window.setInterval(() => loadLatest(false), 60000)
     return () => window.clearInterval(id)
   }, [loadLatest])
+
+  // Realtime: a message/card changed somewhere — pull the latest in.
+  useEffect(() => {
+    if (revision > 0) loadLatest(false)
+  }, [revision, loadLatest])
+
+  // Realtime: a message was deleted elsewhere — drop it immediately.
+  useEffect(() => {
+    if (lastEvent?.type === 'deleted' && lastEvent.message_id != null) {
+      const deletedId = lastEvent.message_id
+      setMessages((prev) => prev.filter((m) => m.message_id !== deletedId))
+    }
+  }, [lastEvent])
 
   // При первой отрисовке ленты прокручиваем к последнему сообщению (вниз).
   useEffect(() => {

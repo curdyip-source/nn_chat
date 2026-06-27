@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useRealtime } from '../../data/RealtimeContext'
 import { Button } from '../../ui/Button'
 import { StatusChip } from '../../ui/StatusChip'
 import { formatDateTime } from '../../lib/format'
@@ -14,6 +15,7 @@ export function DocumentsPage({ kind }: { kind: DocKind }) {
   const [docs, setDocs] = useState<DocView[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { revision } = useRealtime()
 
   const reload = useCallback(() => {
     setLoading(true)
@@ -29,7 +31,7 @@ export function DocumentsPage({ kind }: { kind: DocKind }) {
 
   useEffect(() => {
     if (!creating && viewingId == null && editDoc == null) reload()
-  }, [creating, viewingId, editDoc, reload])
+  }, [creating, viewingId, editDoc, reload, revision])
 
   if (creating || editDoc) {
     return (
@@ -75,7 +77,7 @@ export function DocumentsPage({ kind }: { kind: DocKind }) {
 
       {error && <div className={styles.error}>{error}</div>}
       <div className={styles.scroll}>
-        {loading ? (
+        {loading && docs.length === 0 ? (
           <div className="dim">Загрузка…</div>
         ) : docs.length === 0 ? (
           <div className={styles.empty}>Пока пусто</div>
