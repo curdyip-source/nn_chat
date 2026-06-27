@@ -52,9 +52,15 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
     void run()
 
+    // Fallback poll: if SSE delivery is blocked (e.g. a proxy buffers the browser's stream),
+    // still refresh the realtime-driven pages on a short interval — mirrors the app's poll, so
+    // app→web changes always land even when the stream is silent.
+    const fallback = window.setInterval(bumpRevisionDebounced, 5000)
+
     return () => {
       cancelled = true
       controller.abort()
+      window.clearInterval(fallback)
       if (debounceRef.current) window.clearTimeout(debounceRef.current)
     }
   }, [])
