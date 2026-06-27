@@ -85,7 +85,15 @@ class MessageRepository:
     def get_by_ids(self, message_ids: list[int]) -> list[Message]:
         if not message_ids:
             return []
-        return self._base_query().filter(Message.message_id.in_(message_ids)).all()
+        # populate_existing() forces a refresh of identity-map objects (and their eager-loaded
+        # relationships) so a card serialized right after its order/inventory/registration changed
+        # reflects the new status/items rather than a value cached earlier in this session.
+        return (
+            self._base_query()
+            .populate_existing()
+            .filter(Message.message_id.in_(message_ids))
+            .all()
+        )
 
     def _touch(self, predicate) -> list[int]:
         rows = self.db.query(Message.message_id).filter(predicate, Message.message_deleted_at.is_(None)).all()
