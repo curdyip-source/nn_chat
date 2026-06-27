@@ -10,6 +10,7 @@ from app.schemas.common import build_pagination
 from app.schemas.product_registrations import ProductRegistrationCreatePayload, ProductRegistrationStatusUpdatePayload, ProductRegistrationUpdatePayload
 from app.services.contacts import save_supplier_contact
 from app.services.audit import log_audit_event
+from app.services.card_sync import notify_product_registration_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.push_notifications import send_push_notification_event
 from app.services.serializers import serialize_product_registration
@@ -140,6 +141,7 @@ class ProductRegistrationService:
             items,
         )
         log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_PRODUCT_REGISTRATION, entity_id=row.product_registration_id, event_type=EVENT_TYPE_PRODUCT_REGISTRATION_UPDATE, event_payload={"items_count": len(items)})
+        notify_product_registration_changed(self.db, row.product_registration_id)
         return serialize_product_registration(row)
 
     def update_product_registration_status(self, product_registration_id: int, payload: ProductRegistrationStatusUpdatePayload, current_user: dict) -> dict:
@@ -147,6 +149,7 @@ class ProductRegistrationService:
         status_row = get_status_or_404(self.db, payload.product_registration_status_id, expected_type="product_registration")
         row = self.repository.update(row, {"product_registration_status_id": status_row.status_id})
         log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_PRODUCT_REGISTRATION, entity_id=row.product_registration_id, event_type=EVENT_TYPE_PRODUCT_REGISTRATION_UPDATE, event_payload={"product_registration_status_id": status_row.status_id})
+        notify_product_registration_changed(self.db, row.product_registration_id)
         return serialize_product_registration(row)
 
 

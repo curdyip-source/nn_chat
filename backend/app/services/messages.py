@@ -1,4 +1,7 @@
+import base64
+import binascii
 import logging
+from datetime import datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -11,8 +14,45 @@ from app.repositories.users import UserRepository
 from app.schemas.common import build_pagination
 from app.schemas.messages import MessageCreatePayload, MessageUpdatePayload
 from app.services.audit import log_audit_event
+from app.services.message_stream import broker
 from app.services.push_notifications import send_mention_push_event, send_push_notification_event
-from app.services.serializers import serialize_message
+from app.services.serializers import serialize_message, serialize_message_tombstone
+
+
+def _encode_sync_cursor(updated_at: datetime, message_id: int) -> str:
+    raw = f"{updated_at.isoformat()}|{message_id}"
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+
+def _decode_sync_cursor(cursor: str | None) -> tuple[datetime | None, int | None]:
+    if not cursor:
+        return None, None
+    try:
+        raw = base64.urlsafe_b64decode(cursor.encode()).decode()
+        iso, _, message_id = raw.rpartition("|")
+        return datetime.fromisoformat(iso), int(message_id)
+    except (ValueError, binascii.Error):
+        # A malformed cursor falls back to a full sync rather than failing the request.
+        return None, None
+
+
+def sync_messages(db: Session, *, cursor: str | None, limit: int) -> dict:
+    since_updated_at, since_message_id = _decode_sync_cursor(cursor)
+    rows = MessageRepository(db).list_changes(
+        since_updated_at=since_updated_at,
+        since_message_id=since_message_id,
+        limit=limit,
+    )
+    items = [
+        serialize_message_tombstone(row) if row.message_deleted_at is not None else serialize_message(row)
+        for row in rows
+    ]
+    if rows:
+        last = rows[-1]
+        next_cursor = _encode_sync_cursor(last.message_updated_at, last.message_id)
+    else:
+        next_cursor = cursor or ""
+    return {"items": items, "cursor": next_cursor, "has_more": len(rows) == limit}
 
 
 def resolve_mention_recipient_ids(db: Session, *, mentioned_user_ids: list[int], sender_user_id: int) -> list[int]:
@@ -106,6 +146,8 @@ class MessageService:
         result = serialize_message(row)
         result["notification_target_count"] = len(targets)
 
+        broker.publish({"type": "created", "message": serialize_message(row)})
+
         try:
             send_push_notification_event(
                 self.db,
@@ -168,7 +210,9 @@ class MessageService:
                 "message_text": updated_row.message_text,
             },
         )
-        return serialize_message(updated_row)
+        result = serialize_message(updated_row)
+        broker.publish({"type": "updated", "message": result})
+        return result
 
     def delete_message(self, message_id: int, current_user: dict) -> None:
         row = self.get_message_or_404(message_id)
@@ -186,6 +230,7 @@ class MessageService:
             },
         )
         self.repository.delete(row)
+        broker.publish({"type": "deleted", "message_id": message_id})
 
 
 def list_messages(db: Session, *, before_message_id: int | None = None, page: int = 1, page_size: int = 50) -> dict:

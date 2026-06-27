@@ -13,6 +13,7 @@ from app.schemas.common import build_pagination
 from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
 from app.services.contacts import save_buyer_contact_from_order, save_supplier_contact
 from app.services.audit import log_audit_event
+from app.services.card_sync import notify_order_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.messages import resolve_mention_recipient_ids
 from app.services.push_notifications import send_mention_push_event, send_order_change_push_event, send_push_notification_event
@@ -427,6 +428,7 @@ class OrderService:
                     },
                 )
 
+        notify_order_changed(self.db, row.order_id)
         return serialize_order(row)
 
     def update_order_status(self, order_id: int, payload: OrderStatusUpdatePayload, current_user: dict) -> dict:
@@ -442,6 +444,7 @@ class OrderService:
             event_type=EVENT_TYPE_ORDER_UPDATE,
             event_payload=_build_order_update_audit_payload(before_snapshot, serialize_order(row)),
         )
+        notify_order_changed(self.db, row.order_id)
         return serialize_order(row)
 
     def list_order_comments(self, order_id: int) -> dict:

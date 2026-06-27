@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
+
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.inventories import Inventory
@@ -32,10 +35,14 @@ class MessageRepository:
         )
 
     def get_by_id(self, message_id: int) -> Message | None:
-        return self._base_query().filter(Message.message_id == message_id).first()
+        return (
+            self._base_query()
+            .filter(Message.message_id == message_id, Message.message_deleted_at.is_(None))
+            .first()
+        )
 
     def list(self, *, before_message_id: int | None = None, page: int = 1, page_size: int = 50) -> tuple[list[Message], int]:
-        query = self._base_query()
+        query = self._base_query().filter(Message.message_deleted_at.is_(None))
         if before_message_id is not None:
             query = query.filter(Message.message_id < before_message_id)
         total = query.count()
@@ -46,6 +53,58 @@ class MessageRepository:
             .all()
         )
         return items, total
+
+    def list_changes(
+        self, *, since_updated_at: datetime | None, since_message_id: int | None, limit: int
+    ) -> list[Message]:
+        """Rows changed since the (updated_at, message_id) cursor, oldest change first.
+
+        On the initial sync (no cursor) tombstones are skipped — a client that never saw a
+        message does not need to learn it was deleted. With a cursor, deleted rows are included
+        so the client can drop them.
+        """
+        query = self._base_query()
+        if since_updated_at is None or since_message_id is None:
+            query = query.filter(Message.message_deleted_at.is_(None))
+        else:
+            query = query.filter(
+                or_(
+                    Message.message_updated_at > since_updated_at,
+                    and_(
+                        Message.message_updated_at == since_updated_at,
+                        Message.message_id > since_message_id,
+                    ),
+                )
+            )
+        return (
+            query.order_by(Message.message_updated_at.asc(), Message.message_id.asc())
+            .limit(limit)
+            .all()
+        )
+
+    def get_by_ids(self, message_ids: list[int]) -> list[Message]:
+        if not message_ids:
+            return []
+        return self._base_query().filter(Message.message_id.in_(message_ids)).all()
+
+    def _touch(self, predicate) -> list[int]:
+        rows = self.db.query(Message.message_id).filter(predicate, Message.message_deleted_at.is_(None)).all()
+        ids = [row[0] for row in rows]
+        if ids:
+            self.db.query(Message).filter(Message.message_id.in_(ids)).update(
+                {Message.message_updated_at: func.now()}, synchronize_session=False
+            )
+            self.db.commit()
+        return ids
+
+    def touch_for_order(self, order_id: int) -> list[int]:
+        return self._touch(Message.message_order_id == order_id)
+
+    def touch_for_inventory(self, inventory_id: int) -> list[int]:
+        return self._touch(Message.message_inventory_id == inventory_id)
+
+    def touch_for_product_registration(self, product_registration_id: int) -> list[int]:
+        return self._touch(Message.message_product_registration_id == product_registration_id)
 
     def create(self, data: dict, attachments: list[dict] | None = None) -> Message:
         row = Message(**data)
@@ -66,5 +125,7 @@ class MessageRepository:
         return self.get_by_id(row.message_id)
 
     def delete(self, row: Message) -> None:
-        self.db.delete(row)
+        # Soft delete so delta-sync can ship a tombstone; onupdate bumps message_updated_at.
+        row.message_deleted_at = func.now()
+        self.db.add(row)
         self.db.commit()

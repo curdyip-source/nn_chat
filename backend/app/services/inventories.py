@@ -10,6 +10,7 @@ from app.schemas.common import build_pagination
 from app.schemas.inventories import InventoryCreatePayload, InventoryStatusUpdatePayload, InventoryUpdatePayload
 from app.services.contacts import save_supplier_contact
 from app.services.audit import log_audit_event
+from app.services.card_sync import notify_inventory_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.push_notifications import send_push_notification_event
 from app.services.serializers import serialize_inventory
@@ -140,6 +141,7 @@ class InventoryService:
             items,
         )
         log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_INVENTORY, entity_id=row.inventory_id, event_type=EVENT_TYPE_INVENTORY_UPDATE, event_payload={"items_count": len(items)})
+        notify_inventory_changed(self.db, row.inventory_id)
         return serialize_inventory(row)
 
     def update_inventory_status(self, inventory_id: int, payload: InventoryStatusUpdatePayload, current_user: dict) -> dict:
@@ -147,6 +149,7 @@ class InventoryService:
         status_row = get_status_or_404(self.db, payload.inventory_status_id, expected_type="inventory")
         row = self.repository.update(row, {"inventory_status_id": status_row.status_id})
         log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_INVENTORY, entity_id=row.inventory_id, event_type=EVENT_TYPE_INVENTORY_UPDATE, event_payload={"inventory_status_id": status_row.status_id})
+        notify_inventory_changed(self.db, row.inventory_id)
         return serialize_inventory(row)
 
 

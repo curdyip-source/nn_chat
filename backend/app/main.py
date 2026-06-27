@@ -1,4 +1,6 @@
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
@@ -28,10 +30,19 @@ configure_logging()
 logger = logging.getLogger("app.startup")
 
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Capture the running loop so threadpool request handlers can publish SSE events onto it.
+    from app.services.message_stream import broker
+
+    broker.bind_loop(asyncio.get_running_loop())
+    yield
+
+
 def create_app() -> FastAPI:
     validate_runtime_config()
     init_error_tracking()
-    application = FastAPI()
+    application = FastAPI(lifespan=lifespan)
     application.middleware("http")(request_id_middleware)
     application.add_exception_handler(HTTPException, http_exception_handler)
     application.add_exception_handler(RequestValidationError, validation_exception_handler)

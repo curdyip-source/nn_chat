@@ -353,8 +353,19 @@ def serialize_message(row) -> dict:
         "message_status": message_status,
         "message_status_color": message_status_color,
         "message_created_at": serialize_datetime(row.message_created_at),
+        "message_updated_at": serialize_datetime(row.message_updated_at),
+        "message_deleted": False,
         "attachments": [serialize_message_attachment(item) for item in getattr(row, "attachments", [])],
         "order": serialize_order(order) if order else None,
         "inventory": serialize_inventory(inventory) if inventory else None,
         "product_registration": serialize_product_registration(product_registration) if product_registration else None,
+    }
+
+
+def serialize_message_tombstone(row) -> dict:
+    """Minimal payload for a soft-deleted message so clients can drop it from the cache."""
+    return {
+        "message_id": row.message_id,
+        "message_deleted": True,
+        "message_updated_at": serialize_datetime(row.message_updated_at),
     }

@@ -19,6 +19,11 @@ class Message(Base):
     message_inventory_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("inventories.inventory_id", ondelete="CASCADE"), nullable=True, index=True)
     message_product_registration_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("product_registrations.product_registration_id", ondelete="CASCADE"), nullable=True, index=True)
     message_created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now(), index=True)
+    # Bumped on any change to the message OR its referenced card (order/inventory/registration),
+    # so delta-sync and SSE carry fresh statuses/items. Composite (updated_at, id) is the sync cursor.
+    message_updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now(), index=True)
+    # Soft delete: kept so delta-sync can ship a tombstone and clients drop the row.
+    message_deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     owner = relationship("User", back_populates="messages")
     order = relationship("Order", back_populates="messages")
