@@ -4,7 +4,7 @@
 
 .input {
   width: 100%;
-  background: var(--surface-2);
+  background: var(--surface-solid);
   color: var(--text);
   border: 1px solid var(--stroke);
   border-radius: var(--r-md);
@@ -18,7 +18,7 @@
 }
 .input:focus {
   border-color: var(--focus);
-  background: var(--surface-3);
+  background: var(--surface-solid);
 }
 
 .loader {

@@ -59,6 +59,12 @@ services:
         condition: service_healthy
     ports:
       - "8088:8080"
+    # default — чтобы видеть свой backend; shared — чтобы nginx достучался до
+    # бэкенда прайса (алиас price-backend в стеке nn_vla). Сеть внешняя:
+    #   docker network create nufnaf_shared
+    networks:
+      - default
+      - shared
 
   seed:
     image: nufnaf-dev-backend:latest
@@ -81,3 +87,11 @@ services:
 
 volumes:
   nufnaf_dev_pg:
+
+networks:
+  default:
+  # Общая сеть с локальным стеком прайса (nn_vla). Создать заранее:
+  #   docker network create nufnaf_shared
+  shared:
+    external: true
+    name: nufnaf_shared

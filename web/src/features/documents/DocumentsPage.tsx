@@ -68,7 +68,6 @@ export function DocumentsPage({ kind }: { kind: DocKind }) {
       <header className={styles.header}>
         <div>
           <h1 className={styles.pageTitle}>{kind.title}</h1>
-          <p className="muted">Список и создание</p>
         </div>
         <Button variant="primary" onClick={() => setCreating(true)}>
           + Создать

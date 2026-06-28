@@ -130,7 +130,6 @@ export function ChatPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>Чат</h1>
-        <p className="muted">Общая лента команды</p>
       </header>
 
       {error && <div className={styles.error}>{error}</div>}

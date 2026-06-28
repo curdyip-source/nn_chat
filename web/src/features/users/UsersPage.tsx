@@ -56,16 +56,11 @@ export function UsersPage() {
     }
   }
 
-  const pending = users.filter((u) => !u.user_active).length
-
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Пользователи</h1>
-          <p className="muted">
-            Подтверждение доступа. {pending > 0 ? `Ожидают: ${pending}` : 'Все подтверждены'}
-          </p>
         </div>
       </header>
 

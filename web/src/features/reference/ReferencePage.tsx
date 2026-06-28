@@ -40,7 +40,6 @@ export function ReferencePage() {
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Справочники</h1>
-          <p className="muted">Статусы, склады, способы и валюты</p>
         </div>
         <Button
           variant="primary"
@@ -56,7 +55,7 @@ export function ReferencePage() {
       </header>
 
       <div className={styles.tabs}>
-        <ButtonGroup value={tab} onChange={(t) => t && setTab(t)} options={TABS.map((t) => ({ value: t.key, label: t.label }))} />
+        <ButtonGroup size="sm" value={tab} onChange={(t) => t && setTab(t)} options={TABS.map((t) => ({ value: t.key, label: t.label }))} />
       </div>
 
       <div className={styles.scroll}>

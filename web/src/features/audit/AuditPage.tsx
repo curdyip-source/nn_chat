@@ -29,7 +29,6 @@ export function AuditPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>Аудит</h1>
-        <p className="muted">Журнал действий пользователей</p>
       </header>
 
       <div className={styles.filters}>

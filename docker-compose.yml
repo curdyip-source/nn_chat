@@ -105,6 +105,17 @@ services:
     pids_limit: 128
     security_opt:
       - no-new-privileges:true
+    # default — свой backend; shared — бэкенд прайса (алиас price-backend, стек nn_vla).
+    # Сеть внешняя, создать заранее на сервере: docker network create nufnaf_shared
+    networks:
+      - default
+      - shared
 
 volumes:
   postgres_data:
+
+networks:
+  default:
+  shared:
+    external: true
+    name: nufnaf_shared

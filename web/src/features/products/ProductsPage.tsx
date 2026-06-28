@@ -48,7 +48,6 @@ export function ProductsPage() {
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Товары</h1>
-          <p className="muted">Номенклатура{total ? ` · ${total}` : ''} · правьте прямо в таблице</p>
         </div>
         <div className={styles.headerActions}>
           <Button variant="secondary" onClick={() => setImporting(true)}>

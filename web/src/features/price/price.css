@@ -1,0 +1,1872 @@
+/* Прайс-секция — рестайл под светлую палитру чата (см. index.css).
+   СГЕНЕРИРОВАНО restyle-price-css.py из styles.css прайса. Не редактировать
+   руками — правьте генератор/исходник и пересоберите. */
+.price-root {
+  --bg: #f4f5f7;          /* фон страницы — нейтральный серый (как у чата) */
+  --card: #ffffff;
+  --card-best: #eef2f7;   /* шапки карточек/выделение — бледно-голубой акцент */
+  --text: #1b1c1f;
+  --muted: rgba(0, 0, 0, 0.60);
+  --accent: #1b1c1f;
+  --border: rgba(0, 0, 0, 0.12);
+
+  color: var(--text);
+}
+
+.price-root * {
+  box-sizing: border-box;
+}
+
+/* Всегда резервируем полосу прокрутки — иначе центрированный контейнер
+   сдвигается между короткими и длинными страницами («прыгает» меню). */
+.price-root .page {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 40px 20px 80px;
+}
+.price-root h1 {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0;
+}
+.price-root .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Фон растянут на боковые отступы .page (margin -20px = padding страницы),
+     чтобы контент не просвечивал под закреплённым меню при скролле. */
+  margin: 0 -20px 20px;
+  padding: 14px 20px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.price-root .tabs {
+  display: flex;
+  gap: 6px;
+}
+
+/* Верхнее меню — на 100% ширины, вкладки равномерно. */
+.price-root .topbar .tabs {
+  flex: 1;
+  width: 100%;
+}
+.price-root .topbar .tab {
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+.price-root .tab {
+  padding: 8px 14px;
+  font-size: 14px;
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.price-root .tab.active {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Строка под-вкладок «Настроек подбора» — вторичный ряд под верхним меню. */
+.price-root .subtabs {
+  margin: -8px 0 20px;
+  flex-wrap: wrap;
+}
+.price-root .subtabs .tab {
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.price-root .tag {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  background: var(--border);
+  color: var(--muted);
+}
+.price-root .tag.ok {
+  background: rgba(22,163,74,0.14);
+  color: var(--accent);
+}
+.price-root .tag.bad {
+  background: rgba(229,52,42,0.12);
+  color: #e5342a;
+}
+
+/* --- Переключатель режимов поиска --- */
+.price-root .seg {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.price-root .seg-btn {
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.price-root .seg-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Источник строки (CL / email поставщика) в объединённом поиске. */
+.price-root .src-tag {
+  padding: 1px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  background: rgba(59,130,246,0.12);
+  color: #2563eb;
+  white-space: nowrap;
+}
+
+/* --- Словарь --- */
+.price-root .syn-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+.price-root .syn-form input {
+  flex: 1;
+  padding: 10px 12px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+}
+.price-root .syn-form input:focus {
+  border-color: var(--accent);
+}
+.price-root .syn-form button,
+.price-root .filter {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.price-root .syn-form button {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+.price-root .filter {
+  width: 100%;
+  margin: 14px 0 8px;
+  color: var(--text);
+  background: var(--card);
+  outline: none;
+}
+.price-root .arrow {
+  color: var(--muted);
+}
+.price-root .syn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.price-root .syn-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 500;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.price-root .syn-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border);
+  /* Одинаковая высота и центровка: режим редактирования (инпуты) не «прыгает». */
+  height: 44px;
+  vertical-align: middle;
+}
+.price-root .syn-table tr.off td {
+  color: var(--muted);
+  opacity: 0.5;
+}
+.price-root .del {
+  background: transparent;
+  border: none;
+  color: #e5342a;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* --- Сопоставление --- */
+.price-root .btn-primary {
+  display: inline-block;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.price-root .btn-ghost {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.price-root .btn-ghost.sm {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+/* Сопоставление: текст-инструкция слева, кнопка загрузки справа. */
+.price-root .match-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.price-root .match-intro-text {
+  margin: 0;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.price-root .match-intro-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.price-root .btn-primary.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Справочник: тулбар фильтр + массовое удаление */
+.price-root .conf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.price-root .conf-toolbar .filter {
+  flex: 1;
+}
+.price-root .btn-danger {
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: #e5342a;
+  border: 1px solid #e5342a;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.price-root .chk-col {
+  width: 32px;
+  text-align: center;
+}
+.price-root .syn-table tr.sel td {
+  background: #1d2a22;
+}
+.price-root .syn-form select {
+  padding: 10px 12px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+}
+
+/* Одинаковая высота у полей/селекта/кнопки в форме добавления */
+.price-root .syn-form input,
+.price-root .syn-form select,
+.price-root .syn-form button {
+  height: 40px;
+  box-sizing: border-box;
+}
+.price-root .cell-input {
+  width: 100%;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  vertical-align: middle;
+}
+.price-root .row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* Все кнопки строки — одной высоты с инпутами (border-box, иначе рамка даёт +2px). */
+.price-root .row-actions button {
+  box-sizing: border-box;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+}
+.price-root .actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.price-root .chk {
+  display: block;
+  margin: 12px 2px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.price-root .job {
+  cursor: pointer;
+}
+.price-root .job-done {
+  grid-area: price;
+  align-self: start;
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+.price-root .job-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.price-root .job-head .muted {
+  flex: 1;
+}
+.price-root .progress {
+  position: relative;
+  height: 22px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.price-root .progress .bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(22,163,74,0.14);
+}
+.price-root .progress span {
+  position: relative;
+  display: block;
+  line-height: 22px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text);
+}
+.price-root .filters {
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+/* Фильтры сопоставления — на 100% ширины, кнопки равномерно. */
+.price-root .filters-wide {
+  flex-wrap: nowrap;
+}
+.price-root .filters-wide .tab {
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+.price-root .match-card {
+  display: block;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.price-root .item-title {
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.4;
+}
+.price-root .item-title .tag {
+  display: inline-block;
+  margin: 0 10px 0 0;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.price-root .item-title .item-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  word-break: break-word;
+  vertical-align: middle;
+}
+.price-root .cands {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Этап 3: фильтр по поставщикам внутри задания (дропдаун с чекбоксами) */
+.price-root .sup-filter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.price-root .dropdown {
+  position: relative;
+}
+.price-root .dropdown-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 320px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.16);
+}
+.price-root .dd-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.price-root .dd-item:hover {
+  background: rgba(0,0,0,0.05);
+}
+.price-root .dd-empty {
+  padding: 8px;
+}
+.price-root .dd-actions {
+  display: flex;
+  gap: 6px;
+  padding: 6px 4px 2px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+/* Этап 3: табы-поставщики внутри позиции */
+.price-root .sup-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 8px;
+}
+.price-root .sup-tab {
+  padding: 5px 12px;
+  font-size: 13px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.price-root .sup-tab.active {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.price-root .sup-tab.done {
+  color: var(--accent);
+  border-color: rgba(22,163,74,0.14);
+  background: rgba(22,163,74,0.14);
+}
+.price-root .sup-tab.done.active {
+  border-color: var(--accent);
+}
+
+/* Этап 3: группа кандидатов одного поставщика */
+.price-root .sup-group {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.price-root .sup-head {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.price-root .sup-best {
+  margin: 6px 0 4px;
+  font-size: 14px;
+  color: var(--accent);
+}
+.price-root .cand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.price-root .cand:hover {
+  background: rgba(0,0,0,0.05);
+}
+.price-root .cand.chosen {
+  background: var(--card-best);
+}
+.price-root .cand-main {
+  flex: 1;
+  min-width: 0;
+}
+.price-root .cand .cname {
+  font-size: 14px;
+}
+
+/* Кнопка копирования наименования кандидата (рядом с названием). */
+.price-root .copy-btn {
+  margin-left: 8px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.price-root .copy-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.price-root .cand .cmeta {
+  display: flex;
+  gap: 10px;
+  margin-top: 2px;
+  font-size: 12px;
+}
+.price-root .cand .cprice {
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* --- Приём прайса --- */
+.price-root .pstages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+.price-root .pstage {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.price-root .pstage-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Зелёная галочка слева у выполненного этапа */
+.price-root .pstage-check {
+  flex: 0 0 22px;
+  width: 22px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--accent);
+}
+.price-root .pstage-check.done {
+  color: var(--accent);
+}
+
+/* Прайс за сегодня ещё не получен — успешные этапы прошлого прогона серым. */
+.price-root .pstage-check.done.stale {
+  color: var(--muted);
+}
+.price-root .pstage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.price-root .pstage-num {
+  font-size: 12px;
+  color: var(--muted);
+}
+.price-root .pstage-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.price-root .pstage a {
+  color: var(--accent);
+}
+.price-root .small {
+  font-size: 12px;
+}
+
+/* --- Верх вкладки Price update: сетка слева, кнопки справа --- */
+.price-root .price-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.price-root .price-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.price-root .price-auth {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* --- Сетка обновлений прайсов поставщиков --- */
+.price-root .sup-grid-wrap {
+  margin-top: 0;
+}
+.price-root .sup-grid .sg-cp {
+  text-align: left;
+  white-space: nowrap;
+}
+.price-root .sup-grid .sg-name {
+  font-size: 13px;
+}
+.price-root .sup-grid {
+  border-collapse: collapse;
+  width: 100%;
+}
+.price-root .sup-grid th,
+.price-root .sup-grid td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: center;
+}
+.price-root .sup-grid th {
+  font-weight: 600;
+  font-size: 13px;
+}
+.price-root .sup-grid .sg-email {
+  text-align: left;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.price-root .sup-grid .sg-cell {
+  width: 110px;
+}
+.price-root .sg-ok {
+  color: var(--accent);
+  font-size: 18px;
+  font-weight: 700;
+}
+.price-root .sg-no {
+  color: var(--muted);
+}
+.price-root .search {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 17px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  outline: none;
+}
+.price-root .search:focus {
+  border-color: var(--accent);
+}
+
+/* Поиск + фильтр источников под шестерёнкой у правого края инпута. */
+.price-root .search-wrap {
+  position: relative;
+  margin-bottom: 14px;
+}
+.price-root .search-wrap .search {
+  padding-right: 84px; /* место под крестик + шестерёнку, чтобы текст не заезжал */
+}
+
+/* Крестик очистки — слева от шестерёнки. */
+.price-root .search-clear {
+  position: absolute;
+  top: 50%;
+  right: 44px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.price-root .search-clear:hover {
+  color: var(--text);
+  background: var(--card-best);
+}
+.price-root .search-gear {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 7px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.price-root .search-gear:hover {
+  color: var(--text);
+  background: var(--card-best);
+}
+.price-root .search-gear.active {
+  color: var(--accent);
+}
+.price-root .search-src-panel {
+  top: calc(100% + 6px);
+}
+
+/* Действия «Все/Снять» сверху панели: рамка снизу, не сверху. */
+.price-root .dd-actions-top {
+  align-items: center;
+  border-top: none;
+  border-bottom: 1px solid var(--border);
+  margin-top: 0;
+  margin-bottom: 4px;
+  padding: 2px 4px 6px;
+}
+.price-root .dd-title {
+  margin-right: auto; /* заголовок слева, кнопки прижаты вправо */
+  padding: 0 4px;
+}
+.price-root .status {
+  min-height: 22px;
+  margin: 14px 2px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.price-root .status .error {
+  color: #e5342a;
+}
+
+/* Статус поиска: компактнее, чтобы связка была ближе к строке поиска. */
+.price-root .search-status {
+  min-height: 0;
+  margin: 4px 2px;
+}
+.price-root .search-status:empty {
+  margin: 0;
+}
+.price-root .muted {
+  color: var(--muted);
+}
+.price-root .results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.price-root .row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "name price" "meta price";
+  align-items: center;
+  gap: 2px 16px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.price-root .row.best {
+  background: var(--card-best);
+  border-color: var(--accent);
+}
+
+/* Задание с чекбоксом слева (история, можно удалять). */
+.price-root .row.job {
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "chk name price" "chk meta price";
+}
+.price-root .row.job.sel {
+  border-color: var(--accent);
+  background: var(--card-best);
+}
+.price-root .job-chk {
+  grid-area: chk;
+  align-self: center;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Шапка списка заданий: заголовок · «выбрать все» · удалить. */
+.price-root .jobs-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 18px 0 8px;
+  /* Резервируем высоту кнопки «Удалить выбранные», чтобы её появление
+     не сдвигало контент ниже. */
+  min-height: 36px;
+}
+
+/* «Удалить выбранные» — к правому краю блока. */
+.price-root .jobs-head .btn-danger {
+  margin-left: auto;
+}
+.price-root .jobs-head h3 {
+  margin: 0;
+}
+.price-root .jobs-selall {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* Строка выдачи «По прайс-листам» с отметкой-переключателем слева. */
+.price-root .row.markable {
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "mark name price" "mark meta price";
+}
+.price-root .mark-chk {
+  grid-area: mark;
+  align-self: center;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+/* Отметка «в связке» — кнопка: клик назначает связку целевой для пополнения. */
+.price-root .mark-saved {
+  grid-area: mark;
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: rgba(22,163,74,0.14);
+  color: var(--accent);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.price-root .mark-saved.target {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.30);
+}
+
+/* Баннер целевой связки в корзине (Вариант A: пополняем существующую). */
+.price-root .basket-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.price-root .basket-target-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  word-break: break-word;
+}
+
+/* Корзина подбора связки. */
+.price-root .basket-hint {
+  margin: 6px 0 0;
+}
+
+/* Селектор «чей это запрос» под строкой поиска. */
+.price-root .query-owner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px;
+  font-size: 12px;
+}
+.price-root .query-owner select,
+.price-root .query-owner .query-text {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+}
+
+/* Отступ первого поля подбора от заголовка/кнопок корзины. */
+.price-root .query-owner-first {
+  margin-top: 14px;
+}
+
+/* Небольшой отступ после «Источника» перед списком подбора. */
+.price-root .query-owner-source {
+  margin-bottom: 12px;
+}
+
+/* Комбобокс источника: инпут с выпадающим списком и поиском по вводу. */
+.price-root .query-owner .combo {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.price-root .combo-input {
+  width: 100%;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: inherit;
+  outline: none;
+}
+.price-root .combo-input:focus {
+  border-color: var(--accent);
+}
+
+/* Источник не выбран («— мой ввод —»): приглушаем текст, чтобы не выделялся. */
+.price-root .combo-input.is-empty {
+  color: var(--muted);
+  opacity: 0.7;
+}
+.price-root .combo-panel {
+  left: 0;
+  right: 0;
+  min-width: 0;
+}
+.price-root .combo-opt {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 8px;
+  font-size: 13px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.price-root .combo-opt:hover {
+  background: var(--card-best);
+}
+.price-root .combo-opt.sel {
+  color: var(--accent);
+}
+.price-root .combo-empty {
+  padding: 7px 8px;
+}
+.price-root .basket {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 2px 0 24px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--card-best);
+}
+.price-root .basket-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.price-root .basket-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+.price-root .btn-primary {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.price-root .btn-ghost {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.price-root .btn-primary:disabled,
+.price-root .btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.price-root .btn-sm {
+  padding: 3px 10px;
+  font-size: 12px;
+  margin-left: 10px;
+}
+
+/* Таблица связок: строка = товар, колонки = CL / поставщики / запросы. */
+/* Во всю ширину экрана (выходим за паддинги .page). */
+/* Связки — карточки: каждая связка = «карточка товара», внутри сгруппированы
+   источники (CL + поставщики/заказчики). Адаптивная сетка: на широком экране
+   несколько карточек в ряд, на телефоне — в столбик (без горизонтального скролла). */
+.price-root .cl-selall {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.price-root .cl-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+.price-root .cl-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  overflow: hidden;
+}
+.price-root .cl-card.sel {
+  border-color: var(--accent);
+}
+.price-root .cl-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--card-best);
+  border-bottom: 1px solid var(--border);
+}
+.price-root .cl-card-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 13px;
+  word-break: break-word;
+}
+.price-root .cl-card-head .cl-add-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.price-root .cl-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+}
+.price-root .cl-group-label {
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+/* Имя в связке: текст + копирование сразу после, удаление — в правом углу. */
+.price-root .cl-alias {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 4px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.price-root .cl-alias:last-child {
+  margin-bottom: 0;
+}
+.price-root .cl-alias-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.price-root .cl-alias-name {
+  word-break: break-word;
+}
+.price-root .cl-alias .cl-x {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Пагинатор связок. */
+.price-root .cl-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 14px 0 4px;
+  font-size: 13px;
+}
+.price-root .cl-x {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 2px;
+}
+
+/* Кнопка «+» в узкой колонке — открывает оверлей добавления оффера. */
+.price-root .cl-add-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  line-height: 1;
+  font-size: 16px;
+  cursor: pointer;
+}
+.price-root .cl-add-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* Шапка оверлея добавления: заголовок + подпись связки + крестик. */
+.price-root .cl-modal-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.price-root .cl-modal-head .cl-x {
+  margin-left: auto;
+  font-size: 14px;
+}
+.price-root .cl-add-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.price-root .cl-add-opt {
+  text-align: left;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 3px 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.price-root .cl-add-opt:hover {
+  border-color: var(--accent);
+}
+
+/* Добавить введённое имя вручную (участник без прайса). */
+.price-root .cl-add-manual {
+  border-style: dashed;
+  color: var(--accent);
+}
+.price-root .basket-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.price-root .basket-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.price-root .basket-list .bname {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.price-root .basket-x {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+.price-root .name {
+  grid-area: name;
+  font-size: 15px;
+}
+.price-root .meta {
+  grid-area: meta;
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.price-root .code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.price-root .price {
+  grid-area: price;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* ============ Контрагенты (изолированная разметка) ============ */
+/* Все контролы (инпут/селект/кнопка) — один height + box-sizing, поэтому
+   строки ровные и границы таблицы не «ломаются». */
+.price-root .cp-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+}
+
+/* Модалка добавления контрагента. */
+.price-root .cp-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.38);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.price-root .cp-modal {
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.16);
+}
+.price-root .cp-modal-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+.price-root .cp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.price-root .cp-field .cp-ctrl {
+  width: 100%;
+}
+.price-root .cp-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+.price-root .cp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.price-root .cp-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 500;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.price-root .cp-table td {
+  /* Фикс высота строки: текстовые и редактируемые строки одинаковы. */
+  height: 48px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.price-root .cp-c-role {
+  width: 130px;
+}
+.price-root .cp-c-act {
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* Единый контрол. */
+.price-root .cp-ctrl {
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  vertical-align: middle;
+  outline: none;
+}
+.price-root input.cp-ctrl,
+.price-root select.cp-ctrl {
+  width: 100%;
+  color: var(--text);
+  background: var(--bg);
+}
+.price-root input.cp-ctrl:focus,
+.price-root select.cp-ctrl:focus {
+  border-color: var(--accent);
+}
+.price-root .cp-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.price-root button.cp-ctrl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  color: var(--muted);
+}
+.price-root button.cp-ctrl:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+.price-root .cp-btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+}
+.price-root .cp-btn-primary:hover {
+  color: #ffffff;
+}
+.price-root .cp-btn-del {
+  width: 32px;
+  padding: 0;
+  color: #e5342a;
+}
+.price-root .cp-btn-del:hover {
+  color: #fff;
+  background: #e5342a;
+  border-color: #e5342a;
+}
+
+/* Контейнер для таблиц — горизонтальный скролл на узких экранах. */
+.price-root .table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ============ Адаптив (телефон/планшет) ============ */
+@media (max-width: 700px) {
+.price-root .page {
+    padding: 16px 12px 56px;
+  }
+
+  /* Верхнее меню: 6 вкладок → сетка 3×2, перенос текста. */
+.price-root .topbar {
+    margin: 0 -12px 16px;
+    padding: 10px 12px;
+  }
+.price-root .topbar .tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    width: 100%;
+  }
+.price-root .topbar .tab {
+    flex: none;
+    padding: 9px 4px;
+    font-size: 12px;
+    line-height: 1.15;
+    white-space: normal;
+  }
+
+  /* Поиск. */
+.price-root .seg {
+    width: 100%;
+  }
+.price-root .seg-btn {
+    flex: 1;
+  }
+.price-root .search {
+    font-size: 16px;
+    padding: 12px 14px;
+  }
+  /* iOS Safari автозумит при фокусе на инпут с font-size < 16px:
+     поднимаем шрифт контролов модалки контрагента, чтобы не было зума. */
+.price-root input.cp-ctrl,
+.price-root select.cp-ctrl,
+.price-root .query-owner select,
+.price-root .query-owner .query-text,
+.price-root .combo-input {
+    font-size: 16px;
+  }
+
+  /* Сопоставление: кнопка загрузки во всю ширину. */
+.price-root .match-intro-btn {
+    width: 100%;
+  }
+.price-root .filters-wide {
+    flex-wrap: wrap;
+  }
+.price-root .filters-wide .tab {
+    flex: 1 1 30%;
+    font-size: 12px;
+    padding: 7px 6px;
+  }
+
+  /* Шапки/тулбары — стопкой, кнопки во всю ширину. */
+.price-root .job-head {
+    flex-wrap: wrap;
+  }
+.price-root .job-head .muted {
+    flex: 1 1 100%;
+    order: -1;
+  }
+.price-root .price-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+.price-root .price-top-actions {
+    width: 100%;
+  }
+.price-root .price-top-actions button {
+    flex: 1;
+  }
+.price-root .conf-toolbar {
+    flex-wrap: wrap;
+  }
+.price-root .conf-toolbar .filter {
+    flex: 1 1 100%;
+  }
+
+  /* Фильтр поставщиков: панель в пределах экрана, прижата вправо. */
+.price-root .sup-filter {
+    flex-wrap: wrap;
+  }
+.price-root .dropdown-panel {
+    right: 0;
+    left: auto;
+    max-width: calc(100vw - 24px);
+  }
+
+  /* Табы поставщиков в карточке — горизонтальный скролл. */
+.price-root .sup-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Прайсы поставщиков: без скролла — карточка на поставщика,
+     дни с подписями (сегодня/вчера/дата) переносятся. */
+.price-root .sup-grid,
+.price-root .sup-grid tbody {
+    display: block;
+  }
+.price-root .sup-grid thead {
+    display: none;
+  }
+.price-root .sup-grid tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+.price-root .sup-grid td {
+    border: none;
+    padding: 0;
+    text-align: left;
+  }
+.price-root .sup-grid .sg-cp {
+    display: block;
+    white-space: normal;
+  }
+.price-root .sup-grid .sg-email {
+    display: block;
+    margin-bottom: 8px;
+    white-space: normal;
+    word-break: break-all;
+  }
+.price-root .sup-grid .sg-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    width: auto;
+    margin: 0 14px 6px 0;
+    font-size: 13px;
+  }
+.price-root .sup-grid .sg-cell::before {
+    content: attr(data-day);
+    color: var(--muted);
+  }
+
+  /* Словарь: карточка «термин ↓ канонический» + вкл./удалить справа. */
+.price-root .syn-table,
+.price-root .syn-table tbody {
+    display: block;
+    min-width: 0;
+  }
+.price-root .syn-table thead {
+    display: none;
+  }
+.price-root .syn-table tr {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    grid-template-areas:
+      "term  en del"
+      "arrow en del"
+      "canon en del";
+    align-items: center;
+    gap: 0 12px;
+    padding: 9px 2px;
+    border-bottom: 1px solid var(--border);
+  }
+.price-root .syn-table td {
+    height: auto;
+    padding: 0;
+    border: none;
+  }
+.price-root .syn-d-term {
+    grid-area: term;
+    font-size: 14px;
+    word-break: break-word;
+  }
+.price-root .syn-d-arrow {
+    grid-area: arrow;
+    width: 1em;
+    transform: rotate(90deg);
+    font-size: 12px;
+  }
+.price-root .syn-d-canon {
+    grid-area: canon;
+    font-size: 14px;
+    color: var(--accent);
+    word-break: break-word;
+  }
+.price-root .syn-d-en {
+    grid-area: en;
+    align-self: center;
+  }
+.price-root .syn-d-del {
+    grid-area: del;
+    align-self: center;
+  }
+
+  /* Контрагенты: без горизонтального скролла — каждая строка превращается
+     в карточку. Имя+Наименование в одну строку, почта — на второй. */
+.price-root .cp-table,
+.price-root .cp-table tbody {
+    display: block;
+    min-width: 0;
+  }
+.price-root .cp-table thead {
+    display: none;
+  }
+
+  /* Просмотр: сетка «имя · наименование / почта / тип» + действия справа. */
+.price-root .cp-table tr.cp-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "name  title act"
+      "email email act"
+      "role  role  act";
+    gap: 2px 8px;
+    align-items: center;
+    height: auto;
+    padding: 10px 2px;
+    border-bottom: 1px solid var(--border);
+  }
+.price-root .cp-table tr.cp-row td {
+    height: auto;
+    padding: 0;
+    border: none;
+  }
+.price-root .cp-d-name {
+    grid-area: name;
+    font-weight: 600;
+  }
+.price-root .cp-d-title {
+    grid-area: title;
+    color: var(--muted);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+.price-root .cp-d-email {
+    grid-area: email;
+    font-size: 13px;
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all;
+  }
+.price-root .cp-d-role {
+    grid-area: role;
+    font-size: 12px;
+    color: var(--muted);
+  }
+.price-root .cp-d-act {
+    grid-area: act;
+    align-self: center;
+  }
+
+  /* Редактирование: поля стопкой во всю ширину. */
+.price-root .cp-table tr.cp-row-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 2px;
+    border-bottom: 1px solid var(--border);
+  }
+.price-root .cp-table tr.cp-row-edit td {
+    display: block;
+    height: auto;
+    padding: 0;
+    border: none;
+  }
+
+  /* Результаты поиска и карточки — компактнее. */
+.price-root .row {
+    padding: 12px;
+  }
+.price-root .price {
+    font-size: 18px;
+  }
+.price-root .match-card {
+    padding: 12px;
+  }
+
+  /* Контрагенты: кнопка добавления во всю ширину. */
+.price-root .cp-toolbar .cp-btn-primary {
+    width: 100%;
+  }
+}
+
+/* --- Авторизация --------------------------------------------------------- */
+.price-root .login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.price-root .login-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+  padding: 28px 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.price-root .login-card h1 {
+  margin: 0 0 4px;
+  text-align: center;
+}
+.price-root .login-card input {
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.price-root .login-card button {
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.price-root .login-card button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Кнопка «Выйти» в правом краю верхнего меню. */
+.price-root .logout {
+  flex: none;
+  margin-left: 12px;
+  padding: 8px 14px;
+  font-size: 14px;
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.price-root .logout:hover {
+  color: var(--text);
+}
+
+/* --- Встраивание в оболочку чата: layout как у Заказов --- */
+/* Фиксированная шапка + ОТДЕЛЬНАЯ скролл-область под контролами. Контент из БД
+   живёт в своём блоке (.price-pane) и не заезжает под контролы при скролле. */
+.price-root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Закреп: заголовок + вкладки прайса. */
+.price-head {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 32px 14px;
+}
+.price-root .price-title {
+  /* +12px к gap шапки (12) = 24px от заголовка до вкладок — как .header у страниц чата. */
+  margin: 0 0 12px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+/* Область активной вьюхи. */
+.price-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Скролл-область со списком из БД: единственное, что прокручивается. Начинается
+   строго под контролами — контент не перекрывает фильтр и не «заезжает» под него. */
+.price-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 32px 48px;
+}
+/* Вьюхи настроек подбора: фиксированные контролы над списком + .price-pane снизу. */
+.price-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Контролы вьюхи — закреплены над скроллом (не sticky внутри него), на всю ширину,
+   отделены нижней границей. */
+.price-view > .conf-toolbar,
+.price-view > .price-fixed {
+  flex: 0 0 auto;
+  position: static;
+  margin: 0;
+  padding: 16px 32px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.price-view > .conf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.price-view > .price-fixed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* Внутренние контролы price-fixed — без собственных вертикальных отступов. */
+.price-view > .price-fixed .syn-form,
+.price-view > .price-fixed .filter {
+  margin: 0;
+}
+/* Инпуты прайса — белая заливка, как инпуты чата. */
+.price-root input.cp-ctrl,
+.price-root select.cp-ctrl,
+.price-root .cell-input {
+  background: var(--card);
+}
+@media (max-width: 700px) {
+  .price-head {
+    padding: 16px 16px 12px;
+  }
+  .price-pane {
+    padding: 12px 16px 40px;
+  }
+  .price-view > .conf-toolbar,
+  .price-view > .price-fixed {
+    padding: 12px 16px;
+  }
+}
