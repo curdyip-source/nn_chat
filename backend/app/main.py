@@ -23,6 +23,7 @@ from app.api.routes.user_devices import router as user_devices_router
 from app.api.routes.users import router as users_router
 from app.core.config import CORS_ALLOW_CREDENTIALS, CORS_ALLOW_HEADERS, CORS_ALLOW_METHODS, CORS_ALLOW_ORIGINS, validate_runtime_config
 from app.core.errors import http_exception_handler, request_id_middleware, unhandled_exception_handler, validation_exception_handler
+from app.core.idempotency import idempotency_middleware
 from app.core.logging import configure_logging, init_error_tracking
 
 
@@ -43,6 +44,10 @@ def create_app() -> FastAPI:
     validate_runtime_config()
     init_error_tracking()
     application = FastAPI(lifespan=lifespan)
+    # Registered before request_id_middleware so request_id stays the OUTERMOST middleware:
+    # Starlette runs the last-registered middleware first, so idempotency runs inside request_id
+    # (every request — including a replayed one — still gets a request id and access log).
+    application.middleware("http")(idempotency_middleware)
     application.middleware("http")(request_id_middleware)
     application.add_exception_handler(HTTPException, http_exception_handler)
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
