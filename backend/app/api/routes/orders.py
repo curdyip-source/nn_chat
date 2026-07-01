@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
-from app.services.orders import add_order_comment, create_order, get_order, list_order_comments, list_orders, update_order, update_order_status
+from app.services.orders import add_order_comment, create_order, get_order, list_order_comments, list_orders, split_order, update_order, update_order_status
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -45,6 +45,12 @@ def update_order_route(order_id: int, payload: OrderUpdatePayload, current_user:
 @router.put("/{order_id}/status")
 def update_order_status_route(order_id: int, payload: OrderStatusUpdatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     return {"item": update_order_status(db, order_id, payload, current_user)}
+
+
+@router.post("/{order_id}/split")
+def split_order_route(order_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    # Частичная отгрузка: «В наличии» → этот заказ в «На сборку», остальное → новый заказ-дубль.
+    return split_order(db, order_id, current_user)
 
 
 @router.get("/{order_id}/comments")

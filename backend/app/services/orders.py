@@ -3,12 +3,16 @@ from collections import Counter
 from datetime import date
 
 from fastapi import HTTPException, status
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app.core.audit_types import ENTITY_TYPE_ORDER, EVENT_TYPE_ORDER_COMMENT_CREATE, EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_UPDATE
+from app.models.messages import Message
+from app.models.orders import Order, OrderItem
 from app.repositories.message_attachment_assets import MessageAttachmentAssetRepository
 from app.repositories.messages import MessageRepository
 from app.repositories.orders import OrderRepository
+from app.repositories.reference_data import ReferenceDataRepository
 from app.schemas.common import build_pagination
 from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
 from app.services.contacts import save_buyer_contact_from_order, save_supplier_contact
@@ -551,6 +555,100 @@ class OrderService:
             )
         return serialize_order_comment(row)
 
+    def split_order(self, order_id: int, current_user: dict) -> dict:
+        """Разделить заказ для частичной отгрузки: товары «В наличии» остаются в этом
+        заказе и он переводится в «На сборку»; всё остальное (ожидаемые + отменённые)
+        уходит в новый заказ-дубль со статусом исходного. Атомарно — один commit."""
+        order = self.get_order_or_404(order_id)
+
+        reference = ReferenceDataRepository(self.db)
+        in_stock_status = reference.get_status_by_type_and_name("order_products", "В наличии")
+        assembly_status = reference.get_status_by_type_and_name("orders", "На сборку")
+        if in_stock_status is None or assembly_status is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Не найдены статусы «В наличии»/«На сборку»")
+
+        items = list(order.items)
+        in_stock_items = [i for i in items if i.order_item_status_id == in_stock_status.status_id]
+        rest_items = [i for i in items if i.order_item_status_id != in_stock_status.status_id]
+
+        if not in_stock_items:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Нет товаров «В наличии» для сборки")
+        if not rest_items:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Нечего разделять: все товары «В наличии»")
+
+        # Дубль заказа со статусом исходного — в него уходит «остаток» (ожидаемые + отменённые).
+        new_order = Order(
+            order_establishment_id=order.order_establishment_id,
+            order_method_id=order.order_method_id,
+            order_sub_method=order.order_sub_method,
+            order_contact_method=order.order_contact_method,
+            order_customer=order.order_customer,
+            order_info=order.order_info,
+            order_status_id=order.order_status_id,
+            order_owner_user_id=current_user["user_id"],
+        )
+        self.db.add(new_order)
+        self.db.flush()
+
+        for item in rest_items:
+            self.db.add(
+                OrderItem(
+                    order_item_order_id=new_order.order_id,
+                    order_item_product_id=item.order_item_product_id,
+                    order_item_name=item.order_item_name,
+                    order_item_article=item.order_item_article,
+                    order_item_quantity=item.order_item_quantity,
+                    order_item_price=item.order_item_price,
+                    order_item_status_id=item.order_item_status_id,
+                    order_item_supplier=item.order_item_supplier,
+                    order_item_note=item.order_item_note,
+                    order_item_source_establishment_id=item.order_item_source_establishment_id,
+                    order_item_destination_establishment_id=item.order_item_destination_establishment_id,
+                    order_item_currency_id=item.order_item_currency_id,
+                    order_item_checkpoint_started=item.order_item_checkpoint_started,
+                    order_item_checkpoint_completed=item.order_item_checkpoint_completed,
+                    order_item_owner_user_id=current_user["user_id"],
+                )
+            )
+
+        new_message = Message(
+            message_type="order",
+            message_owner_user_id=current_user["user_id"],
+            message_order_id=new_order.order_id,
+        )
+        self.db.add(new_message)
+
+        # Убираем «остаток» из исходного и переводим его в «На сборку».
+        rest_item_ids = [i.order_item_id for i in rest_items]
+        self.db.execute(delete(OrderItem).where(OrderItem.order_item_id.in_(rest_item_ids)))
+        order.order_status_id = assembly_status.status_id
+
+        original_id = order.order_id
+        new_order_id = new_order.order_id
+        moved_count = len(rest_items)
+        kept_count = len(in_stock_items)
+
+        self.db.commit()
+        new_message_id = new_message.message_id
+
+        # Realtime + delta-sync: переотдаём карточки обоих заказов.
+        notify_order_changed(self.db, original_id)
+        notify_order_changed(self.db, new_order_id)
+
+        log_audit_event(
+            self.db,
+            actor_user_id=current_user["user_id"],
+            entity_type=ENTITY_TYPE_ORDER,
+            entity_id=original_id,
+            event_type=EVENT_TYPE_ORDER_UPDATE,
+            event_payload={"action": "split", "new_order_id": new_order_id, "moved_items": moved_count, "kept_items": kept_count},
+        )
+
+        result_original = serialize_order(self.repository.get_by_id(original_id))
+        result_new = serialize_order(self.repository.get_by_id(new_order_id))
+        result_new["message_id"] = new_message_id
+        return {"order": result_original, "new_order": result_new}
+
     def _resolve_item_route(self, status_name: str | None, source_establishment_id: int | None, destination_establishment_id: int | None) -> tuple[int | None, int | None]:
         if status_name != "Перемещение":
             return source_establishment_id, destination_establishment_id
@@ -583,6 +681,10 @@ def update_order_status(db: Session, order_id: int, payload: OrderStatusUpdatePa
 
 def update_order(db: Session, order_id: int, payload: OrderUpdatePayload, current_user: dict) -> dict:
     return OrderService(db).update_order(order_id, payload, current_user)
+
+
+def split_order(db: Session, order_id: int, current_user: dict) -> dict:
+    return OrderService(db).split_order(order_id, current_user)
 
 
 def list_order_comments(db: Session, order_id: int) -> dict:
