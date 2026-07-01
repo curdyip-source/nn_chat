@@ -103,7 +103,10 @@ jobs:
       - name: Prepare SSH key
         run: |
           mkdir -p ~/.ssh
-          printf '%s' '${{ secrets.VPS_SSH_KEY }}' | perl -0pe 's/\r//g; s/\\n/\n/g' > ~/.ssh/id_ed25519
+          # VPS_SSH_KEY хранится как base64 приватного ключа — декод даёт точные байты
+          # (включая завершающий \n), без проблем с переводами строк/CR/кавычками при
+          # подстановке секрета. Раньше сырой ключ давал ssh-keygen "error in libcrypto".
+          printf '%s' '${{ secrets.VPS_SSH_KEY }}' | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null
           ssh-keyscan -p '${{ secrets.VPS_PORT }}' '${{ secrets.VPS_HOST }}' >> ~/.ssh/known_hosts
