@@ -105,8 +105,10 @@ function normRegistration(r: ProductRegistration): DocView {
 function itemBody(it: CartItem, prefix: string) {
   return {
     product_id: it.productId,
-    product_article: it.productId ? null : it.article,
-    product_name: it.productId ? null : it.name,
+    // Снимок (артикул+название) шлём ВСЕГДА — чтобы бэкенд восстановил позицию, даже
+    // если товар удалён/пересобран при федерации каталога (иначе «Товар не найден»).
+    product_article: it.article,
+    product_name: it.name,
     [`${prefix}_quantity`]: it.quantity,
     [`${prefix}_cost`]: (Number(it.price) || 0).toFixed(2),
     [`${prefix}_currency_id`]: it.currencyId,

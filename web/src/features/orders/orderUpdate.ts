@@ -3,8 +3,10 @@ import type { Order, OrderUpdate, OrderUpdateItem } from '../../api/types'
 function defaultItems(order: Order): OrderUpdateItem[] {
   return order.items.map((it) => ({
     product_id: it.order_item_product_id ?? null,
-    product_article: it.order_item_product_id ? null : it.order_item_article,
-    product_name: it.order_item_product_id ? null : it.order_item_name,
+    // Снимок (артикул+название) шлём ВСЕГДА — чтобы бэкенд восстановил позицию, даже
+    // если товар удалён/пересобран при федерации каталога (иначе «Товар не найден»).
+    product_article: it.order_item_article,
+    product_name: it.order_item_name,
     order_item_quantity: it.order_item_quantity,
     order_item_price: it.order_item_price,
     order_item_status_id: it.order_item_status_id ?? null,
