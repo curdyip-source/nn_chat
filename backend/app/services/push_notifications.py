@@ -115,6 +115,44 @@ def send_order_change_push_event(
     return _dispatch_to_devices(db, devices=targets, title=title, body=body, event_type="order_updated", entity_id=order_id)
 
 
+def send_order_comment_push_event(
+    db: Session,
+    *,
+    excluded_user_ids: set[int],
+    sender_name: str,
+    order_id: int,
+    comment_text: str | None,
+    has_attachments: bool = False,
+) -> int:
+    if not APNS_ENABLED:
+        logger.info(
+            "push.order_comment.skipped_disabled",
+            extra={"event_type": "push.order_comment.skipped_disabled", "order_id": order_id},
+        )
+        return 0
+
+    targets = UserDeviceRepository(db).list_active_excluding_users(excluded_user_ids=excluded_user_ids)
+    if not targets:
+        logger.info(
+            "push.order_comment.skipped_no_targets",
+            extra={"event_type": "push.order_comment.skipped_no_targets", "order_id": order_id},
+        )
+        return 0
+
+    normalized_sender_name = sender_name.strip() or "Пользователь"
+    normalized_text = (comment_text or "").strip()
+    title = "Новый комментарий"
+    if normalized_text:
+        snippet = normalized_text if len(normalized_text) <= 120 else normalized_text[:117] + "…"
+        body = f"{normalized_sender_name} в заказе №{order_id}: {snippet}"
+    elif has_attachments:
+        body = f"{normalized_sender_name} добавил вложение в заказ №{order_id}"
+    else:
+        body = f"{normalized_sender_name} оставил комментарий в заказе №{order_id}"
+    # event_type "order_updated" на клиенте маршрутизируется на открытие заказа.
+    return _dispatch_to_devices(db, devices=targets, title=title, body=body, event_type="order_updated", entity_id=order_id)
+
+
 def _dispatch_to_devices(db: Session, *, devices, title: str, body: str, event_type: str, entity_id: int) -> int:
     token = build_apns_provider_token()
     sent_count = 0

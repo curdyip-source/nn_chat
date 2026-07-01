@@ -16,7 +16,7 @@ from app.services.audit import log_audit_event
 from app.services.card_sync import notify_order_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.messages import resolve_mention_recipient_ids
-from app.services.push_notifications import send_mention_push_event, send_order_change_push_event, send_push_notification_event
+from app.services.push_notifications import send_mention_push_event, send_order_change_push_event, send_order_comment_push_event, send_push_notification_event
 from app.services.serializers import serialize_order, serialize_order_comment
 
 
@@ -486,6 +486,12 @@ class OrderService:
             },
             attachments=attachments,
         )
+        # Комментарий меняет карточку заказа: бампаем message_updated_at (дельта-синк
+        # подхватит) и публикуем SSE-событие updated с обновлённой карточкой, включающей
+        # новый комментарий. Без этого счётчик комментариев на карточке в ленте не
+        # обновляется в реалтайме (и не подтягивается даже после перезапуска — курсор
+        # синка не двигается). Как в update_order / update_order_status.
+        notify_order_changed(self.db, order_id)
         log_audit_event(
             self.db,
             actor_user_id=current_user["user_id"],
@@ -498,6 +504,8 @@ class OrderService:
                 "attachment_count": len(attachments),
             },
         )
+        sender_name = f"{current_user['user_second_name']} {current_user['user_first_name']}".strip() or current_user["user_login"]
+        mention_recipient_ids: list[int] = []
         try:
             mention_recipient_ids = resolve_mention_recipient_ids(
                 self.db,
@@ -508,7 +516,7 @@ class OrderService:
                 send_mention_push_event(
                     self.db,
                     recipient_user_ids=mention_recipient_ids,
-                    sender_name=f"{current_user['user_second_name']} {current_user['user_first_name']}".strip() or current_user["user_login"],
+                    sender_name=sender_name,
                     context="order",
                     entity_id=order_id,
                 )
@@ -517,6 +525,26 @@ class OrderService:
                 "push.mention_dispatch_failed",
                 extra={
                     "event_type": "push.mention_dispatch_failed",
+                    "order_id": order_id,
+                    "user_id": current_user["user_id"],
+                },
+            )
+        # Общий пуш о новом комментарии — всем активным, кроме автора и уже упомянутых
+        # (упомянутые получили более конкретный пуш выше — не дублируем).
+        try:
+            send_order_comment_push_event(
+                self.db,
+                excluded_user_ids={current_user["user_id"], *mention_recipient_ids},
+                sender_name=sender_name,
+                order_id=order_id,
+                comment_text=row.order_comment_text,
+                has_attachments=bool(attachments),
+            )
+        except Exception:
+            logger.exception(
+                "push.order_comment_dispatch_failed",
+                extra={
+                    "event_type": "push.order_comment_dispatch_failed",
                     "order_id": order_id,
                     "user_id": current_user["user_id"],
                 },
