@@ -41,6 +41,25 @@ assert_header() {
     grep -iq "^${header_name}:" "$headers_file"
 }
 
+# Контейнеры только что пересозданы — фронт (nginx) может ещё подниматься. Ждём его
+# готовности с ретраем, иначе первый же curl ловит "empty reply from server" (52) и
+# валит проверку на ровном месте (гонка, а не реальная поломка деплоя).
+wait_for_ready() {
+    local url="$1"
+    local attempts="${2:-30}"
+    local code=""
+    for ((i = 1; i <= attempts; i++)); do
+        code="$(curl -sS -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
+        [[ "$code" == "200" ]] && return 0
+        sleep 2
+    done
+    echo "Timed out waiting for $url to become ready (last status: ${code:-none})" >&2
+    return 1
+}
+
+echo "Waiting for frontend to become ready..."
+wait_for_ready "$base_url/" 30
+
 echo "Checking frontend root..."
 status_code="$(request GET "$base_url/")"
 [[ "$status_code" == "200" ]]
