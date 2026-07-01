@@ -15,6 +15,7 @@ from app.repositories.reference_data import ProductRepository, ReferenceDataRepo
 from app.schemas.common import build_pagination, model_to_dict
 from app.schemas.reference_data import CurrencyPayload, EstablishmentPayload, OrderMethodPayload, ProductCreatePayload, ProductUpdatePayload, StatusPayload
 from app.services.audit import log_audit_event
+from app.services.price_federation import hydrate_products, hydrate_products_for_names
 from app.services.serializers import serialize_currency, serialize_establishment, serialize_order_method, serialize_product, serialize_status
 
 
@@ -443,6 +444,10 @@ class ReferenceDataService:
 
     def list_products(self, *, search: str | None = None, page: int = 1, page_size: int = 20, sort_by: str = "product_id", sort_order: str = "desc") -> dict:
         self.ensure_seed_data()
+        # Свежий каталог — из nn_vla (источник правды). При поиске лениво до-заносим
+        # найденные позиции CL в локальную таблицу, затем ищем локально как раньше.
+        if search and search.strip():
+            hydrate_products(self.db, query=search)
         rows, total = self.product_repository.list(search=search, page=page, page_size=page_size, sort_by=sort_by, sort_order=sort_order)
         return {
             "items": [serialize_product(item) for item in rows],
@@ -455,6 +460,9 @@ class ReferenceDataService:
         # Точное совпадение по имени -> matched; несколько точных -> candidates;
         # ни одного -> подсказки по подстроке (candidates), matched=None.
         self.ensure_seed_data()
+        # Свежая номенклатура — из nn_vla: до-заносим позиции под импортируемые имена,
+        # чтобы матч по имени находил их (иначе «N позиций не найдено» из-за старого каталога).
+        hydrate_products_for_names(self.db, names)
         results = []
         for raw in names:
             name = (raw or "").strip()

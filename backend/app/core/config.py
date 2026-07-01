@@ -31,6 +31,12 @@ REFRESH_TOKEN_TTL_DAYS = int(os.getenv("REFRESH_TOKEN_TTL_DAYS", os.getenv("SESS
 # or send a concurrent/retried refresh — without it, destructive rotation logs them out.
 REFRESH_TOKEN_GRACE_SECONDS = int(os.getenv("REFRESH_TOKEN_GRACE_SECONDS", "60"))
 AUTH_TOKEN_SECRET = os.getenv("AUTH_TOKEN_SECRET", "dev-secret-change-me")
+# Федерация каталога с прайсом nn_vla (источник правды свежего CL). Бэкенд чата
+# ходит к price-backend в общей docker-сети nufnaf_shared. Пусто = выключено.
+PRICE_BACKEND_URL = os.getenv("PRICE_BACKEND_URL", "http://price-backend:8000").strip()
+# user_id для сервисного токена к nn_vla (подпись общим AUTH_TOKEN_SECRET; nn_vla
+# не проверяет существование юзера — идентичность берётся из токена).
+PRICE_FEDERATION_USER_ID = int(os.getenv("PRICE_FEDERATION_USER_ID", "1"))
 SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()
 SENTRY_ENVIRONMENT = os.getenv("SENTRY_ENVIRONMENT", APP_ENV or "development").strip()
 SENTRY_TRACES_SAMPLE_RATE = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0"))

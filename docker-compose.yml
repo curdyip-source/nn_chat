@@ -72,6 +72,11 @@ services:
     pids_limit: 256
     security_opt:
       - no-new-privileges:true
+    # default — своя БД; shared — бэкенд прайса nn_vla (алиас price-backend) для
+    # федерации каталога товаров (свежий CL как источник правды).
+    networks:
+      - default
+      - shared
 
   frontend:
     image: ${FRONTEND_IMAGE}:${RELEASE_TAG}
