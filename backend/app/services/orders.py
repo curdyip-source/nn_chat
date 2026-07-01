@@ -42,12 +42,14 @@ def _normalize_order_contact_method(value: str | None) -> str | None:
 
 
 def _order_item_identity(item: dict) -> str:
-    product_id = item.get("order_item_product_id")
-    if product_id is not None:
-        return f"p:{product_id}"
-    name = (item.get("order_item_name") or "").strip().lower()
+    # Идентичность позиции — по артикулу (он стабилен), иначе по названию. НЕ по
+    # product_id: при федерации каталога товар переподвязывается и product_id меняется
+    # (NULL→id), из-за чего смена статуса ложно выглядела как «убрал+добавил все позиции».
     article = (item.get("order_item_article") or "").strip().lower()
-    return f"n:{name}|{article}"
+    if article:
+        return f"a:{article}"
+    name = (item.get("order_item_name") or "").strip().lower()
+    return f"n:{name}"
 
 
 def _count_order_item_changes(before_items: list[dict], after_items: list[dict]) -> tuple[int, int]:
@@ -91,10 +93,11 @@ ORDER_ITEM_AUDIT_FIELDS = (
 
 
 def _build_order_item_identity(item: dict, sequence: int) -> str:
-    if item.get("order_item_product_id") is not None:
-        base = f"product:{item['order_item_product_id']}"
-    else:
-        base = f"manual:{item.get('order_item_article') or ''}:{item.get('order_item_name') or ''}"
+    # По артикулу (стабилен при федерации), иначе по названию — не по product_id,
+    # который меняется при переподвязке товара к свежему каталогу.
+    article = (item.get("order_item_article") or "").strip().lower()
+    name = (item.get("order_item_name") or "").strip().lower()
+    base = f"a:{article}" if article else f"n:{name}"
     return f"{base}#{sequence}"
 
 
