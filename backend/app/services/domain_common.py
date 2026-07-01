@@ -49,9 +49,12 @@ def resolve_product_snapshot(db: Session, *, current_user: dict, product_id: int
     repository = ProductRepository(db)
     if product_id is not None:
         row = repository.get_by_id(product_id)
-        if row is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Товар не найден")
-        return row, row.product_article, row.product_name, product_cost_usd
+        if row is not None:
+            return row, row.product_article, row.product_name, product_cost_usd
+        # Товар мог быть удалён/пересобран при федерации каталога (nn_vla). НЕ падаем
+        # 404: если пришёл снимок (артикул+название) — восстанавливаем позицию по нему
+        # (find-by-article или создание); иначе позиция сохранит снимок без ссылки на
+        # каталог. Заказ не должен ломаться из-за churn'а каталога.
     if product_article is None or product_name is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Для нового товара нужны артикул и название")
     existing = repository.get_by_article(product_article)
