@@ -559,25 +559,30 @@ class OrderService:
         return serialize_order_comment(row)
 
     def split_order(self, order_id: int, current_user: dict) -> dict:
-        """Разделить заказ для частичной отгрузки: товары «В наличии» остаются в этом
-        заказе и он переводится в «На сборку»; всё остальное (ожидаемые + отменённые)
-        уходит в новый заказ-дубль со статусом исходного. Атомарно — один commit."""
+        """Разделить заказ для частичной отгрузки: товары, готовые к отгрузке сейчас
+        («В наличии» и уже «Собрано»), остаются в этом заказе и он переводится в «На
+        сборку»; всё остальное (ожидаемые + отменённые) уходит в новый заказ-дубль со
+        статусом исходного. Статусы остающихся позиций сохраняются («Собрано» не
+        сбрасывается). Атомарно — один commit."""
         order = self.get_order_or_404(order_id)
 
         reference = ReferenceDataRepository(self.db)
         in_stock_status = reference.get_status_by_type_and_name("order_products", "В наличии")
+        collected_status = reference.get_status_by_type_and_name("order_products", "Собрано")
         assembly_status = reference.get_status_by_type_and_name("orders", "На сборку")
         if in_stock_status is None or assembly_status is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Не найдены статусы «В наличии»/«На сборку»")
 
+        # Готовые к отгрузке сейчас: «В наличии» + уже «Собрано» — они остаются в заказе.
+        collectable_status_ids = {s.status_id for s in (in_stock_status, collected_status) if s is not None}
         items = list(order.items)
-        in_stock_items = [i for i in items if i.order_item_status_id == in_stock_status.status_id]
-        rest_items = [i for i in items if i.order_item_status_id != in_stock_status.status_id]
+        kept_items = [i for i in items if i.order_item_status_id in collectable_status_ids]
+        rest_items = [i for i in items if i.order_item_status_id not in collectable_status_ids]
 
-        if not in_stock_items:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Нет товаров «В наличии» для сборки")
+        if not kept_items:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Нет товаров «В наличии»/«Собрано» для сборки")
         if not rest_items:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Нечего разделять: все товары «В наличии»")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Нечего разделять: все товары готовы к сборке")
 
         # Дубль заказа со статусом исходного — в него уходит «остаток» (ожидаемые + отменённые).
         new_order = Order(
@@ -629,7 +634,7 @@ class OrderService:
         original_id = order.order_id
         new_order_id = new_order.order_id
         moved_count = len(rest_items)
-        kept_count = len(in_stock_items)
+        kept_count = len(kept_items)
 
         self.db.commit()
         new_message_id = new_message.message_id
