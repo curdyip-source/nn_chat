@@ -388,3 +388,18 @@ export function cdekCreateWaybill(orderId: number, payload: CdekWaybillCreate) {
 export function cdekWaybillStatus(orderId: number) {
   return apiRequest<{ item: CdekWaybill }>(`/cdek/orders/${orderId}/status`)
 }
+
+export type CdekPrefill = {
+  recipient_name?: string | null
+  recipient_phone?: string | null
+  city_code?: number | null
+  city_name?: string | null
+  delivery_mode?: string | null
+  pvz_code?: string | null
+  pvz_address?: string | null
+  delivery_address?: string | null
+}
+
+export function cdekPrefill(customer: string) {
+  return apiRequest<{ item: CdekPrefill }>(`/cdek/prefill?customer=${encodeURIComponent(customer)}`)
+}

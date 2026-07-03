@@ -97,6 +97,17 @@ export type OrderItemCreate = {
   order_item_currency_id?: number | null
 }
 
+export type OrderCreateCdek = {
+  recipient_name?: string | null
+  recipient_phone?: string | null
+  city_code?: number | null
+  city_name?: string | null
+  delivery_mode?: 'pvz' | 'door' | null
+  pvz_code?: string | null
+  pvz_address?: string | null
+  delivery_address?: string | null
+}
+
 export type OrderCreate = {
   order_establishment_id: number
   order_method_id: number
@@ -106,6 +117,7 @@ export type OrderCreate = {
   order_info: string
   save_contact: boolean
   order_status_id?: number | null
+  cdek?: OrderCreateCdek | null
   items: OrderItemCreate[]
 }
 

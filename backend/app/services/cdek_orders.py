@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import HTTPException, status
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.core import config
@@ -135,6 +136,32 @@ def create_waybill(db: Session, order_id: int, payload, current_user: dict) -> d
     cdek_chat.post_waybills_async(order_id)
 
     return _serialize(order)
+
+
+def get_prefill(db: Session, customer: str) -> dict:
+    """Автозаполнение СДЭК-данных для клиента: последние сохранённые из его прошлых заказов."""
+    customer = (customer or "").strip()
+    if not customer:
+        return {}
+    row = db.execute(
+        select(Order)
+        .where(Order.order_customer == customer)
+        .where(Order.order_cdek_recipient_name.isnot(None) | Order.order_cdek_city_code.isnot(None))
+        .order_by(desc(Order.order_created_at))
+        .limit(1)
+    ).scalar_one_or_none()
+    if row is None:
+        return {}
+    return {
+        "recipient_name": row.order_cdek_recipient_name,
+        "recipient_phone": row.order_cdek_recipient_phone,
+        "city_code": row.order_cdek_city_code,
+        "city_name": row.order_cdek_city_name,
+        "delivery_mode": row.order_cdek_delivery_mode,
+        "pvz_code": row.order_cdek_pvz_code,
+        "pvz_address": row.order_cdek_pvz_address,
+        "delivery_address": row.order_cdek_delivery_address,
+    }
 
 
 def get_status(db: Session, order_id: int, *, refresh: bool = True) -> dict:

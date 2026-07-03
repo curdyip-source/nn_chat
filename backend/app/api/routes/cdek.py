@@ -62,6 +62,16 @@ def tariffs_route(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 
 
+@router.get("/prefill")
+def prefill_route(
+    customer: str = Query(min_length=1, max_length=255),
+    _: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """СДЭК-данные клиента (из прошлых заказов) — для автозаполнения при создании заказа."""
+    return {"item": cdek_orders.get_prefill(db, customer)}
+
+
 @router.post("/orders/{order_id}/waybill", status_code=status.HTTP_201_CREATED)
 def create_waybill_route(
     order_id: int,

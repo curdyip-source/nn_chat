@@ -308,6 +308,7 @@ function OrderRow({
               <span title={cdek.status ?? ''}>
                 {' · '}
                 {cdek.track_number ?? '…'}
+                {cdek.status ? ` · ${cdek.status}` : ''}
               </span>
             ) : (
               <>

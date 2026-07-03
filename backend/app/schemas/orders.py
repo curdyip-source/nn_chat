@@ -22,6 +22,18 @@ class OrderItemCreatePayload(BaseModel):
     order_item_checkpoint_completed: bool = False
 
 
+class OrderCdekPayload(BaseModel):
+    """Данные СДЭК, заполняемые при создании заказа (метод СДЭК) — сохраняются в заказ."""
+    recipient_name: Optional[str] = Field(default=None, max_length=255)
+    recipient_phone: Optional[str] = Field(default=None, max_length=50)
+    city_code: Optional[int] = Field(default=None, ge=1)
+    city_name: Optional[str] = Field(default=None, max_length=255)
+    delivery_mode: Optional[str] = Field(default=None, pattern="^(pvz|door)$")
+    pvz_code: Optional[str] = Field(default=None, max_length=50)
+    pvz_address: Optional[str] = Field(default=None, max_length=500)
+    delivery_address: Optional[str] = Field(default=None, max_length=500)
+
+
 class OrderCreatePayload(BaseModel):
     order_establishment_id: int = Field(ge=1)
     order_method_id: int = Field(ge=1)
@@ -32,6 +44,7 @@ class OrderCreatePayload(BaseModel):
     save_contact: bool = False
     order_status_id: Optional[int] = Field(default=None, ge=1)
     message_text: Optional[str] = Field(default=None, max_length=4000)
+    cdek: Optional[OrderCdekPayload] = None
     items: list[OrderItemCreatePayload] = Field(min_length=1)
 
 
