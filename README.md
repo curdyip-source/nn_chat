@@ -54,9 +54,9 @@
 - **openpyxl** — экспорт/импорт Excel
 - **pytest** — тесты
 
-**Frontend (админка)**
-- Чистый **HTML5 + CSS3 + Vanilla JavaScript** (без фреймворков) — SPA-дашборд
-- **Nginx 1.29** как статик-сервер и reverse proxy на API
+**Frontend (веб-админка, `web/`)**
+- **React + Vite + TypeScript** — SPA-дашборд (сборка статики)
+- **Nginx** как статик-сервер и reverse proxy на API (и на `/price-api` → бэкенд прайса)
 
 **Инфраструктура**
 - **PostgreSQL 17** — основная БД
@@ -119,9 +119,10 @@ pip install -r requirements.txt
 alembic upgrade head
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-# Frontend (статика)
-cd frontend
-python -m http.server 8080 --directory .
+# Frontend (web/, React + Vite)
+cd web
+npm install
+npm run dev
 ```
 
 > 📚 Интерактивная документация API доступна по адресу `/docs` (Swagger UI) после запуска бэкенда.
