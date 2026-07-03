@@ -14,6 +14,8 @@ class CdekWaybillCreate(BaseModel):
     tariff_code: int = Field(ge=1)
     recipient_name: str = Field(min_length=1, max_length=255)
     recipient_phone: str = Field(min_length=5, max_length=50)
+    from_city_code: Optional[int] = Field(default=None, ge=1, description="Город отправителя (origin); None → дефолт из конфига (Москва)")
+    from_city_name: Optional[str] = Field(default=None, max_length=255)
     city_code: int = Field(ge=1)
     city_name: Optional[str] = Field(default=None, max_length=255)
     delivery_mode: str = Field(default="pvz", pattern="^(pvz|door)$")
