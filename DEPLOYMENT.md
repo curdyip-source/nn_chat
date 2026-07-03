@@ -3,7 +3,7 @@
 ## Production Layout
 
 - Single stack file: [docker-compose.prod.yml](docker-compose.prod.yml)
-- Runtime env template: [.env.prod.example](.env.prod.example)
+- Runtime env template: [.env.example](.env.example)
 - Deploy scripts: [ops](ops)
 - CI/CD workflow: [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
 
@@ -13,7 +13,7 @@ The server does not build the app. Backend and frontend are built in GitHub Acti
 
 You need:
 
-1. A real `.env` based on [.env.prod.example](.env.prod.example).
+1. A real `.env` based on [.env.example](.env.example).
 2. The APNS key file `AuthKey_RLV35R5LP5.p8`.
 3. SSH access to the VPS.
 4. A GHCR token with package read access on the server deploy step.
@@ -99,7 +99,7 @@ The APNS key is not required in GitHub Secrets when the file is already present 
 
 Recommended `PRODUCTION_ENV_FILE` base:
 
-- Copy from [.env.prod.example](.env.prod.example)
+- Copy from [.env.example](.env.example)
 - Replace database password and auth secret
 - Set `CORS_ALLOW_ORIGINS=https://chat.nufnafchat.su`
 - Set `INSECURE_ALLOW_HTTP_ORIGINS=false`
