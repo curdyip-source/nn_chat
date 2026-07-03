@@ -204,6 +204,29 @@ def get_prefill(db: Session, customer: str) -> dict:
     }
 
 
+def delete_waybill(db: Session, order_id: int) -> dict:
+    """Сбросить накладную СДЭК заказа, чтобы можно было создать заново.
+
+    Пытается удалить заказ в CDEK (best-effort — невалидный/уже удалённый CDEK отвергнет,
+    это не страшно), затем чистит uuid/трек/статус. Введённые данные (получатель, город,
+    ПВЗ, origin) СОХРАНЯЕМ — форма пересоздания подставит их заново.
+    """
+    order = _get_order_or_404(db, order_id)
+    if order.order_cdek_uuid:
+        try:
+            cdek.delete_order(order.order_cdek_uuid)
+        except cdek.CdekError:
+            pass  # у CDEK мог не удалиться (невалиден/уже нет) — всё равно чистим у себя
+    order.order_cdek_uuid = None
+    order.order_cdek_track_number = None
+    order.order_cdek_status = None
+    order.order_cdek_status_updated_at = None
+    db.commit()
+    from app.services.card_sync import notify_order_changed
+    notify_order_changed(db, order.order_id)
+    return _serialize(order)
+
+
 def get_origin_default(db: Session) -> dict:
     """Дефолт отправителя (origin): последний использованный ПВЗ сдачи и его город —
     глобально по всем заказам, чтобы подставлять по умолчанию при создании накладной."""

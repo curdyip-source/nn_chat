@@ -92,6 +92,16 @@ def create_waybill_route(
     return {"item": cdek_orders.create_waybill(db, order_id, payload, current_user)}
 
 
+@router.delete("/orders/{order_id}/waybill")
+def delete_waybill_route(
+    order_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Сбросить накладную СДЭК заказа (удалить в CDEK + очистить), чтобы создать заново."""
+    return {"item": cdek_orders.delete_waybill(db, order_id)}
+
+
 @router.get("/orders/{order_id}/status")
 def waybill_status_route(
     order_id: int,
