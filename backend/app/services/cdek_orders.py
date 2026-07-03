@@ -129,6 +129,11 @@ def create_waybill(db: Session, order_id: int, payload, current_user: dict) -> d
     db.commit()
 
     _refresh_status(db, order)  # трек/статус могут прийти не сразу — не страшно
+
+    # Печать (2 накладные) и постинг в чат заказа — в фоне (генерация PDF у CDEK асинхронна).
+    from app.services import cdek_chat
+    cdek_chat.post_waybills_async(order_id)
+
     return _serialize(order)
 
 
