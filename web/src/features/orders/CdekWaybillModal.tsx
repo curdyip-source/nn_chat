@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   cdekCreateWaybill,
+  cdekDefaults,
   cdekDeliveryPoints,
   cdekSuggestCities,
   cdekTariffs,
@@ -36,6 +37,9 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
   // Город отправителя (origin). Дефолт — Москва (44); оператор меняет на Тулу и др. при необходимости.
   const [fromCityName, setFromCityName] = useState('Москва')
   const [fromCityCode, setFromCityCode] = useState<number | null>(44)
+  // ПВЗ сдачи отправителем (origin ПВЗ). Пусто = курьер/договор; выбран = shipment_point.
+  const [shipmentPoint, setShipmentPoint] = useState<string | null>(null)
+  const [shipmentPointAddress, setShipmentPointAddress] = useState('')
   const [cityName, setCityName] = useState(c?.city_name || '')
   const [cityCode, setCityCode] = useState<number | null>(c?.city_code ?? null)
   const [mode, setMode] = useState<'pvz' | 'door'>(c?.delivery_mode === 'door' ? 'door' : 'pvz')
@@ -57,6 +61,23 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
   const [comment, setComment] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  // Дефолт отправителя: последний использованный ПВЗ сдачи + его город (глобально).
+  useEffect(() => {
+    let alive = true
+    cdekDefaults()
+      .then(({ item }) => {
+        if (!alive || !item?.shipment_point) return
+        if (item.from_city_code) setFromCityCode(item.from_city_code)
+        if (item.from_city_name) setFromCityName(item.from_city_name)
+        setShipmentPoint(item.shipment_point)
+        setShipmentPointAddress(item.shipment_point_address || '')
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // Тарифы зависят от города-отправителя (origin), города-получателя и веса.
   useEffect(() => {
@@ -97,6 +118,8 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
         recipient_phone: recipientPhone.trim(),
         from_city_code: fromCityCode,
         from_city_name: fromCityName || null,
+        shipment_point: shipmentPoint,
+        shipment_point_address: shipmentPoint ? shipmentPointAddress || null : null,
         city_code: cityCode,
         city_name: cityName || null,
         delivery_mode: mode,
@@ -152,6 +175,8 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
             onValueChange={(v) => {
               setFromCityName(v)
               setFromCityCode(null)
+              setShipmentPoint(null)
+              setShipmentPointAddress('')
             }}
             search={(q) => cdekSuggestCities(q).then((r) => r.items)}
             getKey={(c) => c.code}
@@ -159,6 +184,31 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
             onSelect={(c) => {
               setFromCityName(c.full_name)
               setFromCityCode(c.code)
+              setShipmentPoint(null)
+              setShipmentPointAddress('')
+            }}
+          />
+        </Field>
+
+        <Field label="ПВЗ отправителя (сдаю в ПВЗ; пусто = курьер)">
+          <SearchSelect<CdekPvz>
+            placeholder={fromCityCode == null ? 'Сначала выберите город отправителя' : 'Поиск ПВЗ по адресу'}
+            value={shipmentPointAddress}
+            onValueChange={(v) => {
+              setShipmentPointAddress(v)
+              setShipmentPoint(null)
+            }}
+            search={(q) => (fromCityCode == null ? Promise.resolve([]) : cdekDeliveryPoints(fromCityCode, q).then((r) => r.items))}
+            getKey={(p) => p.code}
+            renderItem={(p) => (
+              <span>
+                {p.address}
+                {p.work_time ? <small style={{ display: 'block', opacity: 0.7 }}>{p.work_time}</small> : null}
+              </span>
+            )}
+            onSelect={(p) => {
+              setShipmentPoint(p.code)
+              setShipmentPointAddress(p.address || '')
             }}
           />
         </Field>

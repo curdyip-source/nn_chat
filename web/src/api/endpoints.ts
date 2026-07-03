@@ -342,6 +342,8 @@ export type CdekWaybillCreate = {
   recipient_phone: string
   from_city_code?: number | null
   from_city_name?: string | null
+  shipment_point?: string | null
+  shipment_point_address?: string | null
   city_code: number
   city_name?: string | null
   delivery_mode: 'pvz' | 'door'
@@ -392,6 +394,16 @@ export function cdekTariffs(toCode: number, weight = 500, fromCode?: number | nu
 
 export function cdekCreateWaybill(orderId: number, payload: CdekWaybillCreate) {
   return apiRequest<{ item: CdekWaybill }>(`/cdek/orders/${orderId}/waybill`, { method: 'POST', body: payload })
+}
+
+export type CdekOriginDefault = {
+  from_city_code?: number | null
+  from_city_name?: string | null
+  shipment_point?: string | null
+  shipment_point_address?: string | null
+}
+export function cdekDefaults() {
+  return apiRequest<{ item: CdekOriginDefault }>(`/cdek/defaults`)
 }
 
 export function cdekWaybillStatus(orderId: number) {
