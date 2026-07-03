@@ -30,14 +30,15 @@ const inputStyle: React.CSSProperties = {
 }
 
 export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
-  const [recipientName, setRecipientName] = useState(order.order_customer || '')
-  const [recipientPhone, setRecipientPhone] = useState('')
-  const [cityName, setCityName] = useState('')
-  const [cityCode, setCityCode] = useState<number | null>(null)
-  const [mode, setMode] = useState<'pvz' | 'door'>('pvz')
-  const [pvzAddress, setPvzAddress] = useState('')
-  const [pvzCode, setPvzCode] = useState<string | null>(null)
-  const [deliveryAddress, setDeliveryAddress] = useState('')
+  const c = order.cdek // предзаполнение данными, сохранёнными при создании заказа (метод СДЭК)
+  const [recipientName, setRecipientName] = useState(c?.recipient_name || order.order_customer || '')
+  const [recipientPhone, setRecipientPhone] = useState(c?.recipient_phone || '')
+  const [cityName, setCityName] = useState(c?.city_name || '')
+  const [cityCode, setCityCode] = useState<number | null>(c?.city_code ?? null)
+  const [mode, setMode] = useState<'pvz' | 'door'>(c?.delivery_mode === 'door' ? 'door' : 'pvz')
+  const [pvzAddress, setPvzAddress] = useState(c?.pvz_address || '')
+  const [pvzCode, setPvzCode] = useState<string | null>(c?.pvz_code || null)
+  const [deliveryAddress, setDeliveryAddress] = useState(c?.delivery_address || '')
   const [weight, setWeight] = useState(500)
   const [length, setLength] = useState(20)
   const [width, setWidth] = useState(15)
