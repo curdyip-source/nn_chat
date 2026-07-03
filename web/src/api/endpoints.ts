@@ -376,8 +376,8 @@ export function cdekDeliveryPoints(cityCode: number, query?: string) {
   return apiRequest<{ items: CdekPvz[] }>(`/cdek/delivery-points?${q}`)
 }
 
-export function cdekTariffs(fromCode: number, toCode: number, weight = 500) {
-  const q = new URLSearchParams({ from_code: String(fromCode), to_code: String(toCode), weight: String(weight) })
+export function cdekTariffs(toCode: number, weight = 500) {
+  const q = new URLSearchParams({ to_code: String(toCode), weight: String(weight) })
   return apiRequest<{ items: CdekTariff[] }>(`/cdek/tariffs?${q}`)
 }
 

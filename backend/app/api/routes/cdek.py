@@ -48,15 +48,16 @@ def delivery_points_route(
 
 @router.get("/tariffs")
 def tariffs_route(
-    from_code: int = Query(ge=1),
     to_code: int = Query(ge=1),
+    from_code: int | None = Query(default=None, ge=1),
     weight: int = Query(default=500, ge=1),
     _: dict = Depends(get_current_user),
 ) -> dict:
-    """Доступные тарифы (цены/сроки) для пары городов."""
+    """Доступные тарифы (цены/сроки). from_code по умолчанию — город отправителя (конфиг)."""
     _guard()
+    sender = from_code or cdek.config.CDEK_SENDER_CITY_CODE
     try:
-        return {"items": cdek.calculate_tariff_list(from_code, to_code, weight)}
+        return {"items": cdek.calculate_tariff_list(sender, to_code, weight)}
     except cdek.CdekError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 
