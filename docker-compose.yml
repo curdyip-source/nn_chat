@@ -29,6 +29,8 @@ services:
   backend:
     build: ./backend
     image: nufnaf-dev-backend:latest
+    # Образ собирается локально (не из реестра) — не пытаться его pull'ить.
+    pull_policy: never
     environment:
       APP_ENV: development
       POSTGRES_HOST: db
@@ -67,6 +69,8 @@ services:
 
   seed:
     image: nufnaf-dev-backend:latest
+    # Переиспользует образ, собранный сервисом backend — не тянуть из реестра.
+    pull_policy: never
     depends_on:
       backend:
         condition: service_healthy
