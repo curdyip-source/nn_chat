@@ -46,6 +46,11 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
   const [tariffs, setTariffs] = useState<CdekTariff[]>([])
   const [tariffsLoading, setTariffsLoading] = useState(false)
   const [tariffCode, setTariffCode] = useState<number | null>(null)
+  const [declaredValue, setDeclaredValue] = useState(0)
+  const [insurance, setInsurance] = useState(false)
+  const [codAmount, setCodAmount] = useState(0)
+  const [sms, setSms] = useState(false)
+  const [payer, setPayer] = useState<'sender' | 'recipient'>('sender')
   const [comment, setComment] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -96,6 +101,12 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
         package: { weight, length, width, height },
         comment: comment.trim() || null,
         save_to_contact: true,
+        declared_value: declaredValue,
+        insurance,
+        sms,
+        cod_amount: codAmount,
+        delivery_paid_by_recipient: payer === 'recipient',
+        delivery_cost: payer === 'recipient' ? tariffs.find((t) => t.tariff_code === tariffCode)?.delivery_sum ?? 0 : 0,
       })
       onCreated(item)
     } catch (e) {
@@ -213,6 +224,34 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
               ))}
             </select>
           )}
+        </Field>
+
+        <Field label="Объявленная стоимость, ₽ (база страхования)">
+          <input style={inputStyle} type="number" min={0} value={declaredValue} onChange={(e) => setDeclaredValue(Number(e.target.value) || 0)} />
+        </Field>
+
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
+          <input type="checkbox" checked={insurance} onChange={(e) => setInsurance(e.target.checked)} />
+          Страхование (по объявленной стоимости)
+        </label>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
+          <input type="checkbox" checked={sms} onChange={(e) => setSms(e.target.checked)} />
+          СМС-уведомление получателю <span style={{ opacity: 0.6 }}>(зависит от тарифа/договора)</span>
+        </label>
+
+        <Field label="Наложенный платёж, ₽ (0 — нет)">
+          <input style={inputStyle} type="number" min={0} value={codAmount} onChange={(e) => setCodAmount(Number(e.target.value) || 0)} />
+        </Field>
+
+        <Field label="Оплата доставки">
+          <ButtonGroup
+            value={payer}
+            onChange={(v) => setPayer((v as 'sender' | 'recipient') ?? 'sender')}
+            options={[
+              { value: 'sender', label: 'Отправитель' },
+              { value: 'recipient', label: 'Получатель' },
+            ]}
+          />
         </Field>
 
         <Field label="Комментарий (необязательно)">

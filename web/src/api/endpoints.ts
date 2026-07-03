@@ -349,6 +349,12 @@ export type CdekWaybillCreate = {
   package: CdekPackage
   comment?: string | null
   save_to_contact?: boolean
+  declared_value?: number
+  insurance?: boolean
+  sms?: boolean
+  cod_amount?: number
+  delivery_paid_by_recipient?: boolean
+  delivery_cost?: number
 }
 export type CdekWaybill = {
   has_waybill: boolean

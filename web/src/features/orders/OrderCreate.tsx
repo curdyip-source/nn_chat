@@ -348,6 +348,15 @@ export function OrderCreate({
             />
           </Field>
 
+          <Field label="Способ связи">
+            <ButtonGroup
+              deselectable
+              value={contactMethod}
+              onChange={setContactMethod}
+              options={CONTACT_METHODS.map((m) => ({ value: m, label: m }))}
+            />
+          </Field>
+
           <Field label="Способ">
             <ButtonGroup
               columns={3}
@@ -437,15 +446,6 @@ export function OrderCreate({
               )}
             </div>
           )}
-
-          <Field label="Способ связи">
-            <ButtonGroup
-              deselectable
-              value={contactMethod}
-              onChange={setContactMethod}
-              options={CONTACT_METHODS.map((m) => ({ value: m, label: m }))}
-            />
-          </Field>
 
         </div>
       ) : (

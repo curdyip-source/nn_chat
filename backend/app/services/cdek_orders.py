@@ -47,8 +47,8 @@ def _build_payload(order: Order, payload) -> dict:
             "items": [{
                 "name": f"Заказ №{order.order_id}",
                 "ware_key": str(order.order_id),
-                "payment": {"value": 0},
-                "cost": 0,
+                "payment": {"value": payload.cod_amount},  # наложенный платёж (за товар)
+                "cost": payload.declared_value,             # объявленная стоимость
                 "weight": payload.package.weight,
                 "amount": 1,
             }],
@@ -60,6 +60,19 @@ def _build_payload(order: Order, payload) -> dict:
         body["delivery_point"] = payload.pvz_code
     else:
         body["to_location"] = {"code": payload.city_code, "address": payload.delivery_address}
+
+    # Доставку оплачивает получатель.
+    if payload.delivery_paid_by_recipient and payload.delivery_cost > 0:
+        body["delivery_recipient_cost"] = {"value": payload.delivery_cost}
+
+    # Доп. услуги: страхование (param = объявленная стоимость), СМС-уведомление (param = телефон).
+    services = []
+    if payload.insurance and payload.declared_value > 0:
+        services.append({"code": "INSURANCE", "parameter": str(int(payload.declared_value))})
+    if payload.sms:
+        services.append({"code": "SMS", "parameter": payload.recipient_phone})
+    if services:
+        body["services"] = services
     return body
 
 

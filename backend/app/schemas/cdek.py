@@ -23,3 +23,11 @@ class CdekWaybillCreate(BaseModel):
     package: CdekPackage = Field(default_factory=CdekPackage)
     comment: Optional[str] = Field(default=None, max_length=255)
     save_to_contact: bool = Field(default=True, description="Сохранить данные СДЭК в контакт покупателя")
+
+    # --- Доп. услуги / оплата ---
+    declared_value: float = Field(default=0, ge=0, description="Объявленная стоимость, ₽ (база страхования)")
+    insurance: bool = Field(default=False, description="Страхование по объявленной стоимости")
+    sms: bool = Field(default=False, description="СМС-уведомление получателю")
+    cod_amount: float = Field(default=0, ge=0, description="Наложенный платёж, ₽ (получатель платит за товар)")
+    delivery_paid_by_recipient: bool = Field(default=False, description="Доставку оплачивает получатель")
+    delivery_cost: float = Field(default=0, ge=0, description="Сумма доставки (тариф), если платит получатель")
