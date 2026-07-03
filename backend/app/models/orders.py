@@ -23,6 +23,20 @@ class Order(Base):
     order_owner_user_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
     order_created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now(), index=True)
 
+    # --- СДЭК (доставка): заполняется при создании накладной ---
+    order_cdek_recipient_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    order_cdek_recipient_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    order_cdek_city_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    order_cdek_city_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    order_cdek_delivery_mode: Mapped[str | None] = mapped_column(String(10), nullable=True)  # 'pvz' | 'door'
+    order_cdek_pvz_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    order_cdek_pvz_address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    order_cdek_delivery_address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    order_cdek_uuid: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    order_cdek_track_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    order_cdek_status: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    order_cdek_status_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     establishment = relationship("Establishment", back_populates="orders")
     order_method = relationship("OrderMethod", back_populates="orders")
     status = relationship("Status", back_populates="orders")
