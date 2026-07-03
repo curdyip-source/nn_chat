@@ -14,6 +14,9 @@ export type OrderSelection = {
   unregisterApply: (orderId: number) => void
   registerRemove: (orderId: number, fn: BulkRemoveFn) => void
   unregisterRemove: (orderId: number) => void
+  /** Выбор целых заказов (чекбоксы у свёрнутых строк) — для массовой смены статуса заказа. */
+  isOrderSelected: (orderId: number) => boolean
+  toggleOrder: (orderId: number) => void
 }
 
 const noop: OrderSelection = {
@@ -23,6 +26,8 @@ const noop: OrderSelection = {
   unregisterApply: () => {},
   registerRemove: () => {},
   unregisterRemove: () => {},
+  isOrderSelected: () => false,
+  toggleOrder: () => {},
 }
 
 export const OrderSelectionContext = createContext<OrderSelection>(noop)

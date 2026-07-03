@@ -13,7 +13,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 32px 48px minmax(110px, 0.85fr) minmax(210px, 2fr) 190px 44px 120px minmax(100px, auto) 32px;
+  grid-template-columns: 52px 48px minmax(110px, 0.85fr) minmax(210px, 2fr) 190px 44px 120px minmax(100px, auto) 32px;
   gap: 10px;
   align-items: center;
   padding: 8px 12px;
@@ -37,6 +37,18 @@
   color: var(--text-dim);
 }
 
+.rowLead {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.orderCheck {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--accent, #2b6cff);
+  flex: none;
+}
 .expandBtn {
   background: transparent;
   border: none;

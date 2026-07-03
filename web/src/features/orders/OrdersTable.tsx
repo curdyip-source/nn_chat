@@ -313,9 +313,21 @@ function OrderRow({
   return (
     <div className={styles.orderBlock}>
       <div className={styles.row}>
-        <button className={styles.expandBtn} onClick={() => setExpanded((v) => !v)}>
-          {expanded ? '▾' : '▸'}
-        </button>
+        <div className={styles.rowLead}>
+          {!expanded && (
+            <input
+              type="checkbox"
+              className={styles.orderCheck}
+              checked={selection.isOrderSelected(order.order_id)}
+              onChange={() => selection.toggleOrder(order.order_id)}
+              title="Выбрать заказ для массовой смены статуса"
+              aria-label="Выбрать заказ"
+            />
+          )}
+          <button className={styles.expandBtn} onClick={() => setExpanded((v) => !v)}>
+            {expanded ? '▾' : '▸'}
+          </button>
+        </div>
         <span className={styles.no}>{order.order_id}</span>
         <input className={styles.cellInput} value={customer} onChange={(e) => setCustomer(e.target.value)} onBlur={saveCustomer} />
         <span className={styles.dim} title={metaText}>
