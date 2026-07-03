@@ -50,6 +50,28 @@ APNS_USE_SANDBOX = os.getenv(
     "true" if APP_ENV != "production" else "false",
 ).strip().lower() in {"1", "true", "yes", "on"}
 APNS_ENABLED = all([APNS_AUTH_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC])
+# --- CDEK (доставка) ---
+# По умолчанию — тестовая среда СДЭК (публичные тест-креды из cdek-sdk-v2), чтобы
+# локально работало без .env. Прод: задать CDEK_BASE_URL=https://api.cdek.ru/v2 и
+# боевые CDEK_ACCOUNT/CDEK_SECURE (в GitHub-секретах).
+CDEK_BASE_URL = os.getenv("CDEK_BASE_URL", "https://api.edu.cdek.ru/v2").strip().rstrip("/")
+CDEK_ACCOUNT = os.getenv("CDEK_ACCOUNT", "wqGwiQx0gg8mLtiEKsUinjVSICCjtTEP").strip()
+CDEK_SECURE = os.getenv("CDEK_SECURE", "RmAmgvSgSl1yirlz9QupbzOJVqhCxcP5").strip()
+CDEK_ENABLED = bool(CDEK_ACCOUNT and CDEK_SECURE)
+# Публичный URL для вебхуков CDEK (статусы). Пусто локально — вебхук не регистрируем.
+CDEK_WEBHOOK_URL = os.getenv("CDEK_WEBHOOK_URL", "").strip()
+# Отправитель. На проде НЕ шлём sender/from_location — CDEK берёт отправителя из договора
+# (личного кабинета). На тест-среде (edu.cdek.ru) у договора дефолтного отправителя нет,
+# поэтому подставляем тестового, чтобы создание накладной работало локально.
+# Заполнять эти env вручную только если нужно переопределить договор.
+_CDEK_IS_TEST = "edu.cdek.ru" in CDEK_BASE_URL
+CDEK_SENDER_NAME = os.getenv("CDEK_SENDER_NAME", "Магазин NufNaf" if _CDEK_IS_TEST else "").strip()
+CDEK_SENDER_PHONE = os.getenv("CDEK_SENDER_PHONE", "+79000000000" if _CDEK_IS_TEST else "").strip()
+CDEK_SENDER_ADDRESS = os.getenv("CDEK_SENDER_ADDRESS", "Москва, ул. Тестовая, 1" if _CDEK_IS_TEST else "").strip()
+# Город отправителя нужен ТОЛЬКО для расчёта тарифа (цена/сроки от origin к получателю) —
+# это считается до создания заказа, из договора взять неоткуда. 44 = Москва.
+CDEK_SENDER_CITY_CODE = int(os.getenv("CDEK_SENDER_CITY_CODE", "44"))
+
 INSECURE_ALLOW_HTTP_ORIGINS = os.getenv("INSECURE_ALLOW_HTTP_ORIGINS", "false").strip().lower() in {"1", "true", "yes", "on"}
 FIRST_ADMIN_PASS = os.getenv(
     "FIRST_ADMIN_PASS",

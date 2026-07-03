@@ -114,6 +114,14 @@ jobs:
       - name: Prepare deploy artifacts
         run: |
           printf '%s' '${{ secrets.PRODUCTION_ENV_FILE }}' > .deploy.env
+          # СДЭК-переменные не входят в PRODUCTION_ENV_FILE — дописываем из отдельных
+          # секретов (последнее значение в .env побеждает, так что дубли безопасны).
+          {
+            printf '\nCDEK_BASE_URL=%s\n' 'https://api.cdek.ru/v2'
+            printf 'CDEK_ACCOUNT=%s\n' '${{ secrets.CDEK_ACCOUNT }}'
+            printf 'CDEK_SECURE=%s\n' '${{ secrets.CDEK_SECURE }}'
+            printf 'CDEK_WEBHOOK_URL=%s\n' '${{ secrets.CDEK_WEBHOOK_URL }}'
+          } >> .deploy.env
 
       - name: Upload compose and scripts
         run: |

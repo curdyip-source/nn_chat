@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.auth import router as auth_router
 from app.api.routes.audit import router as audit_router
+from app.api.routes.cdek import router as cdek_router
 from app.api.routes.contacts import router as contacts_router
 from app.api.routes.documents import router as documents_router
 from app.api.routes.inventories import router as inventories_router
@@ -37,6 +38,24 @@ async def lifespan(_: FastAPI):
     from app.services.message_stream import broker
 
     broker.bind_loop(asyncio.get_running_loop())
+
+    # Регистрируем статус-вебхук СДЭК (best-effort, в фоне — не блокируем и не роняем старт).
+    from app.core import config as _cfg
+
+    if _cfg.CDEK_ENABLED and _cfg.CDEK_WEBHOOK_URL:
+        import threading
+
+        def _register_cdek_webhook() -> None:
+            from app.services import cdek as _cdek
+
+            try:
+                _cdek.set_webhook(_cfg.CDEK_WEBHOOK_URL)
+                logger.info("cdek.webhook.registered url=%s", _cfg.CDEK_WEBHOOK_URL)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("cdek.webhook.register_failed error=%s", exc)
+
+        threading.Thread(target=_register_cdek_webhook, daemon=True).start()
+
     yield
 
 
@@ -69,6 +88,7 @@ def create_app() -> FastAPI:
     api_v1_router.include_router(system_router)
     api_v1_router.include_router(auth_router)
     api_v1_router.include_router(audit_router)
+    api_v1_router.include_router(cdek_router)
     api_v1_router.include_router(contacts_router)
     api_v1_router.include_router(documents_router)
     api_v1_router.include_router(reference_data_router)

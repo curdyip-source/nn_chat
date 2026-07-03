@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { updateOrder, updateOrderStatus } from '../../api/endpoints'
+import { cdekWaybillStatus, updateOrder, updateOrderStatus } from '../../api/endpoints'
 import type { Order, OrderUpdateItem, Product } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
@@ -7,6 +7,7 @@ import { Checkbox } from '../../ui/Checkbox'
 import { StatusSelect } from '../../ui/StatusSelect'
 import { formatAmount, formatDateTime } from '../../lib/format'
 import { AddItemModal } from './AddItemModal'
+import { CdekWaybillModal } from './CdekWaybillModal'
 import { newUid } from './cart'
 import { ItemStatusExtraModal } from './ItemStatusExtraModal'
 import { showsMovement, showsSupplier, statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
@@ -102,6 +103,9 @@ function OrderRow({
   const [customer, setCustomer] = useState(order.order_customer)
   const [info, setInfo] = useState(order.order_info)
   const [error, setError] = useState('')
+  const [cdekOpen, setCdekOpen] = useState(false)
+  const [cdek, setCdek] = useState(order.cdek ?? null)
+  const isCdek = order.order_method_name === 'СДЭК' || order.order_sub_method === 'СДЭК'
   const [drafts, setDrafts] = useState<ItemDraft[]>(
     order.items.map((it) => ({
       uid: newUid(),
@@ -285,9 +289,9 @@ function OrderRow({
   }
   const totalText = [...totals.entries()].map(([s, v]) => `${formatAmount(v)}${s}`).join(' · ')
 
-  const metaText = [order.order_establishment_name, order.order_method_name, order.order_sub_method, order.order_contact_method]
-    .filter(Boolean)
-    .join(' · ')
+  // Порядок: способ связи · склад · метод · подметод (+ действие СДЭК инлайн ниже).
+  const metaParts = [order.order_contact_method, order.order_establishment_name, order.order_method_name, order.order_sub_method].filter(Boolean)
+  const metaText = metaParts.join(' · ')
 
   return (
     <div className={styles.orderBlock}>
@@ -297,7 +301,24 @@ function OrderRow({
         </button>
         <span className={styles.no}>{order.order_id}</span>
         <input className={styles.cellInput} value={customer} onChange={(e) => setCustomer(e.target.value)} onBlur={saveCustomer} />
-        <span className={styles.dim} title={metaText}>{metaText}</span>
+        <span className={styles.dim} title={metaText}>
+          {metaText}
+          {isCdek &&
+            (cdek?.has_waybill ? (
+              <span title={cdek.status ?? ''}>
+                {' · '}
+                {cdek.track_number ?? '…'}
+                {cdek.status ? ` · ${cdek.status}` : ''}
+              </span>
+            ) : (
+              <>
+                {' · '}
+                <span onClick={() => setCdekOpen(true)} style={{ cursor: 'pointer', color: 'var(--accent, #2b6cff)' }} title="Создать накладную СДЭК">
+                  Создать накладную
+                </span>
+              </>
+            ))}
+        </span>
         <StatusSelect size="sm" value={order.order_status_id} options={orderStatusOptions} onChange={changeStatus} />
         <span className={styles.right}>{drafts.length}</span>
         <span className={styles.dim}>{formatDateTime(order.order_created_at)}</span>
@@ -385,6 +406,33 @@ function OrderRow({
       )}
 
       <AddItemModal open={addOpen} onClose={() => setAddOpen(false)} onAdd={addProduct} />
+
+      {cdekOpen && (
+        <CdekWaybillModal
+          order={order}
+          onClose={() => setCdekOpen(false)}
+          onCreated={(c) => {
+            setCdek(c)
+            setCdekOpen(false)
+            // Трек присваивается у CDEK асинхронно — опрашиваем статус, пока не появится.
+            if (!c.track_number) {
+              let tries = 0
+              const tick = async () => {
+                tries += 1
+                try {
+                  const { item } = await cdekWaybillStatus(order.order_id)
+                  setCdek(item)
+                  if (item.track_number || tries >= 8) return
+                } catch {
+                  if (tries >= 8) return
+                }
+                setTimeout(tick, 3000)
+              }
+              setTimeout(tick, 3000)
+            }
+          }}
+        />
+      )}
 
       {pendingExtra && (() => {
         const d = drafts.find((x) => x.uid === pendingExtra.uid)

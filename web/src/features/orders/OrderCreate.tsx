@@ -1,6 +1,17 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
-import { createOrder, matchProductsByName, searchContacts, searchProducts, updateOrder } from '../../api/endpoints'
-import type { Contact, Order, Product } from '../../api/types'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import {
+  cdekDeliveryPoints,
+  cdekPrefill,
+  cdekSuggestCities,
+  createOrder,
+  matchProductsByName,
+  searchContacts,
+  searchProducts,
+  updateOrder,
+  type CdekCity,
+  type CdekPvz,
+} from '../../api/endpoints'
+import type { Contact, Order, OrderCreateCdek, Product } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
 import { ButtonGroup } from '../../ui/ButtonGroup'
@@ -18,6 +29,18 @@ const ExcelImport = lazy(() =>
 )
 
 const CONTACT_METHODS = ['WA', 'TG', 'AV', 'IG', 'SMS', 'MX']
+
+const cdekInput: React.CSSProperties = {
+  width: '100%',
+  height: 38,
+  padding: '0 12px',
+  borderRadius: 10,
+  border: '1px solid var(--border, #d8dbe0)',
+  background: '#fff',
+  fontSize: 14,
+  outline: 'none',
+  boxSizing: 'border-box',
+}
 
 // Строка вставленного списка: «Наименование <таб/2+ пробела> Цена».
 // Цену отделяем только явным разделителем (таб или 2+ пробела), чтобы не спутать
@@ -50,6 +73,18 @@ export function OrderCreate({
   const [subMethod, setSubMethod] = useState<string | null>(editOrder?.order_sub_method ?? null)
   const [contactMethod, setContactMethod] = useState<string | null>(editOrder?.order_contact_method ?? null)
   const [saveContact, setSaveContact] = useState(false)
+
+  // --- Данные СДЭК (когда метод/подметод = СДЭК): сохраняются в заказ, тянутся в накладную ---
+  const ec = editOrder?.cdek
+  const [cdekName, setCdekName] = useState(ec?.recipient_name ?? '')
+  const [cdekPhone, setCdekPhone] = useState(ec?.recipient_phone ?? '')
+  const [cdekCityName, setCdekCityName] = useState(ec?.city_name ?? '')
+  const [cdekCityCode, setCdekCityCode] = useState<number | null>(ec?.city_code ?? null)
+  const [cdekMode, setCdekMode] = useState<'pvz' | 'door'>(ec?.delivery_mode === 'door' ? 'door' : 'pvz')
+  const [cdekPvzAddress, setCdekPvzAddress] = useState(ec?.pvz_address ?? '')
+  const [cdekPvzCode, setCdekPvzCode] = useState<string | null>(ec?.pvz_code ?? null)
+  const [cdekDeliveryAddress, setCdekDeliveryAddress] = useState(ec?.delivery_address ?? '')
+  const [cdekPrefilledFor, setCdekPrefilledFor] = useState<string | null>(null)
   const [items, setItems] = useState<CartItem[]>(
     editOrder
       ? editOrder.items.map((it) => ({
@@ -79,6 +114,42 @@ export function OrderCreate({
 
   const selectedMethod = ref.order_methods.find((m) => m.order_method_id === methodId)
   const subMethods = selectedMethod?.order_method_sub_methods ?? []
+  const isCdek = selectedMethod?.order_method_name === 'СДЭК' || subMethod === 'СДЭК'
+
+  // Автозаполнение СДЭК-данных клиента из его прошлых заказов (один раз на имя клиента).
+  useEffect(() => {
+    const name = customer.trim()
+    if (!isCdek || !name || cdekPrefilledFor === name) return
+    setCdekPrefilledFor(name)
+    cdekPrefill(name)
+      .then(({ item }) => {
+        if (!item) return
+        if (item.recipient_name && !cdekName) setCdekName(item.recipient_name)
+        if (item.recipient_phone && !cdekPhone) setCdekPhone(item.recipient_phone)
+        if (item.city_name && !cdekCityName) setCdekCityName(item.city_name)
+        if (item.city_code && cdekCityCode == null) setCdekCityCode(item.city_code)
+        if (item.delivery_mode === 'door' || item.delivery_mode === 'pvz') setCdekMode(item.delivery_mode)
+        if (item.pvz_address && !cdekPvzAddress) setCdekPvzAddress(item.pvz_address)
+        if (item.pvz_code && !cdekPvzCode) setCdekPvzCode(item.pvz_code)
+        if (item.delivery_address && !cdekDeliveryAddress) setCdekDeliveryAddress(item.delivery_address)
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCdek, customer])
+
+  const cdekPayload = (): OrderCreateCdek | undefined =>
+    isCdek
+      ? {
+          recipient_name: cdekName.trim() || null,
+          recipient_phone: cdekPhone.trim() || null,
+          city_code: cdekCityCode,
+          city_name: cdekCityName || null,
+          delivery_mode: cdekMode,
+          pvz_code: cdekMode === 'pvz' ? cdekPvzCode : null,
+          pvz_address: cdekMode === 'pvz' ? cdekPvzAddress || null : null,
+          delivery_address: cdekMode === 'door' ? cdekDeliveryAddress.trim() || null : null,
+        }
+      : undefined
 
   const total = useMemo(
     () =>
@@ -194,6 +265,7 @@ export function OrderCreate({
           order_customer: customer.trim(),
           order_info: info.trim(),
           save_contact: saveContact,
+          cdek: cdekPayload(),
           order_status_id: null,
           items: mappedItems,
         })
@@ -276,6 +348,15 @@ export function OrderCreate({
             />
           </Field>
 
+          <Field label="Способ связи">
+            <ButtonGroup
+              deselectable
+              value={contactMethod}
+              onChange={setContactMethod}
+              options={CONTACT_METHODS.map((m) => ({ value: m, label: m }))}
+            />
+          </Field>
+
           <Field label="Способ">
             <ButtonGroup
               columns={3}
@@ -302,14 +383,69 @@ export function OrderCreate({
             </Field>
           )}
 
-          <Field label="Способ связи">
-            <ButtonGroup
-              deselectable
-              value={contactMethod}
-              onChange={setContactMethod}
-              options={CONTACT_METHODS.map((m) => ({ value: m, label: m }))}
-            />
-          </Field>
+          {isCdek && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12, border: '1px solid var(--border, #e2e5ea)', borderRadius: 12 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Данные СДЭК</div>
+              <Field label="Получатель (ФИО)">
+                <input style={cdekInput} value={cdekName} onChange={(e) => setCdekName(e.target.value)} placeholder="Иван Иванов" />
+              </Field>
+              <Field label="Телефон">
+                <input style={cdekInput} value={cdekPhone} onChange={(e) => setCdekPhone(e.target.value)} placeholder="+7 900 000-00-00" />
+              </Field>
+              <Field label="Город (поиск по названию)">
+                <SearchSelect<CdekCity>
+                  placeholder="Начните вводить город"
+                  value={cdekCityName}
+                  onValueChange={(v) => {
+                    setCdekCityName(v)
+                    setCdekCityCode(null)
+                    setCdekPvzCode(null)
+                    setCdekPvzAddress('')
+                  }}
+                  search={(q) => cdekSuggestCities(q).then((r) => r.items)}
+                  getKey={(c) => c.code}
+                  renderItem={(c) => <span>{c.full_name}</span>}
+                  onSelect={(c) => {
+                    setCdekCityName(c.full_name)
+                    setCdekCityCode(c.code)
+                  }}
+                />
+              </Field>
+              <Field label="Способ доставки">
+                <ButtonGroup
+                  value={cdekMode}
+                  onChange={(v) => setCdekMode((v as 'pvz' | 'door') ?? 'pvz')}
+                  options={[
+                    { value: 'pvz', label: 'В пункт выдачи' },
+                    { value: 'door', label: 'Курьером' },
+                  ]}
+                />
+              </Field>
+              {cdekMode === 'pvz' ? (
+                <Field label="Пункт выдачи (поиск по адресу)">
+                  <SearchSelect<CdekPvz>
+                    placeholder={cdekCityCode == null ? 'Сначала выберите город' : 'Поиск ПВЗ по адресу'}
+                    value={cdekPvzAddress}
+                    onValueChange={(v) => {
+                      setCdekPvzAddress(v)
+                      setCdekPvzCode(null)
+                    }}
+                    search={(q) => (cdekCityCode == null ? Promise.resolve([]) : cdekDeliveryPoints(cdekCityCode, q).then((r) => r.items))}
+                    getKey={(p) => p.code}
+                    renderItem={(p) => <span>{p.address}</span>}
+                    onSelect={(p) => {
+                      setCdekPvzAddress(p.address)
+                      setCdekPvzCode(p.code)
+                    }}
+                  />
+                </Field>
+              ) : (
+                <Field label="Адрес доставки">
+                  <input style={cdekInput} value={cdekDeliveryAddress} onChange={(e) => setCdekDeliveryAddress(e.target.value)} placeholder="Улица, дом, квартира" />
+                </Field>
+              )}
+            </div>
+          )}
 
         </div>
       ) : (

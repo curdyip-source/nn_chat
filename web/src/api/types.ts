@@ -97,6 +97,17 @@ export type OrderItemCreate = {
   order_item_currency_id?: number | null
 }
 
+export type OrderCreateCdek = {
+  recipient_name?: string | null
+  recipient_phone?: string | null
+  city_code?: number | null
+  city_name?: string | null
+  delivery_mode?: 'pvz' | 'door' | null
+  pvz_code?: string | null
+  pvz_address?: string | null
+  delivery_address?: string | null
+}
+
 export type OrderCreate = {
   order_establishment_id: number
   order_method_id: number
@@ -106,6 +117,7 @@ export type OrderCreate = {
   order_info: string
   save_contact: boolean
   order_status_id?: number | null
+  cdek?: OrderCreateCdek | null
   items: OrderItemCreate[]
 }
 
@@ -128,6 +140,22 @@ export type OrderItem = {
   order_item_destination_establishment_name?: string | null
 }
 
+export type OrderCdek = {
+  has_waybill: boolean
+  uuid: string | null
+  track_number: string | null
+  status: string | null
+  status_updated_at: string | null
+  recipient_name: string | null
+  recipient_phone: string | null
+  city_code: number | null
+  city_name: string | null
+  delivery_mode: string | null
+  pvz_code: string | null
+  pvz_address: string | null
+  delivery_address: string | null
+}
+
 export type Order = {
   order_id: number
   order_establishment_id?: number | null
@@ -143,6 +171,7 @@ export type Order = {
   order_status_color?: string | null
   order_owner_user_login?: string | null
   order_created_at?: string | null
+  cdek?: OrderCdek | null
   items: OrderItem[]
 }
 

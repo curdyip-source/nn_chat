@@ -276,6 +276,7 @@ class OrderService:
                 }
             )
 
+        cdek = payload.cdek
         row = self.repository.create(
             {
                 "order_establishment_id": payload.order_establishment_id,
@@ -286,6 +287,14 @@ class OrderService:
                 "order_info": payload.order_info,
                 "order_status_id": status_row.status_id,
                 "order_owner_user_id": current_user["user_id"],
+                "order_cdek_recipient_name": cdek.recipient_name if cdek else None,
+                "order_cdek_recipient_phone": cdek.recipient_phone if cdek else None,
+                "order_cdek_city_code": cdek.city_code if cdek else None,
+                "order_cdek_city_name": cdek.city_name if cdek else None,
+                "order_cdek_delivery_mode": cdek.delivery_mode if cdek else None,
+                "order_cdek_pvz_code": cdek.pvz_code if cdek else None,
+                "order_cdek_pvz_address": cdek.pvz_address if cdek else None,
+                "order_cdek_delivery_address": cdek.delivery_address if cdek else None,
             },
             items,
         )
