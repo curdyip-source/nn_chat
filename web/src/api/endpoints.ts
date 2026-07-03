@@ -322,3 +322,69 @@ export function listAuditEvents(
   if (opts.eventType) q.set('event_type', opts.eventType)
   return apiRequest<Paginated<AuditEvent>>(`/audit-events?${q}`)
 }
+
+// ---------- СДЭК (доставка) ----------
+
+export type CdekCity = { code: number; full_name: string; city_uuid: string }
+export type CdekPvz = { code: string; name: string; address: string; work_time: string; type: string }
+export type CdekTariff = {
+  tariff_code: number
+  tariff_name?: string
+  delivery_sum?: number
+  period_min?: number
+  period_max?: number
+  delivery_mode?: number
+}
+export type CdekPackage = { weight: number; length: number; width: number; height: number }
+export type CdekWaybillCreate = {
+  tariff_code: number
+  recipient_name: string
+  recipient_phone: string
+  city_code: number
+  city_name?: string | null
+  delivery_mode: 'pvz' | 'door'
+  pvz_code?: string | null
+  pvz_address?: string | null
+  delivery_address?: string | null
+  package: CdekPackage
+  comment?: string | null
+  save_to_contact?: boolean
+}
+export type CdekWaybill = {
+  has_waybill: boolean
+  uuid: string | null
+  track_number: string | null
+  status: string | null
+  status_updated_at: string | null
+  recipient_name: string | null
+  recipient_phone: string | null
+  city_code: number | null
+  city_name: string | null
+  delivery_mode: string | null
+  pvz_code: string | null
+  pvz_address: string | null
+  delivery_address: string | null
+}
+
+export function cdekSuggestCities(name: string) {
+  return apiRequest<{ items: CdekCity[] }>(`/cdek/cities/suggest?name=${encodeURIComponent(name)}`)
+}
+
+export function cdekDeliveryPoints(cityCode: number, query?: string) {
+  const q = new URLSearchParams({ city_code: String(cityCode) })
+  if (query) q.set('query', query)
+  return apiRequest<{ items: CdekPvz[] }>(`/cdek/delivery-points?${q}`)
+}
+
+export function cdekTariffs(fromCode: number, toCode: number, weight = 500) {
+  const q = new URLSearchParams({ from_code: String(fromCode), to_code: String(toCode), weight: String(weight) })
+  return apiRequest<{ items: CdekTariff[] }>(`/cdek/tariffs?${q}`)
+}
+
+export function cdekCreateWaybill(orderId: number, payload: CdekWaybillCreate) {
+  return apiRequest<{ item: CdekWaybill }>(`/cdek/orders/${orderId}/waybill`, { method: 'POST', body: payload })
+}
+
+export function cdekWaybillStatus(orderId: number) {
+  return apiRequest<{ item: CdekWaybill }>(`/cdek/orders/${orderId}/status`)
+}
