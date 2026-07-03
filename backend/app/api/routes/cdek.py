@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -91,3 +91,21 @@ def waybill_status_route(
 ) -> dict:
     """Актуальный статус накладной СДЭК заказа (подтягивает из CDEK)."""
     return {"item": cdek_orders.get_status(db, order_id)}
+
+
+@router.post("/webhook")
+async def cdek_webhook_route(request: Request, db: Session = Depends(get_db)) -> dict:
+    """Приёмник статус-вебхуков CDEK. Без авторизации — вызывает сам CDEK.
+
+    Всегда отвечаем 200, чтобы CDEK не уходил в бесконечные ретраи; ошибки/незнакомые
+    заказы просто игнорируем.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    try:
+        cdek_orders.handle_status_webhook(db, body)
+    except Exception:
+        pass
+    return {"ok": True}

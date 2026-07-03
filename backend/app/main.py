@@ -38,6 +38,24 @@ async def lifespan(_: FastAPI):
     from app.services.message_stream import broker
 
     broker.bind_loop(asyncio.get_running_loop())
+
+    # Регистрируем статус-вебхук СДЭК (best-effort, в фоне — не блокируем и не роняем старт).
+    from app.core import config as _cfg
+
+    if _cfg.CDEK_ENABLED and _cfg.CDEK_WEBHOOK_URL:
+        import threading
+
+        def _register_cdek_webhook() -> None:
+            from app.services import cdek as _cdek
+
+            try:
+                _cdek.set_webhook(_cfg.CDEK_WEBHOOK_URL)
+                logger.info("cdek.webhook.registered url=%s", _cfg.CDEK_WEBHOOK_URL)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("cdek.webhook.register_failed error=%s", exc)
+
+        threading.Thread(target=_register_cdek_webhook, daemon=True).start()
+
     yield
 
 

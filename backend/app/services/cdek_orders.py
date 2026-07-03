@@ -182,3 +182,26 @@ def get_status(db: Session, order_id: int, *, refresh: bool = True) -> dict:
     if refresh and order.order_cdek_uuid:
         _refresh_status(db, order)
     return _serialize(order)
+
+
+def handle_status_webhook(db: Session, body: dict) -> bool:
+    """Приёмник вебхука CDEK ORDER_STATUS.
+
+    CDEK шлёт событие с `uuid` заказа; сам статус в вебхуке приходит только кодом,
+    поэтому проще перечитать заказ через order_info (свежий трек + русский статус) и
+    пушнуть карточку в realtime. Возвращает True, если заказ найден и обновлён.
+    """
+    if not isinstance(body, dict):
+        return False
+    if body.get("type") not in (None, "ORDER_STATUS"):
+        return False
+    uuid = body.get("uuid") or (body.get("attributes") or {}).get("order_uuid")
+    if not uuid:
+        return False
+    order = db.query(Order).filter(Order.order_cdek_uuid == str(uuid)).first()
+    if order is None:
+        return False
+    _refresh_status(db, order)
+    from app.services.card_sync import notify_order_changed
+    notify_order_changed(db, order.order_id)
+    return True
