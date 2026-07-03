@@ -11,6 +11,7 @@ import { CdekWaybillModal } from './CdekWaybillModal'
 import { newUid } from './cart'
 import { ItemStatusExtraModal } from './ItemStatusExtraModal'
 import { showsMovement, showsSupplier, statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
+import { OrderChat } from './OrderChat'
 import { useOrderSelection, type BulkApplyFn, type BulkRemoveFn } from './orderSelection'
 import { orderToUpdate } from './orderUpdate'
 import styles from './OrdersTable.module.css'
@@ -439,6 +440,8 @@ function OrderRow({
           ))}
 
           {error && <div className={styles.rowError}>{error}</div>}
+
+          <OrderChat orderId={order.order_id} />
         </div>
       )}
 
