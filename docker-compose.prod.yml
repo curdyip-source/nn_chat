@@ -58,6 +58,12 @@ services:
       APNS_TOPIC: ${APNS_TOPIC}
       APNS_USE_SANDBOX: ${APNS_USE_SANDBOX}
       FIRST_ADMIN_PASS: ${FIRST_ADMIN_PASS}
+      # СДЭК: боевой API по умолчанию; ключи из договора, вебхук для авто-статусов.
+      CDEK_BASE_URL: ${CDEK_BASE_URL:-https://api.cdek.ru/v2}
+      CDEK_ACCOUNT: ${CDEK_ACCOUNT}
+      CDEK_SECURE: ${CDEK_SECURE}
+      CDEK_WEBHOOK_URL: ${CDEK_WEBHOOK_URL}
+      CDEK_SENDER_CITY_CODE: ${CDEK_SENDER_CITY_CODE:-44}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/live', timeout=5).read()"]
       interval: 15s
