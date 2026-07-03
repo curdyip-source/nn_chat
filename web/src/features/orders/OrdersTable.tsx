@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { cdekWaybillStatus, updateOrder, updateOrderStatus } from '../../api/endpoints'
+import { cdekDeleteWaybill, cdekWaybillStatus, updateOrder, updateOrderStatus } from '../../api/endpoints'
 import type { Order, OrderUpdateItem, Product } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
 import { Checkbox } from '../../ui/Checkbox'
 import { StatusSelect } from '../../ui/StatusSelect'
 import { formatAmount, formatDateTime } from '../../lib/format'
+import { Modal } from '../../ui/Modal'
 import { AddItemModal } from './AddItemModal'
 import { CdekWaybillModal } from './CdekWaybillModal'
 import { newUid } from './cart'
 import { ItemStatusExtraModal } from './ItemStatusExtraModal'
 import { showsMovement, showsSupplier, statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
+import { OrderChat } from './OrderChat'
 import { useOrderSelection, type BulkApplyFn, type BulkRemoveFn } from './orderSelection'
 import { orderToUpdate } from './orderUpdate'
 import styles from './OrdersTable.module.css'
@@ -99,13 +101,31 @@ function OrderRow({
     setExpanded(expandSignal.expanded)
   }, [expandSignal.expanded, expandSignal.nonce])
   const [addOpen, setAddOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
   const [pendingExtra, setPendingExtra] = useState<{ uid: string; statusId: number; mode: ExtraMode } | null>(null)
   const [customer, setCustomer] = useState(order.order_customer)
   const [info, setInfo] = useState(order.order_info)
   const [error, setError] = useState('')
   const [cdekOpen, setCdekOpen] = useState(false)
   const [cdek, setCdek] = useState(order.cdek ?? null)
+  const [cdekBusy, setCdekBusy] = useState(false)
   const isCdek = order.order_method_name === 'СДЭК' || order.order_sub_method === 'СДЭК'
+
+  // Сброс накладной (удалить в CDEK + очистить) и открыть форму пересоздания.
+  const recreateCdek = async () => {
+    if (cdekBusy) return
+    if (!confirm('Сбросить текущую накладную и создать заново? Данные получателя сохранятся.')) return
+    setCdekBusy(true)
+    try {
+      const { item } = await cdekDeleteWaybill(order.order_id)
+      setCdek(item)
+      setCdekOpen(true)
+    } catch (e) {
+      alert((e as Error)?.message || 'Не удалось сбросить накладную')
+    } finally {
+      setCdekBusy(false)
+    }
+  }
   const [drafts, setDrafts] = useState<ItemDraft[]>(
     order.items.map((it) => ({
       uid: newUid(),
@@ -296,9 +316,21 @@ function OrderRow({
   return (
     <div className={styles.orderBlock}>
       <div className={styles.row}>
-        <button className={styles.expandBtn} onClick={() => setExpanded((v) => !v)}>
-          {expanded ? '▾' : '▸'}
-        </button>
+        <div className={styles.rowLead}>
+          {!expanded && (
+            <input
+              type="checkbox"
+              className={styles.orderCheck}
+              checked={selection.isOrderSelected(order.order_id)}
+              onChange={() => selection.toggleOrder(order.order_id)}
+              title="Выбрать заказ для массовой смены статуса"
+              aria-label="Выбрать заказ"
+            />
+          )}
+          <button className={styles.expandBtn} onClick={() => setExpanded((v) => !v)}>
+            {expanded ? '▾' : '▸'}
+          </button>
+        </div>
         <span className={styles.no}>{order.order_id}</span>
         <input className={styles.cellInput} value={customer} onChange={(e) => setCustomer(e.target.value)} onBlur={saveCustomer} />
         <span className={styles.dim} title={metaText}>
@@ -309,6 +341,14 @@ function OrderRow({
                 {' · '}
                 {cdek.track_number ?? '…'}
                 {cdek.status ? ` · ${cdek.status}` : ''}
+                {' · '}
+                <span
+                  onClick={recreateCdek}
+                  style={{ cursor: cdekBusy ? 'default' : 'pointer', color: 'var(--accent, #2b6cff)', opacity: cdekBusy ? 0.5 : 1 }}
+                  title="Сбросить и создать накладную заново"
+                >
+                  {cdekBusy ? 'Сброс…' : 'Пересоздать'}
+                </span>
               </span>
             ) : (
               <>
@@ -326,9 +366,14 @@ function OrderRow({
           <span className={styles.totalLabel}>Итого</span>
           {totalText || '—'}
         </span>
-        <button className={styles.editBtn} onClick={() => onEdit(order)} title="Редактировать заказ">
-          ✏️
-        </button>
+        <div className={styles.rowActions}>
+          <button className={styles.editBtn} onClick={() => setChatOpen(true)} title="Чат заказа">
+            💬
+          </button>
+          <button className={styles.editBtn} onClick={() => onEdit(order)} title="Редактировать заказ">
+            ✏️
+          </button>
+        </div>
       </div>
 
       {expanded && (
@@ -403,6 +448,12 @@ function OrderRow({
 
           {error && <div className={styles.rowError}>{error}</div>}
         </div>
+      )}
+
+      {chatOpen && (
+        <Modal open title={`Чат заказа №${order.order_id}`} onClose={() => setChatOpen(false)} width={560}>
+          <OrderChat orderId={order.order_id} />
+        </Modal>
       )}
 
       <AddItemModal open={addOpen} onClose={() => setAddOpen(false)} onAdd={addProduct} />

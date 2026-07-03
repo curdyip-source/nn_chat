@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { listOrders, type OrderTotal } from '../../api/endpoints'
+import { listOrders, updateOrderStatus, type OrderTotal } from '../../api/endpoints'
 import type { Order } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { useRealtime } from '../../data/RealtimeContext'
@@ -27,6 +27,7 @@ export function OrdersPage() {
   const orderMethods = ref.order_methods
   const establishments = ref.establishments
   const itemStatusOptions = ref.statusesByType('order_products').map((s) => ({ id: s.status_id, label: s.status_status, color: s.status_color }))
+  const orderStatusOptions = ref.statusesByType('orders').map((s) => ({ id: s.status_id, label: s.status_status, color: s.status_color }))
 
   const [creating, setCreating] = useState(false)
   const [editOrder, setEditOrder] = useState<Order | null>(null)
@@ -92,6 +93,10 @@ export function OrdersPage() {
   const unregisterRemove = useCallback((orderId: number) => {
     removeFns.current.delete(orderId)
   }, [])
+  // --- Массовое выделение целых заказов (чекбоксы у свёрнутых строк) ---
+  const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set())
+  const orderSelectionCount = selectedOrders.size
+
   const selection = useMemo<OrderSelection>(
     () => ({
       isSelected: (orderId, uid) => (selected[orderId] ?? []).includes(uid),
@@ -108,9 +113,24 @@ export function OrdersPage() {
       unregisterApply,
       registerRemove,
       unregisterRemove,
+      isOrderSelected: (orderId) => selectedOrders.has(orderId),
+      toggleOrder: (orderId) =>
+        setSelectedOrders((prev) => {
+          const next = new Set(prev)
+          if (next.has(orderId)) next.delete(orderId)
+          else next.add(orderId)
+          return next
+        }),
     }),
-    [selected, registerApply, unregisterApply, registerRemove, unregisterRemove],
+    [selected, selectedOrders, registerApply, unregisterApply, registerRemove, unregisterRemove],
   )
+
+  const onBulkOrderStatus = async (statusId: number) => {
+    const ids = [...selectedOrders]
+    setSelectedOrders(new Set())
+    await Promise.all(ids.map((id) => updateOrderStatus(id, statusId).catch(() => {})))
+    reload()
+  }
 
   const applyBulkStatus = (statusId: number, extra: ItemExtra) => {
     for (const [orderId, uids] of Object.entries(selected)) {
@@ -225,18 +245,27 @@ export function OrdersPage() {
           <div className={styles.midPanel}>
             {itemStatusOptions.length > 0 && (
               <div className={styles.bulkActions}>
-                <span title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Статус для ${selectionCount} поз.`}>
-                  <StatusSelect value={null} options={itemStatusOptions} onChange={onBulkStatus} saving={selectionCount === 0} />
-                </span>
-                <button
-                  type="button"
-                  className={styles.bulkDelete}
-                  disabled={selectionCount === 0}
-                  onClick={() => setConfirmDelete(true)}
-                  title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Удалить ${selectionCount} поз.`}
-                >
-                  Удалить
-                </button>
+                {orderSelectionCount > 0 ? (
+                  // Выбраны целые заказы (свёрнутые строки) — тот же селектор, но статусы заказа.
+                  <span title={`Статус для ${orderSelectionCount} заказ.`}>
+                    <StatusSelect value={null} options={orderStatusOptions} onChange={onBulkOrderStatus} />
+                  </span>
+                ) : (
+                  <>
+                    <span title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Статус для ${selectionCount} поз.`}>
+                      <StatusSelect value={null} options={itemStatusOptions} onChange={onBulkStatus} saving={selectionCount === 0} />
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.bulkDelete}
+                      disabled={selectionCount === 0}
+                      onClick={() => setConfirmDelete(true)}
+                      title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Удалить ${selectionCount} поз.`}
+                    >
+                      Удалить
+                    </button>
+                  </>
+                )}
               </div>
             )}
             <span className={styles.expandToggle} title={expandAll ? 'Свернуть все заказы' : 'Развернуть все заказы'}>

@@ -243,6 +243,36 @@ export function editMessage(messageId: number, text: string) {
   })
 }
 
+// ---------- Order chat (внутренний чат заказа = комментарии) ----------
+
+export type OrderComment = {
+  order_comment_id: number
+  order_comment_order_id: number
+  order_comment_text: string | null
+  order_comment_owner_user_id: number
+  order_comment_owner_user_login: string | null
+  order_comment_owner_first_name: string | null
+  order_comment_owner_second_name: string | null
+  order_comment_owner_profile_photo: string | null
+  order_comment_created_at: string | null
+  attachments: OrderCommentAttachment[]
+}
+export type OrderCommentAttachment = {
+  attachment_id: number
+  attachment_kind: string | null
+  attachment_original_filename: string | null
+  attachment_mime_type: string | null
+}
+export function getOrderComments(orderId: number) {
+  return apiRequest<{ items: OrderComment[] }>(`/orders/${orderId}/comments`)
+}
+export function addOrderComment(orderId: number, text: string) {
+  return apiRequest<{ item: OrderComment }>(`/orders/${orderId}/comments`, {
+    method: 'POST',
+    body: { order_comment_text: text, attachments: [], mentioned_user_ids: [] },
+  })
+}
+
 export function deleteMessage(messageId: number) {
   return apiRequest<void>(`/messages/${messageId}`, { method: 'DELETE' })
 }
@@ -342,6 +372,8 @@ export type CdekWaybillCreate = {
   recipient_phone: string
   from_city_code?: number | null
   from_city_name?: string | null
+  shipment_point?: string | null
+  shipment_point_address?: string | null
   city_code: number
   city_name?: string | null
   delivery_mode: 'pvz' | 'door'
@@ -392,6 +424,20 @@ export function cdekTariffs(toCode: number, weight = 500, fromCode?: number | nu
 
 export function cdekCreateWaybill(orderId: number, payload: CdekWaybillCreate) {
   return apiRequest<{ item: CdekWaybill }>(`/cdek/orders/${orderId}/waybill`, { method: 'POST', body: payload })
+}
+
+export function cdekDeleteWaybill(orderId: number) {
+  return apiRequest<{ item: CdekWaybill }>(`/cdek/orders/${orderId}/waybill`, { method: 'DELETE' })
+}
+
+export type CdekOriginDefault = {
+  from_city_code?: number | null
+  from_city_name?: string | null
+  shipment_point?: string | null
+  shipment_point_address?: string | null
+}
+export function cdekDefaults() {
+  return apiRequest<{ item: CdekOriginDefault }>(`/cdek/defaults`)
 }
 
 export function cdekWaybillStatus(orderId: number) {

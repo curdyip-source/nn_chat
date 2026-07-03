@@ -32,6 +32,12 @@ class Order(Base):
     order_cdek_pvz_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     order_cdek_pvz_address: Mapped[str | None] = mapped_column(String(500), nullable=True)
     order_cdek_delivery_address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Отправитель (origin): город + опциональный ПВЗ сдачи (shipment_point). Сохраняем,
+    # чтобы подставлять как дефолт при следующем создании накладной.
+    order_cdek_from_city_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    order_cdek_from_city_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    order_cdek_shipment_point: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    order_cdek_shipment_point_address: Mapped[str | None] = mapped_column(String(500), nullable=True)
     order_cdek_uuid: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     order_cdek_track_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
     order_cdek_status: Mapped[str | None] = mapped_column(String(100), nullable=True)

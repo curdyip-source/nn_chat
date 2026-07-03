@@ -72,6 +72,15 @@ def prefill_route(
     return {"item": cdek_orders.get_prefill(db, customer)}
 
 
+@router.get("/defaults")
+def origin_default_route(
+    _: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Дефолт отправителя (последний использованный ПВЗ сдачи + город) — для подстановки."""
+    return {"item": cdek_orders.get_origin_default(db)}
+
+
 @router.post("/orders/{order_id}/waybill", status_code=status.HTTP_201_CREATED)
 def create_waybill_route(
     order_id: int,
@@ -81,6 +90,16 @@ def create_waybill_route(
 ) -> dict:
     """Создать накладную СДЭК для заказа (сохраняет uuid/трек/статус в заказ)."""
     return {"item": cdek_orders.create_waybill(db, order_id, payload, current_user)}
+
+
+@router.delete("/orders/{order_id}/waybill")
+def delete_waybill_route(
+    order_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Сбросить накладную СДЭК заказа (удалить в CDEK + очистить), чтобы создать заново."""
+    return {"item": cdek_orders.delete_waybill(db, order_id)}
 
 
 @router.get("/orders/{order_id}/status")
