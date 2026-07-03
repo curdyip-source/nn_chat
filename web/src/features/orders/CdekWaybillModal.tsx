@@ -33,6 +33,9 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
   const c = order.cdek // предзаполнение данными, сохранёнными при создании заказа (метод СДЭК)
   const [recipientName, setRecipientName] = useState(c?.recipient_name || order.order_customer || '')
   const [recipientPhone, setRecipientPhone] = useState(c?.recipient_phone || '')
+  // Город отправителя (origin). Дефолт — Москва (44); оператор меняет на Тулу и др. при необходимости.
+  const [fromCityName, setFromCityName] = useState('Москва')
+  const [fromCityCode, setFromCityCode] = useState<number | null>(44)
   const [cityName, setCityName] = useState(c?.city_name || '')
   const [cityCode, setCityCode] = useState<number | null>(c?.city_code ?? null)
   const [mode, setMode] = useState<'pvz' | 'door'>(c?.delivery_mode === 'door' ? 'door' : 'pvz')
@@ -55,7 +58,7 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  // Тарифы зависят от города-получателя и веса (город-отправитель — на бэкенде).
+  // Тарифы зависят от города-отправителя (origin), города-получателя и веса.
   useEffect(() => {
     if (cityCode == null) {
       setTariffs([])
@@ -64,7 +67,7 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
     }
     let alive = true
     setTariffsLoading(true)
-    cdekTariffs(cityCode, weight)
+    cdekTariffs(cityCode, weight, fromCityCode)
       .then((r) => {
         if (alive) setTariffs(r.items)
       })
@@ -77,7 +80,7 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
     return () => {
       alive = false
     }
-  }, [cityCode, weight])
+  }, [cityCode, weight, fromCityCode])
 
   const submit = async () => {
     if (cityCode == null) return setError('Выберите город')
@@ -92,6 +95,8 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
         tariff_code: tariffCode,
         recipient_name: recipientName.trim(),
         recipient_phone: recipientPhone.trim(),
+        from_city_code: fromCityCode,
+        from_city_name: fromCityName || null,
         city_code: cityCode,
         city_name: cityName || null,
         delivery_mode: mode,
@@ -140,7 +145,25 @@ export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
           <input style={inputStyle} value={recipientPhone} onChange={(e) => setRecipientPhone(e.target.value)} placeholder="+7 900 000-00-00" />
         </Field>
 
-        <Field label="Город (поиск по названию)">
+        <Field label="Откуда — город отправителя (по умолчанию Москва)">
+          <SearchSelect<CdekCity>
+            placeholder="Город отправителя"
+            value={fromCityName}
+            onValueChange={(v) => {
+              setFromCityName(v)
+              setFromCityCode(null)
+            }}
+            search={(q) => cdekSuggestCities(q).then((r) => r.items)}
+            getKey={(c) => c.code}
+            renderItem={(c) => <span>{c.full_name}</span>}
+            onSelect={(c) => {
+              setFromCityName(c.full_name)
+              setFromCityCode(c.code)
+            }}
+          />
+        </Field>
+
+        <Field label="Куда — город получателя (поиск по названию)">
           <SearchSelect<CdekCity>
             placeholder="Начните вводить город"
             value={cityName}

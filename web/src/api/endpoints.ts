@@ -340,6 +340,8 @@ export type CdekWaybillCreate = {
   tariff_code: number
   recipient_name: string
   recipient_phone: string
+  from_city_code?: number | null
+  from_city_name?: string | null
   city_code: number
   city_name?: string | null
   delivery_mode: 'pvz' | 'door'
@@ -382,8 +384,9 @@ export function cdekDeliveryPoints(cityCode: number, query?: string) {
   return apiRequest<{ items: CdekPvz[] }>(`/cdek/delivery-points?${q}`)
 }
 
-export function cdekTariffs(toCode: number, weight = 500) {
+export function cdekTariffs(toCode: number, weight = 500, fromCode?: number | null) {
   const q = new URLSearchParams({ to_code: String(toCode), weight: String(weight) })
+  if (fromCode != null) q.set('from_code', String(fromCode))
   return apiRequest<{ items: CdekTariff[] }>(`/cdek/tariffs?${q}`)
 }
 
