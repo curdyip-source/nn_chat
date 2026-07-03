@@ -35,8 +35,6 @@ def _build_payload(order: Order, payload) -> dict:
     body: dict = {
         "type": 1,
         "tariff_code": payload.tariff_code,
-        "sender": {"name": config.CDEK_SENDER_NAME, "phones": [{"number": config.CDEK_SENDER_PHONE}]},
-        "from_location": {"code": config.CDEK_SENDER_CITY_CODE, "address": config.CDEK_SENDER_ADDRESS},
         "recipient": {"name": payload.recipient_name, "phones": [{"number": payload.recipient_phone}]},
         "packages": [{
             "number": "1",
@@ -54,6 +52,16 @@ def _build_payload(order: Order, payload) -> dict:
             }],
         }],
     }
+    # Отправитель/адрес забора — только если явно переопределяем договор (иначе CDEK
+    # берёт их из личного кабинета, как при обычных отправках).
+    if config.CDEK_SENDER_NAME:
+        sender: dict = {"name": config.CDEK_SENDER_NAME}
+        if config.CDEK_SENDER_PHONE:
+            sender["phones"] = [{"number": config.CDEK_SENDER_PHONE}]
+        body["sender"] = sender
+    if config.CDEK_SENDER_ADDRESS:
+        body["from_location"] = {"code": config.CDEK_SENDER_CITY_CODE, "address": config.CDEK_SENDER_ADDRESS}
+
     if payload.comment:
         body["comment"] = payload.comment
     if payload.delivery_mode == "pvz":
