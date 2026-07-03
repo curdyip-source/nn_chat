@@ -50,6 +50,17 @@ APNS_USE_SANDBOX = os.getenv(
     "true" if APP_ENV != "production" else "false",
 ).strip().lower() in {"1", "true", "yes", "on"}
 APNS_ENABLED = all([APNS_AUTH_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC])
+# --- CDEK (доставка) ---
+# По умолчанию — тестовая среда СДЭК (публичные тест-креды из cdek-sdk-v2), чтобы
+# локально работало без .env. Прод: задать CDEK_BASE_URL=https://api.cdek.ru/v2 и
+# боевые CDEK_ACCOUNT/CDEK_SECURE (в GitHub-секретах).
+CDEK_BASE_URL = os.getenv("CDEK_BASE_URL", "https://api.edu.cdek.ru/v2").strip().rstrip("/")
+CDEK_ACCOUNT = os.getenv("CDEK_ACCOUNT", "wqGwiQx0gg8mLtiEKsUinjVSICCjtTEP").strip()
+CDEK_SECURE = os.getenv("CDEK_SECURE", "RmAmgvSgSl1yirlz9QupbzOJVqhCxcP5").strip()
+CDEK_ENABLED = bool(CDEK_ACCOUNT and CDEK_SECURE)
+# Публичный URL для вебхуков CDEK (статусы). Пусто локально — вебхук не регистрируем.
+CDEK_WEBHOOK_URL = os.getenv("CDEK_WEBHOOK_URL", "").strip()
+
 INSECURE_ALLOW_HTTP_ORIGINS = os.getenv("INSECURE_ALLOW_HTTP_ORIGINS", "false").strip().lower() in {"1", "true", "yes", "on"}
 FIRST_ADMIN_PASS = os.getenv(
     "FIRST_ADMIN_PASS",
