@@ -289,9 +289,9 @@ function OrderRow({
   }
   const totalText = [...totals.entries()].map(([s, v]) => `${formatAmount(v)}${s}`).join(' · ')
 
-  const metaText = [order.order_establishment_name, order.order_method_name, order.order_sub_method, order.order_contact_method]
-    .filter(Boolean)
-    .join(' · ')
+  // Порядок: способ связи · склад · метод · подметод (+ действие СДЭК инлайн ниже).
+  const metaParts = [order.order_contact_method, order.order_establishment_name, order.order_method_name, order.order_sub_method].filter(Boolean)
+  const metaText = metaParts.join(' · ')
 
   return (
     <div className={styles.orderBlock}>
@@ -301,23 +301,23 @@ function OrderRow({
         </button>
         <span className={styles.no}>{order.order_id}</span>
         <input className={styles.cellInput} value={customer} onChange={(e) => setCustomer(e.target.value)} onBlur={saveCustomer} />
-        <span className={styles.dim} title={metaText}>{metaText}</span>
-        {isCdek &&
-          (cdek?.has_waybill ? (
-            <span className={styles.dim} title={cdek.status ?? ''} style={{ whiteSpace: 'nowrap' }}>
-              📦 {cdek.track_number ?? '…'}
-              {cdek.status ? ` · ${cdek.status}` : ''}
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setCdekOpen(true)}
-              title="Создать накладную СДЭК"
-              style={{ border: 'none', background: 'transparent', color: 'var(--accent, #2b6cff)', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap', padding: 0 }}
-            >
-              + Накладная
-            </button>
-          ))}
+        <span className={styles.dim} title={metaText}>
+          {metaText}
+          {isCdek &&
+            (cdek?.has_waybill ? (
+              <span title={cdek.status ?? ''}>
+                {' · '}📦 {cdek.track_number ?? '…'}
+                {cdek.status ? ` · ${cdek.status}` : ''}
+              </span>
+            ) : (
+              <>
+                {' · '}
+                <span onClick={() => setCdekOpen(true)} style={{ cursor: 'pointer', color: 'var(--accent, #2b6cff)' }} title="Создать накладную СДЭК">
+                  Создать накладную
+                </span>
+              </>
+            ))}
+        </span>
         <StatusSelect size="sm" value={order.order_status_id} options={orderStatusOptions} onChange={changeStatus} />
         <span className={styles.right}>{drafts.length}</span>
         <span className={styles.dim}>{formatDateTime(order.order_created_at)}</span>

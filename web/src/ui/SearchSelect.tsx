@@ -101,6 +101,7 @@ export function SearchSelect<T>({
 
     onSelect(item)
     if (!controlled && clearOnSelect) setInternalQuery('')
+    setItems([])
     setOpen(false)
   }
 
