@@ -3,26 +3,25 @@
 #
 #   docker compose up --build
 #
-# Веб:     http://localhost:8088   (логин: admin / admin123)
-# API:     http://localhost:8001
-# Postgres: localhost:5433 (app_user / app_pass / appdb)
-#
-# Никаких секретов/.env не нужно — APP_ENV=development отключает прод-валидацию.
+# Значения берутся из .env (см. .env.example), но у всех есть дефолты — можно
+# запускать и без .env. Дефолты: Веб http://localhost:8088 (admin / admin123),
+# API http://localhost:8001, Postgres localhost:5433 (app_user / app_pass / appdb).
+# Секретов не нужно — APP_ENV=development отключает прод-валидацию.
 name: nufnaf-dev
 
 services:
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: app_user
-      POSTGRES_PASSWORD: app_pass
-      POSTGRES_DB: appdb
+      POSTGRES_USER: ${POSTGRES_USER:-app_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-appdb}
     ports:
-      - "5433:5432"
+      - "${PG_PORT:-5433}:5432"
     volumes:
       - nufnaf_dev_pg:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app_user -d appdb"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app_user} -d ${POSTGRES_DB:-appdb}"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -34,17 +33,17 @@ services:
       APP_ENV: development
       POSTGRES_HOST: db
       POSTGRES_PORT: "5432"
-      POSTGRES_USER: app_user
-      POSTGRES_PASSWORD: app_pass
-      POSTGRES_DB: appdb
-      AUTH_TOKEN_SECRET: dev-secret-change-me
-      FIRST_ADMIN_PASS: dev-first-admin-pass
-      CORS_ALLOW_ORIGINS: "*"
+      POSTGRES_USER: ${POSTGRES_USER:-app_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-appdb}
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-dev-secret-change-me}
+      FIRST_ADMIN_PASS: ${FIRST_ADMIN_PASS:-dev-first-admin-pass}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-*}
     depends_on:
       db:
         condition: service_healthy
     ports:
-      - "8001:8000"
+      - "${API_PORT:-8001}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/live', timeout=5).read()"]
       interval: 10s
@@ -58,9 +57,9 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "8088:8080"
+      - "${WEB_PORT:-8088}:8080"
     # default — чтобы видеть свой backend; shared — чтобы nginx достучался до
-    # бэкенда прайса (алиас price-backend в стеке nn_vla). Сеть внешняя:
+    # бэкенда прайса (алиас price-backend в стеке nn_price). Сеть внешняя:
     #   docker network create nufnaf_shared
     networks:
       - default
@@ -77,9 +76,9 @@ services:
       PYTHONPATH: /app
       POSTGRES_HOST: db
       POSTGRES_PORT: "5432"
-      POSTGRES_USER: app_user
-      POSTGRES_PASSWORD: app_pass
-      POSTGRES_DB: appdb
+      POSTGRES_USER: ${POSTGRES_USER:-app_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-appdb}
     volumes:
       - ./ops/dev_seed.py:/seed.py:ro
     command: ["python", "/seed.py"]
@@ -90,7 +89,7 @@ volumes:
 
 networks:
   default:
-  # Общая сеть с локальным стеком прайса (nn_vla). Создать заранее:
+  # Общая сеть с локальным стеком прайса (nn_price). Создать заранее:
   #   docker network create nufnaf_shared
   shared:
     external: true

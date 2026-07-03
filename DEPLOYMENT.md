@@ -3,29 +3,67 @@
 ## Production Layout
 
 - Single stack file: [docker-compose.prod.yml](docker-compose.prod.yml)
-- Runtime env template: [.env.example](.env.example)
+- Runtime env: GitHub secret `PRODUCTION_ENV_FILE` (полный `.env`; шаблон — блок ниже)
 - Deploy scripts: [ops](ops)
 - CI/CD workflow: [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
 
 The server does not build the app. Backend and frontend are built in GitHub Actions, Postgres is mirrored to GHCR, then the VPS only pulls images and starts containers.
 
+> Локальный запуск (`docker-compose.yml`) прод-переменных НЕ требует — см.
+> [.env.example](.env.example) (локальный шаблон). Ниже — именно **серверный** `.env`.
+
+## Server env template (`PRODUCTION_ENV_FILE` secret)
+
+Реальный серверный `.env` (деплой пишет его в `~/nn_chat/.env` из секрета
+`PRODUCTION_ENV_FILE`). Замени пароли/секреты на сильные:
+
+```env
+BACKEND_IMAGE=ghcr.io/curdyip-source/nn_chat-backend
+FRONTEND_IMAGE=ghcr.io/curdyip-source/nn_chat-frontend
+RELEASE_TAG=latest
+POSTGRES_CONTAINER_NAME=nufnaf_db
+
+POSTGRES_USER=nufnaf_admin_user
+POSTGRES_PASSWORD=CHANGE_ME_STRONG_PASSWORD
+POSTGRES_DB=nufnaf_db
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+
+BACKEND_PORT=32069
+FRONTEND_PORT=25256
+
+APP_ENV=production
+CORS_ALLOW_ORIGINS=https://chat.nufnafchat.su
+INSECURE_ALLOW_HTTP_ORIGINS=false
+
+ACCESS_TOKEN_TTL_MINUTES=30
+SESSION_TTL_DAYS=30
+REFRESH_TOKEN_TTL_DAYS=30
+AUTH_TOKEN_SECRET=CHANGE_ME_LONG_RANDOM_SECRET_WITH_32_CHARS_MINIMUM
+
+FIRST_ADMIN_PASS=replace-with-first-admin-pass
+
+SENTRY_DSN=
+SENTRY_ENVIRONMENT=production
+SENTRY_TRACES_SAMPLE_RATE=0
+
+PROFILE_PHOTO_MAX_BYTES=5242880
+
+APNS_AUTH_KEY_P8=/home/dev/nn_chat/secrets/AuthKey_RLV35R5LP5.p8
+APNS_KEY_ID=RLV35R5LP5
+APNS_TEAM_ID=89CV94WHUK
+APNS_TOPIC=com.NufNaf.Vorobev
+APNS_USE_SANDBOX=false
+```
+
 ## Required Secrets And Files
 
 You need:
 
-1. A real `.env` based on [.env.example](.env.example).
+1. A real server `.env` based on the block above (stored in the `PRODUCTION_ENV_FILE` secret).
 2. The APNS key file `AuthKey_RLV35R5LP5.p8`.
 3. SSH access to the VPS.
 4. A GHCR token with package read access on the server deploy step.
-
-For the current production domain, `.env` can use:
-
-```env
-CORS_ALLOW_ORIGINS=https://chat.nufnafchat.su
-INSECURE_ALLOW_HTTP_ORIGINS=false
-FRONTEND_PORT=25256
-APNS_AUTH_KEY_P8=/home/dev/nn_chat/secrets/AuthKey_RLV35R5LP5.p8
-```
 
 The public entrypoint is expected to be `https://chat.nufnafchat.su`, with TLS terminated on the VPS and proxied to the frontend container on `127.0.0.1:25256`.
 
@@ -99,7 +137,7 @@ The APNS key is not required in GitHub Secrets when the file is already present 
 
 Recommended `PRODUCTION_ENV_FILE` base:
 
-- Copy from [.env.example](.env.example)
+- Start from the **Server env template** block above
 - Replace database password and auth secret
 - Set `CORS_ALLOW_ORIGINS=https://chat.nufnafchat.su`
 - Set `INSECURE_ALLOW_HTTP_ORIGINS=false`

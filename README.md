@@ -80,7 +80,7 @@ nn_chat/
 ├── ops/                     # скрипты сборки, деплоя, бэкапа и проверок
 ├── docker-compose.yml       # локальный стек: db + backend + web + сидер
 ├── docker-compose.prod.yml  # прод-стек для сервера (образы из GHCR)
-├── .env.example        # шаблон прод-переменных окружения
+├── .env.example             # локальный шаблон (порты/БД; прод — в DEPLOYMENT.md)
 └── DEPLOYMENT.md            # подробная инструкция по деплою
 ```
 
@@ -130,20 +130,19 @@ python -m http.server 8080 --directory .
 
 ## ⚙️ Конфигурация
 
-Все настройки задаются через `.env` (см. `.env.example`). Ключевые параметры:
+**Локально** (`docker-compose.yml`) всё работает на дефолтах — `.env` не обязателен.
+Чтобы переопределить, скопируй `.env.example` → `.env` (в `.gitignore`). Локальные параметры:
 
-| Переменная | Назначение | Пример |
+| Переменная | Назначение | Дефолт |
 |------------|-----------|--------|
-| `BACKEND_PORT` | внешний порт API | `32069` |
-| `FRONTEND_PORT` | внешний порт админки | `25256` |
-| `POSTGRES_HOST` / `POSTGRES_PORT` | подключение к БД | `db` / `5432` |
-| `ACCESS_TOKEN_TTL_MINUTES` | время жизни access-токена | `30` |
-| `REFRESH_TOKEN_TTL_DAYS` | время жизни refresh-токена | `30` |
-| `APNS_TOPIC` | bundle id для push | `com.NufNaf.Vorobev` |
-| `APNS_USE_SANDBOX` | окружение push | `false` |
-| `CORS_ALLOW_ORIGINS` | разрешённые origin | `https://chat.nufnafchat.su` |
+| `WEB_PORT` / `API_PORT` / `PG_PORT` | порты на хосте | `8088` / `8001` / `5433` |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | локальная БД | `app_user` / `app_pass` / `appdb` |
+| `AUTH_TOKEN_SECRET` | dev-секрет единого входа с прайсом | `dev-secret-change-me` |
+| `CORS_ALLOW_ORIGINS` | разрешённые origin | `*` |
 
-> 🔐 Для production обязательны сильные секреты (`AUTH_TOKEN_SECRET` ≥ 32 символов, `POSTGRES_PASSWORD` ≥ 16) и файл ключа APNs (`.p8`). Скрипт `ops/preflight_production.sh` проверит это за вас.
+**Прод** конфигурируется отдельно — серверный `.env` живёт в GitHub-секрете
+`PRODUCTION_ENV_FILE` (полный шаблон и переменные — в [DEPLOYMENT.md](DEPLOYMENT.md)).
+Там же — про сильные секреты и ключ APNs (`.p8`); `ops/preflight_production.sh` их проверит.
 
 ---
 
