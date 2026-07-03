@@ -60,6 +60,11 @@ CDEK_SECURE = os.getenv("CDEK_SECURE", "RmAmgvSgSl1yirlz9QupbzOJVqhCxcP5").strip
 CDEK_ENABLED = bool(CDEK_ACCOUNT and CDEK_SECURE)
 # Публичный URL для вебхуков CDEK (статусы). Пусто локально — вебхук не регистрируем.
 CDEK_WEBHOOK_URL = os.getenv("CDEK_WEBHOOK_URL", "").strip()
+# Отправитель по умолчанию (магазин). Тест-дефолты — Москва; на проде задать свои.
+CDEK_SENDER_NAME = os.getenv("CDEK_SENDER_NAME", "Магазин NufNaf").strip()
+CDEK_SENDER_PHONE = os.getenv("CDEK_SENDER_PHONE", "+79000000000").strip()
+CDEK_SENDER_CITY_CODE = int(os.getenv("CDEK_SENDER_CITY_CODE", "44"))  # 44 = Москва
+CDEK_SENDER_ADDRESS = os.getenv("CDEK_SENDER_ADDRESS", "Москва, ул. Тестовая, 1").strip()
 
 INSECURE_ALLOW_HTTP_ORIGINS = os.getenv("INSECURE_ALLOW_HTTP_ORIGINS", "false").strip().lower() in {"1", "true", "yes", "on"}
 FIRST_ADMIN_PASS = os.getenv(

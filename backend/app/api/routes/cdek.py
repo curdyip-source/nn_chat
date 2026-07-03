@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
+from app.core.database import get_db
 from app.dependencies.auth import get_current_user
-from app.services import cdek
+from app.schemas.cdek import CdekWaybillCreate
+from app.services import cdek, cdek_orders
 
 router = APIRouter(prefix="/cdek", tags=["cdek"])
 
@@ -56,3 +59,24 @@ def tariffs_route(
         return {"items": cdek.calculate_tariff_list(from_code, to_code, weight)}
     except cdek.CdekError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+
+
+@router.post("/orders/{order_id}/waybill", status_code=status.HTTP_201_CREATED)
+def create_waybill_route(
+    order_id: int,
+    payload: CdekWaybillCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Создать накладную СДЭК для заказа (сохраняет uuid/трек/статус в заказ)."""
+    return {"item": cdek_orders.create_waybill(db, order_id, payload, current_user)}
+
+
+@router.get("/orders/{order_id}/status")
+def waybill_status_route(
+    order_id: int,
+    _: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Актуальный статус накладной СДЭК заказа (подтягивает из CDEK)."""
+    return {"item": cdek_orders.get_status(db, order_id)}
