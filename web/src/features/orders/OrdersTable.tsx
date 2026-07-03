@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { updateOrder, updateOrderStatus } from '../../api/endpoints'
+import { cdekWaybillStatus, updateOrder, updateOrderStatus } from '../../api/endpoints'
 import type { Order, OrderUpdateItem, Product } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
@@ -306,8 +306,8 @@ function OrderRow({
           {isCdek &&
             (cdek?.has_waybill ? (
               <span title={cdek.status ?? ''}>
-                {' · '}📦 {cdek.track_number ?? '…'}
-                {cdek.status ? ` · ${cdek.status}` : ''}
+                {' · '}
+                {cdek.track_number ?? '…'}
               </span>
             ) : (
               <>
@@ -413,6 +413,22 @@ function OrderRow({
           onCreated={(c) => {
             setCdek(c)
             setCdekOpen(false)
+            // Трек присваивается у CDEK асинхронно — опрашиваем статус, пока не появится.
+            if (!c.track_number) {
+              let tries = 0
+              const tick = async () => {
+                tries += 1
+                try {
+                  const { item } = await cdekWaybillStatus(order.order_id)
+                  setCdek(item)
+                  if (item.track_number || tries >= 8) return
+                } catch {
+                  if (tries >= 8) return
+                }
+                setTimeout(tick, 3000)
+              }
+              setTimeout(tick, 3000)
+            }
           }}
         />
       )}
