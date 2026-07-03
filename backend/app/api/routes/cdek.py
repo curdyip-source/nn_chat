@@ -72,6 +72,15 @@ def prefill_route(
     return {"item": cdek_orders.get_prefill(db, customer)}
 
 
+@router.get("/defaults")
+def origin_default_route(
+    _: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Дефолт отправителя (последний использованный ПВЗ сдачи + город) — для подстановки."""
+    return {"item": cdek_orders.get_origin_default(db)}
+
+
 @router.post("/orders/{order_id}/waybill", status_code=status.HTTP_201_CREATED)
 def create_waybill_route(
     order_id: int,

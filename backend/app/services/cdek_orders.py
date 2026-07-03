@@ -60,14 +60,18 @@ def _build_payload(order: Order, payload) -> dict:
             sender["phones"] = [{"number": config.CDEK_SENDER_PHONE}]
         body["sender"] = sender
 
-    # Город отправителя (origin): выбор оператора (Москва по умолчанию, иногда Тула) или
-    # дефолт из конфига. CDEK принимает from_location по одному коду города.
-    origin_code = payload.from_city_code or config.CDEK_SENDER_CITY_CODE
-    from_location: dict = {"code": origin_code}
-    # Точный адрес забора — из конфига и только для дефолтного origin (тест-среда/оверрайд).
-    if config.CDEK_SENDER_ADDRESS and not payload.from_city_code:
-        from_location["address"] = config.CDEK_SENDER_ADDRESS
-    body["from_location"] = from_location
+    # Origin отправителя. Если оператор выбрал ПВЗ сдачи — шлём shipment_point (он задаёт
+    # точку отправки, from_location тогда не нужен). Иначе — from_location по городу
+    # (курьер/договор); CDEK принимает from_location по одному коду города.
+    if payload.shipment_point:
+        body["shipment_point"] = payload.shipment_point
+    else:
+        origin_code = payload.from_city_code or config.CDEK_SENDER_CITY_CODE
+        from_location: dict = {"code": origin_code}
+        # Точный адрес забора — из конфига и только для дефолтного origin (тест-среда/оверрайд).
+        if config.CDEK_SENDER_ADDRESS and not payload.from_city_code:
+            from_location["address"] = config.CDEK_SENDER_ADDRESS
+        body["from_location"] = from_location
 
     if payload.comment:
         body["comment"] = payload.comment
@@ -106,6 +110,10 @@ def _serialize(order: Order) -> dict:
         "pvz_code": order.order_cdek_pvz_code,
         "pvz_address": order.order_cdek_pvz_address,
         "delivery_address": order.order_cdek_delivery_address,
+        "from_city_code": order.order_cdek_from_city_code,
+        "from_city_name": order.order_cdek_from_city_name,
+        "shipment_point": order.order_cdek_shipment_point,
+        "shipment_point_address": order.order_cdek_shipment_point_address,
     }
 
 
@@ -152,6 +160,10 @@ def create_waybill(db: Session, order_id: int, payload, current_user: dict) -> d
     order.order_cdek_pvz_code = payload.pvz_code
     order.order_cdek_pvz_address = payload.pvz_address
     order.order_cdek_delivery_address = payload.delivery_address
+    order.order_cdek_from_city_code = payload.from_city_code
+    order.order_cdek_from_city_name = payload.from_city_name
+    order.order_cdek_shipment_point = payload.shipment_point
+    order.order_cdek_shipment_point_address = payload.shipment_point_address
     order.order_cdek_uuid = uuid
     order.order_cdek_status = "Создание накладной"
     order.order_cdek_status_updated_at = datetime.utcnow()
@@ -189,6 +201,25 @@ def get_prefill(db: Session, customer: str) -> dict:
         "pvz_code": row.order_cdek_pvz_code,
         "pvz_address": row.order_cdek_pvz_address,
         "delivery_address": row.order_cdek_delivery_address,
+    }
+
+
+def get_origin_default(db: Session) -> dict:
+    """Дефолт отправителя (origin): последний использованный ПВЗ сдачи и его город —
+    глобально по всем заказам, чтобы подставлять по умолчанию при создании накладной."""
+    row = db.execute(
+        select(Order)
+        .where(Order.order_cdek_shipment_point.isnot(None))
+        .order_by(desc(Order.order_created_at))
+        .limit(1)
+    ).scalar_one_or_none()
+    if row is None:
+        return {}
+    return {
+        "from_city_code": row.order_cdek_from_city_code,
+        "from_city_name": row.order_cdek_from_city_name,
+        "shipment_point": row.order_cdek_shipment_point,
+        "shipment_point_address": row.order_cdek_shipment_point_address,
     }
 
 
