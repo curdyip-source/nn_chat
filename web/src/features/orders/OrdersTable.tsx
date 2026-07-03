@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { cdekWaybillStatus, updateOrder, updateOrderStatus } from '../../api/endpoints'
+import { cdekDeleteWaybill, cdekWaybillStatus, updateOrder, updateOrderStatus } from '../../api/endpoints'
 import type { Order, OrderUpdateItem, Product } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
@@ -105,7 +105,24 @@ function OrderRow({
   const [error, setError] = useState('')
   const [cdekOpen, setCdekOpen] = useState(false)
   const [cdek, setCdek] = useState(order.cdek ?? null)
+  const [cdekBusy, setCdekBusy] = useState(false)
   const isCdek = order.order_method_name === 'СДЭК' || order.order_sub_method === 'СДЭК'
+
+  // Сброс накладной (удалить в CDEK + очистить) и открыть форму пересоздания.
+  const recreateCdek = async () => {
+    if (cdekBusy) return
+    if (!confirm('Сбросить текущую накладную и создать заново? Данные получателя сохранятся.')) return
+    setCdekBusy(true)
+    try {
+      const { item } = await cdekDeleteWaybill(order.order_id)
+      setCdek(item)
+      setCdekOpen(true)
+    } catch (e) {
+      alert((e as Error)?.message || 'Не удалось сбросить накладную')
+    } finally {
+      setCdekBusy(false)
+    }
+  }
   const [drafts, setDrafts] = useState<ItemDraft[]>(
     order.items.map((it) => ({
       uid: newUid(),
@@ -309,6 +326,14 @@ function OrderRow({
                 {' · '}
                 {cdek.track_number ?? '…'}
                 {cdek.status ? ` · ${cdek.status}` : ''}
+                {' · '}
+                <span
+                  onClick={recreateCdek}
+                  style={{ cursor: cdekBusy ? 'default' : 'pointer', color: 'var(--accent, #2b6cff)', opacity: cdekBusy ? 0.5 : 1 }}
+                  title="Сбросить и создать накладную заново"
+                >
+                  {cdekBusy ? 'Сброс…' : 'Пересоздать'}
+                </span>
               </span>
             ) : (
               <>

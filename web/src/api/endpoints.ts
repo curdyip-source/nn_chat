@@ -396,6 +396,10 @@ export function cdekCreateWaybill(orderId: number, payload: CdekWaybillCreate) {
   return apiRequest<{ item: CdekWaybill }>(`/cdek/orders/${orderId}/waybill`, { method: 'POST', body: payload })
 }
 
+export function cdekDeleteWaybill(orderId: number) {
+  return apiRequest<{ item: CdekWaybill }>(`/cdek/orders/${orderId}/waybill`, { method: 'DELETE' })
+}
+
 export type CdekOriginDefault = {
   from_city_code?: number | null
   from_city_name?: string | null
