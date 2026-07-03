@@ -79,7 +79,7 @@ export function OrderChat({ orderId }: { orderId: number }) {
                 {c.attachments?.length ? (
                   <div className={styles.attachments}>
                     {c.attachments.map((a) => {
-                      const url = `/media/message-attachments/${a.attachment_id}`
+                      const url = `/media/order-comment-attachments/${a.attachment_id}`
                       const isImage = (a.attachment_mime_type || '').startsWith('image/')
                       return isImage ? (
                         <a key={a.attachment_id} href={url} target="_blank" rel="noreferrer">

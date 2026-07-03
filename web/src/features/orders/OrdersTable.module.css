@@ -13,7 +13,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 52px 48px minmax(110px, 0.85fr) minmax(210px, 2fr) 190px 44px 120px minmax(100px, auto) 32px;
+  grid-template-columns: 52px 48px minmax(110px, 0.85fr) minmax(210px, 2fr) 190px 44px 120px minmax(100px, auto) 60px;
   gap: 10px;
   align-items: center;
   padding: 8px 12px;
@@ -41,6 +41,11 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 .orderCheck {
   width: 15px;

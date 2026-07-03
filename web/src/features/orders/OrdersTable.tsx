@@ -6,6 +6,7 @@ import { Button } from '../../ui/Button'
 import { Checkbox } from '../../ui/Checkbox'
 import { StatusSelect } from '../../ui/StatusSelect'
 import { formatAmount, formatDateTime } from '../../lib/format'
+import { Modal } from '../../ui/Modal'
 import { AddItemModal } from './AddItemModal'
 import { CdekWaybillModal } from './CdekWaybillModal'
 import { newUid } from './cart'
@@ -100,6 +101,7 @@ function OrderRow({
     setExpanded(expandSignal.expanded)
   }, [expandSignal.expanded, expandSignal.nonce])
   const [addOpen, setAddOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
   const [pendingExtra, setPendingExtra] = useState<{ uid: string; statusId: number; mode: ExtraMode } | null>(null)
   const [customer, setCustomer] = useState(order.order_customer)
   const [info, setInfo] = useState(order.order_info)
@@ -364,9 +366,14 @@ function OrderRow({
           <span className={styles.totalLabel}>Итого</span>
           {totalText || '—'}
         </span>
-        <button className={styles.editBtn} onClick={() => onEdit(order)} title="Редактировать заказ">
-          ✏️
-        </button>
+        <div className={styles.rowActions}>
+          <button className={styles.editBtn} onClick={() => setChatOpen(true)} title="Чат заказа">
+            💬
+          </button>
+          <button className={styles.editBtn} onClick={() => onEdit(order)} title="Редактировать заказ">
+            ✏️
+          </button>
+        </div>
       </div>
 
       {expanded && (
@@ -440,9 +447,13 @@ function OrderRow({
           ))}
 
           {error && <div className={styles.rowError}>{error}</div>}
-
-          <OrderChat orderId={order.order_id} />
         </div>
+      )}
+
+      {chatOpen && (
+        <Modal open title={`Чат заказа №${order.order_id}`} onClose={() => setChatOpen(false)} width={560}>
+          <OrderChat orderId={order.order_id} />
+        </Modal>
       )}
 
       <AddItemModal open={addOpen} onClose={() => setAddOpen(false)} onAdd={addProduct} />

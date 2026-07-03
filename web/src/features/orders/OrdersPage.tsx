@@ -243,25 +243,29 @@ export function OrdersPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
           <div className={styles.midPanel}>
-            {orderSelectionCount > 0 && orderStatusOptions.length > 0 && (
-              <div className={styles.bulkActions} title={`Статус для ${orderSelectionCount} заказ.`}>
-                <StatusSelect value={null} options={orderStatusOptions} onChange={onBulkOrderStatus} />
-              </div>
-            )}
             {itemStatusOptions.length > 0 && (
               <div className={styles.bulkActions}>
-                <span title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Статус для ${selectionCount} поз.`}>
-                  <StatusSelect value={null} options={itemStatusOptions} onChange={onBulkStatus} saving={selectionCount === 0} />
-                </span>
-                <button
-                  type="button"
-                  className={styles.bulkDelete}
-                  disabled={selectionCount === 0}
-                  onClick={() => setConfirmDelete(true)}
-                  title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Удалить ${selectionCount} поз.`}
-                >
-                  Удалить
-                </button>
+                {orderSelectionCount > 0 ? (
+                  // Выбраны целые заказы (свёрнутые строки) — тот же селектор, но статусы заказа.
+                  <span title={`Статус для ${orderSelectionCount} заказ.`}>
+                    <StatusSelect value={null} options={orderStatusOptions} onChange={onBulkOrderStatus} />
+                  </span>
+                ) : (
+                  <>
+                    <span title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Статус для ${selectionCount} поз.`}>
+                      <StatusSelect value={null} options={itemStatusOptions} onChange={onBulkStatus} saving={selectionCount === 0} />
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.bulkDelete}
+                      disabled={selectionCount === 0}
+                      onClick={() => setConfirmDelete(true)}
+                      title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Удалить ${selectionCount} поз.`}
+                    >
+                      Удалить
+                    </button>
+                  </>
+                )}
               </div>
             )}
             <span className={styles.expandToggle} title={expandAll ? 'Свернуть все заказы' : 'Развернуть все заказы'}>
