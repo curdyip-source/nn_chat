@@ -25,13 +25,13 @@ postgres_db="$(grep '^POSTGRES_DB=' "$env_file" | cut -d= -f2-)"
 
 docker compose \
     --env-file "$env_file" \
-    -f docker-compose.yml \
+    -f docker-compose.prod.yml \
     exec -T db \
     psql -U "$postgres_user" -d "$postgres_db" -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
 
 docker compose \
     --env-file "$env_file" \
-    -f docker-compose.yml \
+    -f docker-compose.prod.yml \
     exec -T db \
     psql -U "$postgres_user" -d "$postgres_db" \
     < "$input_file"

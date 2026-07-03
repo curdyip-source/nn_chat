@@ -76,35 +76,34 @@ nn_chat/
 │   │   └── ...
 │   ├── alembic/         # миграции БД
 │   └── requirements.txt
-├── frontend/            # веб-панель администратора (HTML/CSS/JS)
-├── ops/                 # скрипты сборки, деплоя, бэкапа и проверок
-├── docker-compose.yml   # полный стек: db + backend + frontend
-├── .env.example         # шаблон переменных окружения
-└── DEPLOYMENT.md        # подробная инструкция по деплою
+├── web/                     # веб-фронт (React + Vite)
+├── ops/                     # скрипты сборки, деплоя, бэкапа и проверок
+├── docker-compose.yml       # локальный стек: db + backend + web + сидер
+├── docker-compose.prod.yml  # прод-стек для сервера (образы из GHCR)
+├── .env.prod.example        # шаблон прод-переменных окружения
+└── DEPLOYMENT.md            # подробная инструкция по деплою
 ```
 
 ---
 
 ## 🚀 Быстрый старт
 
-### Вариант 1 — Docker Compose (весь стек)
+### Вариант 1 — Docker Compose (локальный стек)
+
+`docker-compose.yml` поднимает локальный стек (Postgres + backend + web + сидер),
+секреты и `.env` не нужны:
 
 ```bash
-# 1. Подготовить окружение
-cp .env.example .env
-# отредактируйте .env под свои значения
-
-# 2. (опционально) проверить production-конфиг
-bash ./ops/preflight_production.sh .env
-
-# 3. Поднять стек
-docker compose --env-file .env up -d
+docker compose up --build
 ```
 
 После запуска:
-- 🌐 Админка — `http://localhost:25256`
-- ⚙️ API — `http://localhost:32069`
-- ❤️ Health-check — `http://localhost:25256/api/v1/health/live`
+- 🌐 Веб — `http://localhost:8088` (логин: `admin` / `admin123`)
+- ⚙️ API — `http://localhost:8001`
+- ❤️ Health-check — `http://localhost:8001/api/v1/health/live`
+
+Прод-стек для сервера — `docker-compose.prod.yml` + `.env` (из секрета CI),
+см. [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### Вариант 2 — локальная разработка
 
@@ -131,7 +130,7 @@ python -m http.server 8080 --directory .
 
 ## ⚙️ Конфигурация
 
-Все настройки задаются через `.env` (см. `.env.example`). Ключевые параметры:
+Все настройки задаются через `.env` (см. `.env.prod.example`). Ключевые параметры:
 
 | Переменная | Назначение | Пример |
 |------------|-----------|--------|

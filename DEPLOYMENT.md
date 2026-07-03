@@ -2,8 +2,8 @@
 
 ## Production Layout
 
-- Single stack file: [docker-compose.yml](docker-compose.yml)
-- Runtime env template: [.env.example](.env.example)
+- Single stack file: [docker-compose.prod.yml](docker-compose.prod.yml)
+- Runtime env template: [.env.prod.example](.env.prod.example)
 - Deploy scripts: [ops](ops)
 - CI/CD workflow: [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
 
@@ -13,7 +13,7 @@ The server does not build the app. Backend and frontend are built in GitHub Acti
 
 You need:
 
-1. A real `.env` based on [.env.example](.env.example).
+1. A real `.env` based on [.env.prod.example](.env.prod.example).
 2. The APNS key file `AuthKey_RLV35R5LP5.p8`.
 3. SSH access to the VPS.
 4. A GHCR token with package read access on the server deploy step.
@@ -40,7 +40,7 @@ bash ./ops/preflight_production.sh .env
 Render compose config:
 
 ```bash
-docker compose --env-file .env -f docker-compose.yml config
+docker compose --env-file .env -f docker-compose.prod.yml config
 ```
 
 The preflight will fail locally until the APNS key exists at the path from `APNS_AUTH_KEY_P8`. This is expected when that key is stored only on the VPS.
@@ -81,7 +81,7 @@ Jobs:
 1. Run backend tests.
 2. Build and push backend and frontend images to GHCR.
 3. Mirror `postgres:17-alpine` to GHCR for server pulls.
-4. Upload `docker-compose.yml`, `ops/`, and `.env` to the VPS.
+4. Upload `docker-compose.prod.yml`, `ops/`, and `.env` to the VPS.
 5. Pull the new tag on the server and restart the stack.
 6. Run health and deep smoke checks.
 
@@ -99,7 +99,7 @@ The APNS key is not required in GitHub Secrets when the file is already present 
 
 Recommended `PRODUCTION_ENV_FILE` base:
 
-- Copy from [.env.example](.env.example)
+- Copy from [.env.prod.example](.env.prod.example)
 - Replace database password and auth secret
 - Set `CORS_ALLOW_ORIGINS=https://chat.nufnafchat.su`
 - Set `INSECURE_ALLOW_HTTP_ORIGINS=false`

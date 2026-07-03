@@ -18,17 +18,17 @@ export RELEASE_TAG="$release_tag"
 
 docker compose \
     --env-file "$env_file" \
-    -f docker-compose.yml \
+    -f docker-compose.prod.yml \
     pull backend frontend
 
 docker compose \
     --env-file "$env_file" \
-    -f docker-compose.yml \
+    -f docker-compose.prod.yml \
     up -d
 
 front_port="$(grep '^FRONTEND_PORT=' "$env_file" | cut -d= -f2-)"
 
 ./ops/post_deploy_check.sh "http://127.0.0.1:${front_port}"
-./ops/post_deploy_api_smoke.sh docker-compose.yml "$env_file"
+./ops/post_deploy_api_smoke.sh docker-compose.prod.yml "$env_file"
 
 echo "Release ${release_tag} deployed successfully"

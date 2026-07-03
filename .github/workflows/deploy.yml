@@ -118,7 +118,7 @@ jobs:
       - name: Upload compose and scripts
         run: |
           ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -p '${{ secrets.VPS_PORT }}' '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}' 'mkdir -p ${{ env.DEPLOY_ROOT }}/secrets'
-          scp -i ~/.ssh/id_ed25519 -o BatchMode=yes -P '${{ secrets.VPS_PORT }}' docker-compose.yml '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_ROOT }}/docker-compose.yml'
+          scp -i ~/.ssh/id_ed25519 -o BatchMode=yes -P '${{ secrets.VPS_PORT }}' docker-compose.prod.yml '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_ROOT }}/docker-compose.prod.yml'
           scp -i ~/.ssh/id_ed25519 -o BatchMode=yes -P '${{ secrets.VPS_PORT }}' .deploy.env '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_ROOT }}/.env'
           scp -i ~/.ssh/id_ed25519 -o BatchMode=yes -P '${{ secrets.VPS_PORT }}' -r ops '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_ROOT }}/'
 
