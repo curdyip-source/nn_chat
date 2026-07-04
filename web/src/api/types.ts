@@ -17,8 +17,11 @@ export type User = {
   user_login: string
   user_first_name?: string | null
   user_second_name?: string | null
+  user_age?: number | null
+  user_address?: string | null
   user_admin: boolean
   user_active?: boolean
+  user_created_at?: string | null
   user_establishment_roles?: EstablishmentPermission[]
 }
 
