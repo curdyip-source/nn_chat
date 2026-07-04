@@ -11,6 +11,8 @@
 """
 
 import logging
+import threading
+import time
 from decimal import Decimal, InvalidOperation
 
 import httpx
@@ -18,13 +20,36 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.core.config import PRICE_BACKEND_URL, PRICE_FEDERATION_USER_ID
+from app.core.database import SessionLocal
 from app.core.tokens import create_access_token
 from app.models.reference_data import Product
 
 logger = logging.getLogger("app.price_federation")
 
-_HTTP_TIMEOUT = httpx.Timeout(4.0)
+# connect быстрый (fail-fast если nn_vla недоступна), read — под холодный поиск nn_vla.
+_HTTP_TIMEOUT = httpx.Timeout(6.0, connect=1.5)
 _FETCH_LIMIT = 100
+
+# Переиспользуемый HTTP-клиент (keep-alive пул) — без пересоединения на каждый поиск.
+_client: httpx.Client | None = None
+
+
+def _get_client() -> httpx.Client:
+    global _client
+    if _client is None:
+        _client = httpx.Client(timeout=_HTTP_TIMEOUT)
+    return _client
+
+
+# TTL-кэш уже гидратированных запросов: тот же поиск в пределах TTL не ходит в nn_vla
+# повторно (мгновенно). Кэшируем только успешные обращения (не ошибки/недоступность).
+# Один uvicorn-worker (см. realtime-sse-architecture) — модульный кэш процесс-локальный, ок.
+_HYDRATE_TTL = 120.0
+_hydrated_at: dict[str, float] = {}
+
+# Запросы, гидратируемые прямо сейчас в фоне — чтобы не плодить дубли-потоки.
+_inflight: set[str] = set()
+_inflight_lock = threading.Lock()
 
 
 def _service_token() -> str:
@@ -41,17 +66,17 @@ def _to_cost(value) -> Decimal:
         return Decimal("0")
 
 
-def _fetch_cl_rows(query: str) -> list[dict]:
-    """Свежие строки CL из nn_vla по запросу. [] при любой ошибке/выключенной федерации."""
+def _fetch_cl_rows(query: str) -> list[dict] | None:
+    """Свежие строки CL из nn_vla по запросу. None — обращение НЕ удалось (ошибка/выключена),
+    [] — успешно, но CL-строк нет. Различие нужно, чтобы кэшировать только успех."""
     q = (query or "").strip()
     if not q or not PRICE_BACKEND_URL:
-        return []
+        return None
     try:
-        response = httpx.get(
+        response = _get_client().get(
             f"{PRICE_BACKEND_URL}/api/search/all",
             params={"q": q, "limit": _FETCH_LIMIT, "emails": ["CL"]},
             headers={"Authorization": f"Bearer {_service_token()}"},
-            timeout=_HTTP_TIMEOUT,
         )
         response.raise_for_status()
         results = response.json().get("results", [])
@@ -60,7 +85,7 @@ def _fetch_cl_rows(query: str) -> list[dict]:
             "price_federation.fetch_failed",
             extra={"event_type": "price_federation.fetch_failed", "query": q},
         )
-        return []
+        return None
     return [r for r in results if isinstance(r, dict) and r.get("source") == "CL"]
 
 
@@ -71,7 +96,20 @@ def hydrate_products(db: Session, *, query: str) -> int:
     stmt (INSERT .. ON CONFLICT (product_article) DO UPDATE name/cost), ничего не
     удаляет: ручные позиции и прочие товары не трогаются.
     """
+    # TTL-кэш: тот же запрос недавно гидратировали — не ходим в nn_vla повторно.
+    cache_key = (query or "").strip().lower()
+    if cache_key:
+        last = _hydrated_at.get(cache_key)
+        if last is not None and time.monotonic() - last < _HYDRATE_TTL:
+            return 0
+
     rows = _fetch_cl_rows(query)
+    if rows is None:
+        # Обращение не удалось (nn_vla недоступна) — не кэшируем, дадим повторить.
+        return 0
+    # Успешно (даже если 0 CL-строк) — запоминаем, чтобы не долбить nn_vla повторно.
+    if cache_key:
+        _hydrated_at[cache_key] = time.monotonic()
     if not rows:
         return 0
 
@@ -119,6 +157,36 @@ def hydrate_products(db: Session, *, query: str) -> int:
         extra={"event_type": "price_federation.hydrated", "query": query, "count": len(values)},
     )
     return len(values)
+
+
+def hydrate_products_async(query: str) -> None:
+    """Гидратация в ФОНЕ (для интерактивного поиска): не блокирует ответ. Поиск сразу
+    возвращает локальные результаты, а свежий CL из nn_vla подтягивается отдельным
+    потоком (со своей сессией) — новые позиции появятся при следующем поиске. Дедуп:
+    пропускаем, если запрос недавно гидратирован (TTL) или уже гидратируется сейчас."""
+    key = (query or "").strip().lower()
+    if not key or not PRICE_BACKEND_URL:
+        return
+    last = _hydrated_at.get(key)
+    if last is not None and time.monotonic() - last < _HYDRATE_TTL:
+        return
+    with _inflight_lock:
+        if key in _inflight:
+            return
+        _inflight.add(key)
+
+    def _worker() -> None:
+        db = SessionLocal()
+        try:
+            hydrate_products(db, query=query)
+        except Exception:  # noqa: BLE001 — фон не должен ничего ронять
+            logger.exception("price_federation.async_failed", extra={"event_type": "price_federation.async_failed", "query": query})
+        finally:
+            db.close()
+            with _inflight_lock:
+                _inflight.discard(key)
+
+    threading.Thread(target=_worker, name="price-hydrate", daemon=True).start()
 
 
 def hydrate_products_for_names(db: Session, names: list[str], *, max_names: int = 100) -> None:
