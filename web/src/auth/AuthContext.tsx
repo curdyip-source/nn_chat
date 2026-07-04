@@ -22,6 +22,9 @@ type AuthState = {
   user: User | null
   login: (login: string, password: string) => Promise<void>
   logout: () => void
+  // Перечитать /me и применить свежие права (реалтайм при SSE `user_updated`).
+  // Если доступ в веб отозван — разлогинивает.
+  refreshUser: () => Promise<void>
 }
 
 const AuthCtx = createContext<AuthState | null>(null)
@@ -112,9 +115,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut()
   }, [signOut])
 
+  const refreshUser = useCallback(async () => {
+    if (!getAccessToken()) return
+    try {
+      const { user: fresh } = await fetchMe()
+      if (!hasWebAccess(fresh)) {
+        signOut()
+        return
+      }
+      storeUser(fresh)
+      setUser(fresh)
+    } catch {
+      // Сеть/временный сбой — не трогаем сессию (401 обработает глобальный обработчик).
+    }
+  }, [signOut])
+
   const value = useMemo<AuthState>(
-    () => ({ status, user, login, logout }),
-    [status, user, login, logout],
+    () => ({ status, user, login, logout, refreshUser }),
+    [status, user, login, logout, refreshUser],
   )
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>

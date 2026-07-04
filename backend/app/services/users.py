@@ -24,6 +24,7 @@ from app.schemas.auth import RegisterPayload
 from app.schemas.common import build_pagination, model_to_dict
 from app.schemas.users import GRANTABLE_SECTIONS, UserCreatePayload, UserPermissionsPayload, UserProfileUpdatePayload, UserUpdatePayload
 from app.services.audit import log_audit_event
+from app.services.card_sync import notify_user_updated
 from app.services.domain_common import get_establishment_or_404
 from app.services.profile_photos import build_profile_photo_storage_key
 from app.services.serializers import serialize_chat_participant, serialize_datetime, serialize_user
@@ -203,6 +204,9 @@ class UserService:
             event_type=EVENT_TYPE_USER_UPDATE,
             event_payload={"changed_fields": sorted(data.keys())},
         )
+        # Реалтайм: если изменились доступ-релевантные поля — уведомим клиента перечитать /me.
+        if any(field in data for field in ("user_sections", "user_active", "user_admin")):
+            notify_user_updated(row.user_id)
         return serialize_user(row)
 
     def set_permissions(self, user_id: int, payload: UserPermissionsPayload, actor_user: dict) -> dict:
@@ -230,6 +234,8 @@ class UserService:
             event_type=EVENT_TYPE_USER_ROLES_UPDATE,
             event_payload={"establishments": settings},
         )
+        # Реалтайм: права по складам изменились — клиент перечитает /me и применит доступ.
+        notify_user_updated(user_id)
         return serialize_user(user)
 
     def update_profile(self, user_id: int, payload: UserProfileUpdatePayload) -> dict:

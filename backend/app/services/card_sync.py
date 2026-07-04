@@ -33,6 +33,13 @@ def notify_cards_deleted(message_ids: list[int]) -> None:
         broker.publish({"type": "deleted", "message_id": message_id})
 
 
+def notify_user_updated(user_id: int) -> None:
+    # Права/разделы/статус пользователя изменились. Публикуем SSE `user_updated`
+    # (широковещательно всем подписчикам — клиент сам сверит user_id со своим),
+    # чтобы приложение/веб перечитали /me и применили доступы реалтайм, без перезахода.
+    broker.publish({"type": "user_updated", "user_id": user_id})
+
+
 def notify_inventory_changed(db: Session, inventory_id: int) -> None:
     _emit_updated(db, MessageRepository(db).touch_for_inventory(inventory_id))
 

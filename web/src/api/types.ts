@@ -188,8 +188,11 @@ export type Order = {
   order_status?: string | null
   order_status_color?: string | null
   order_owner_user_login?: string | null
+  order_owner_first_name?: string | null
+  order_owner_second_name?: string | null
   order_created_at?: string | null
   cdek?: OrderCdek | null
+  comments?: { order_comment_id: number }[]
   items: OrderItem[]
 }
 
@@ -298,9 +301,11 @@ export type ChatMessage = {
 
 /** Realtime event pushed over /messages/stream (SSE). */
 export type MessageStreamEvent = {
-  type: 'created' | 'updated' | 'deleted'
+  type: 'created' | 'updated' | 'deleted' | 'user_updated'
   message?: ChatMessage | null
   message_id?: number | null
+  // Для `user_updated`: id пользователя, чьи права/разделы/статус изменились.
+  user_id?: number | null
 }
 
 export type AuditEvent = {
