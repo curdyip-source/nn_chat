@@ -339,7 +339,7 @@ export function listUsers(opts: { search?: string; page?: number; pageSize?: num
 
 export function updateUser(
   userId: number,
-  patch: Partial<Pick<User, 'user_active' | 'user_admin' | 'user_first_name' | 'user_second_name' | 'user_age' | 'user_address'>>,
+  patch: Partial<Pick<User, 'user_active' | 'user_admin' | 'user_first_name' | 'user_second_name' | 'user_age' | 'user_address' | 'user_sections'>>,
 ) {
   return apiRequest<{ item: User }>(`/users/${userId}`, { method: 'PUT', body: patch })
 }

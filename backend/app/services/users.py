@@ -22,7 +22,7 @@ from app.repositories.user_establishment_roles import UserEstablishmentRoleRepos
 from app.repositories.profile_photos import ProfilePhotoRepository
 from app.schemas.auth import RegisterPayload
 from app.schemas.common import build_pagination, model_to_dict
-from app.schemas.users import UserCreatePayload, UserPermissionsPayload, UserProfileUpdatePayload, UserUpdatePayload
+from app.schemas.users import GRANTABLE_SECTIONS, UserCreatePayload, UserPermissionsPayload, UserProfileUpdatePayload, UserUpdatePayload
 from app.services.audit import log_audit_event
 from app.services.domain_common import get_establishment_or_404
 from app.services.profile_photos import build_profile_photo_storage_key
@@ -181,6 +181,11 @@ class UserService:
     def update_user(self, user_id: int, payload: UserUpdatePayload, actor_user: dict) -> dict:
         user = self.get_user_by_id_or_404(user_id)
         data = model_to_dict(payload)
+        if "user_sections" in data and data["user_sections"] is not None:
+            unknown = [s for s in data["user_sections"] if s not in GRANTABLE_SECTIONS]
+            if unknown:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Недопустимые разделы: {', '.join(unknown)}")
+            data["user_sections"] = list(dict.fromkeys(data["user_sections"]))  # уникальные, порядок сохранён
         if "user_login" in data:
             self.ensure_login_is_unique(data["user_login"], exclude_user_id=user_id)
         if "user_password" in data:

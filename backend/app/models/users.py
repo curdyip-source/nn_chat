@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -17,6 +17,8 @@ class User(Base):
     user_password: Mapped[str] = mapped_column(Text, nullable=False)
     user_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     user_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=func.false())
+    # Разрешённые разделы меню (ось A). NULL = все операционные разделы; список = только эти.
+    user_sections: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     user_first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     user_second_name: Mapped[str] = mapped_column(String(100), nullable=False)
     user_profile_photo: Mapped[str | None] = mapped_column(Text, nullable=True)

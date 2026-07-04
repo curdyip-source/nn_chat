@@ -23,6 +23,8 @@ export type User = {
   user_active?: boolean
   user_created_at?: string | null
   user_establishment_roles?: EstablishmentPermission[]
+  // Разрешённые разделы меню (ось A). null/undefined = все операционные разделы.
+  user_sections?: string[] | null
 }
 
 export type AuthResponse = {

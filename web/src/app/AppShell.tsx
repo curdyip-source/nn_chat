@@ -50,8 +50,13 @@ function AppShellInner() {
   const { user, logout } = useAuth()
   const { sidebarHidden, setSidebarHidden } = useLayout()
   const [active, setActive] = useState('orders')
-  // Не-админам административные разделы не показываем и не даём открыть.
-  const visibleSections = SECTIONS.filter((s) => !s.adminOnly || user?.user_admin)
+  // Видимость разделов: админ — всё; не-админ — админ-разделы скрыты, операционные —
+  // по user_sections (null/undefined = все операционные разрешены).
+  const visibleSections = SECTIONS.filter((s) => {
+    if (user?.user_admin) return true
+    if (s.adminOnly) return false
+    return user?.user_sections == null || user.user_sections.includes(s.key)
+  })
   const section = visibleSections.find((s) => s.key === active) ?? visibleSections[0]
 
   return (

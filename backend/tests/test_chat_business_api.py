@@ -1358,3 +1358,24 @@ def test_can_create_required_to_create_order(client, integration_db_session, int
     # can_create=True, член склада → 201
     _set_profile_db(integration_db_session, integration_user, establishment_ids=[est], view_scope="establishment", can_create=True)
     assert client.post(f"{API_PREFIX}/orders", headers={"Authorization": f"Bearer {worker_token}"}, json=body).status_code == 201
+
+
+def test_admin_sets_user_menu_sections(client, integration_db_session, integration_user, integration_admin):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+
+    resp = client.put(f"{API_PREFIX}/users/{integration_user.user_id}", headers={"Authorization": f"Bearer {admin_token}"},
+                      json={"user_sections": ["orders", "chat"]})
+    assert resp.status_code == 200
+    assert resp.json()["item"]["user_sections"] == ["orders", "chat"]
+
+    # доходит до пользователя при логине
+    user = login(client, "worker", "WorkerPass123")["user"]
+    assert user["user_sections"] == ["orders", "chat"]
+
+    # недопустимый раздел → 400
+    bad = client.put(f"{API_PREFIX}/users/{integration_user.user_id}", headers={"Authorization": f"Bearer {admin_token}"},
+                     json={"user_sections": ["orders", "users"]})
+    assert bad.status_code == 400

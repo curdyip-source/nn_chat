@@ -23,6 +23,18 @@ const DEFAULT_SCOPES: Omit<EstablishmentPermission, 'establishment_id'> = {
   delete_scope: 'none',
 }
 
+// Разделы меню, которые можно выдавать не-админу (ось A). Порядок = как в сайдбаре.
+const GRANTABLE_SECTIONS: { key: string; label: string; icon: string }[] = [
+  { key: 'orders', label: 'Заказы', icon: '📦' },
+  { key: 'products', label: 'Товары', icon: '🏷️' },
+  { key: 'inventory', label: 'Инвентаризации', icon: '📊' },
+  { key: 'registrations', label: 'Приёмки', icon: '📥' },
+  { key: 'contacts', label: 'Контрагенты', icon: '👥' },
+  { key: 'chat', label: 'Чат', icon: '💬' },
+  { key: 'price', label: 'Прайс', icon: '💲' },
+]
+const ALL_SECTION_KEYS = GRANTABLE_SECTIONS.map((s) => s.key)
+
 const PAGE_SIZE = 100
 const fullName = (u: User) => [u.user_first_name, u.user_second_name].filter(Boolean).join(' ') || u.user_login
 
@@ -119,7 +131,10 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
   const ref = useReference()
   const establishments = ref.establishments
   const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState<'info' | 'access' | 'perms' | null>(null)
+  const [saving, setSaving] = useState<'info' | 'access' | 'perms' | 'sections' | null>(null)
+
+  // Разделы меню — черновик (null user_sections = все разрешены).
+  const [sections, setSections] = useState<string[]>(user.user_sections ?? ALL_SECTION_KEYS)
 
   // Личные данные — черновик.
   const [info, setInfo] = useState({
@@ -142,7 +157,7 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
   }, [user])
   const [perms, setPerms] = useState<Record<number, EstablishmentPermission>>(initialPerms)
 
-  const run = async (kind: 'info' | 'access' | 'perms', fn: () => Promise<{ item: User }>) => {
+  const run = async (kind: 'info' | 'access' | 'perms' | 'sections', fn: () => Promise<{ item: User }>) => {
     setSaving(kind)
     setError(null)
     try {
@@ -153,6 +168,7 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
         for (const r of item.user_establishment_roles ?? []) map[r.establishment_id] = r
         setPerms(map)
       }
+      if (kind === 'sections') setSections(item.user_sections ?? ALL_SECTION_KEYS)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось сохранить')
     } finally {
@@ -171,6 +187,8 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
     )
   const setAccess = (body: Partial<Pick<User, 'user_active' | 'user_admin'>>) => run('access', () => updateUser(user.user_id, body))
   const savePerms = () => run('perms', () => setUserPermissions(user.user_id, Object.values(perms)))
+  const saveSections = () => run('sections', () => updateUser(user.user_id, { user_sections: sections }))
+  const toggleSection = (key: string) => setSections((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]))
 
   const toggleAccess = (id: number) =>
     setPerms((p) => {
@@ -245,6 +263,31 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
               <Button variant="primary" disabled={!infoDirty} loading={saving === 'info'} onClick={saveInfo}>Сохранить данные</Button>
             </div>
           </section>
+
+          {/* Разделы меню */}
+          {!user.user_admin && (
+            <section className={styles.card}>
+              <div className={styles.cardHead}>
+                <div className={styles.cardTitle}><span className={styles.cardIcon}>🗂️</span> Разделы меню</div>
+                <span className={styles.hint}>что пользователь видит в меню</span>
+              </div>
+              <div className={styles.sectionGrid}>
+                {GRANTABLE_SECTIONS.map((s) => {
+                  const on = sections.includes(s.key)
+                  return (
+                    <button key={s.key} type="button" onClick={() => toggleSection(s.key)}
+                      className={[styles.sectionChip, on ? styles.sectionChipOn : ''].join(' ')}>
+                      <span>{s.icon}</span>{s.label}
+                      <span className={styles.sectionMark}>{on ? '✓' : ''}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className={styles.cardFooter}>
+                <Button variant="primary" loading={saving === 'sections'} onClick={saveSections}>Сохранить разделы</Button>
+              </div>
+            </section>
+          )}
 
           {/* Права по складам */}
           <section className={styles.card}>
