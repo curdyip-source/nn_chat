@@ -23,17 +23,20 @@ const DEFAULT_SCOPES: Omit<EstablishmentPermission, 'establishment_id'> = {
   delete_scope: 'none',
 }
 
-// Разделы меню, которые можно выдавать не-админу (ось A). Порядок = как в сайдбаре.
-const GRANTABLE_SECTIONS: { key: string; label: string; icon: string }[] = [
+// Режимы приложения (верхний уровень) и разделы внутри СРМ (ось A).
+const APP_MODES: { key: string; label: string; icon: string }[] = [
+  { key: 'chat', label: 'Чат', icon: '💬' },
+  { key: 'crm', label: 'СРМ', icon: '📋' },
+  { key: 'price', label: 'Прайс', icon: '💲' },
+]
+const CRM_SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: 'orders', label: 'Заказы', icon: '📦' },
   { key: 'products', label: 'Товары', icon: '🏷️' },
   { key: 'inventory', label: 'Инвентаризации', icon: '📊' },
   { key: 'registrations', label: 'Приёмки', icon: '📥' },
   { key: 'contacts', label: 'Контрагенты', icon: '👥' },
-  { key: 'chat', label: 'Чат', icon: '💬' },
-  { key: 'price', label: 'Прайс', icon: '💲' },
 ]
-const ALL_SECTION_KEYS = GRANTABLE_SECTIONS.map((s) => s.key)
+const ALL_SECTION_KEYS = [...APP_MODES, ...CRM_SECTIONS].map((s) => s.key)
 
 const PAGE_SIZE = 100
 const fullName = (u: User) => [u.user_first_name, u.user_second_name].filter(Boolean).join(' ') || u.user_login
@@ -264,27 +267,46 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
             </div>
           </section>
 
-          {/* Разделы меню */}
+          {/* Режимы приложения + разделы СРМ */}
           {!user.user_admin && (
             <section className={styles.card}>
               <div className={styles.cardHead}>
-                <div className={styles.cardTitle}><span className={styles.cardIcon}>🗂️</span> Разделы меню</div>
-                <span className={styles.hint}>что пользователь видит в меню</span>
+                <div className={styles.cardTitle}><span className={styles.cardIcon}>🗂️</span> Доступ к разделам</div>
+                <span className={styles.hint}>режимы приложения и разделы веба</span>
               </div>
+
+              <div className={styles.fieldLabel} style={{ marginBottom: 8 }}>Режимы приложения</div>
               <div className={styles.sectionGrid}>
-                {GRANTABLE_SECTIONS.map((s) => {
+                {APP_MODES.map((s) => {
                   const on = sections.includes(s.key)
                   return (
                     <button key={s.key} type="button" onClick={() => toggleSection(s.key)}
                       className={[styles.sectionChip, on ? styles.sectionChipOn : ''].join(' ')}>
                       <span>{s.icon}</span>{s.label}
-                      <span className={styles.sectionMark}>{on ? '✓' : ''}</span>
                     </button>
                   )
                 })}
               </div>
+
+              {sections.includes('crm') && (
+                <>
+                  <div className={styles.fieldLabel} style={{ margin: '16px 0 8px' }}>Разделы СРМ</div>
+                  <div className={styles.sectionGrid}>
+                    {CRM_SECTIONS.map((s) => {
+                      const on = sections.includes(s.key)
+                      return (
+                        <button key={s.key} type="button" onClick={() => toggleSection(s.key)}
+                          className={[styles.sectionChip, on ? styles.sectionChipOn : ''].join(' ')}>
+                          <span>{s.icon}</span>{s.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+
               <div className={styles.cardFooter}>
-                <Button variant="primary" loading={saving === 'sections'} onClick={saveSections}>Сохранить разделы</Button>
+                <Button variant="primary" loading={saving === 'sections'} onClick={saveSections}>Сохранить доступ</Button>
               </div>
             </section>
           )}

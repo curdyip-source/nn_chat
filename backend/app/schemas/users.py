@@ -2,8 +2,10 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-# Разделы меню, которые можно выдавать не-админу (админ-разделы недоступны через это).
-GRANTABLE_SECTIONS = ("orders", "products", "inventory", "registrations", "contacts", "chat", "price")
+# Доступы, выдаваемые не-админу (админ-разделы недоступны через это). Режимы приложения:
+# chat / crm / price. Разделы внутри СРМ: orders / products / inventory / registrations /
+# contacts (видны только вместе с режимом crm).
+GRANTABLE_SECTIONS = ("chat", "crm", "price", "orders", "products", "inventory", "registrations", "contacts")
 
 
 class EstablishmentPermission(BaseModel):
