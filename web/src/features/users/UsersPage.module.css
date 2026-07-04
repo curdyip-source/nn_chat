@@ -279,19 +279,26 @@
   cursor: pointer;
 }
 .whScopes {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 10px 18px;
-  margin-top: 12px;
-  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
   border-top: 1px solid var(--stroke);
 }
 .scopeRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   font-size: 13.5px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--surface-2);
+}
+.scopeRow:last-child {
+  border-bottom: none;
+}
+.scopeRow > span {
+  color: var(--text-muted);
+  font-weight: 500;
 }
 .scopeSelect {
   padding: 5px 8px;
