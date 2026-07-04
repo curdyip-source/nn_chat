@@ -21,8 +21,11 @@ class InventoryRepository:
     def get_by_id(self, inventory_id: int) -> Inventory | None:
         return self._base_query().filter(Inventory.inventory_id == inventory_id).first()
 
-    def list(self, *, page: int = 1, page_size: int = 20) -> tuple[list[Inventory], int]:
+    def list(self, *, page: int = 1, page_size: int = 20, scoped_establishment_ids: set[int] | None = None) -> tuple[list[Inventory], int]:
         query = self._base_query()
+        # Ось B: не-админ видит инвентаризации строго доступных складов.
+        if scoped_establishment_ids is not None:
+            query = query.filter(Inventory.inventory_establishment_id.in_(scoped_establishment_ids))
         total = query.count()
         items = (
             query.order_by(Inventory.inventory_created_at.desc(), Inventory.inventory_id.desc())

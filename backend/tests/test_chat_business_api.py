@@ -1235,3 +1235,42 @@ def test_orders_list_scoped_to_accessible_establishments(client, integration_db_
     # админ видит все
     admin_ids = {o["order_id"] for o in client.get(f"{API_PREFIX}/orders?page=1&page_size=100", headers={"Authorization": f"Bearer {admin_token}"}).json()["items"]}
     assert {o_est0, o_est1, own_on_est1}.issubset(admin_ids)
+
+
+def test_inventories_and_registrations_scoped_to_accessible_establishments(client, integration_db_session, integration_user, integration_admin):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+    worker_token = login(client, "worker", "WorkerPass123")["token"]
+    est = _first_establishment_ids(client, admin_token, 2)
+
+    def make_inv(est_id):
+        return client.post(f"{API_PREFIX}/inventories", headers={"Authorization": f"Bearer {admin_token}"},
+            json={"inventory_establishment_id": est_id,
+                  "items": [{"product_article": "IV-1", "product_name": "P", "inventory_item_quantity": 1, "inventory_item_cost": "10.00"}]}).json()["item"]["inventory_id"]
+
+    def make_reg(est_id):
+        return client.post(f"{API_PREFIX}/product-registrations", headers={"Authorization": f"Bearer {admin_token}"},
+            json={"product_registration_establishment_id": est_id, "product_registration_supplier": "Поставщик",
+                  "items": [{"product_article": "RG-1", "product_name": "P", "product_registration_item_quantity": 1, "product_registration_item_cost": "10.00"}]}).json()["item"]["product_registration_id"]
+
+    inv0, inv1 = make_inv(est[0]), make_inv(est[1])
+    reg0, reg1 = make_reg(est[0]), make_reg(est[1])
+
+    # worker без ролей не видит ничего из админских
+    inv_seen = client.get(f"{API_PREFIX}/inventories?page=1&page_size=100", headers={"Authorization": f"Bearer {worker_token}"}).json()["items"]
+    assert all(i["inventory_id"] not in (inv0, inv1) for i in inv_seen)
+
+    # даём роль на est[0]
+    client.put(f"{API_PREFIX}/users/{integration_user.user_id}/establishment-roles", headers={"Authorization": f"Bearer {admin_token}"},
+               json={"roles": [{"establishment_id": est[0], "role": "viewer"}]})
+
+    inv_ids = {i["inventory_id"] for i in client.get(f"{API_PREFIX}/inventories?page=1&page_size=100", headers={"Authorization": f"Bearer {worker_token}"}).json()["items"]}
+    assert inv0 in inv_ids and inv1 not in inv_ids
+    reg_ids = {r["product_registration_id"] for r in client.get(f"{API_PREFIX}/product-registrations?page=1&page_size=100", headers={"Authorization": f"Bearer {worker_token}"}).json()["items"]}
+    assert reg0 in reg_ids and reg1 not in reg_ids
+
+    # одиночный доступ: недоступный склад → 404
+    assert client.get(f"{API_PREFIX}/inventories/{inv1}", headers={"Authorization": f"Bearer {worker_token}"}).status_code == 404
+    assert client.get(f"{API_PREFIX}/inventories/{inv0}", headers={"Authorization": f"Bearer {worker_token}"}).status_code == 200

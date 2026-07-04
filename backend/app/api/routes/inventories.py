@@ -10,13 +10,13 @@ router = APIRouter(prefix="/inventories", tags=["inventories"])
 
 
 @router.get("")
-def get_inventories(_: dict = Depends(get_current_user), db: Session = Depends(get_db), page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100)) -> dict:
-    return list_inventories(db, page=page, page_size=page_size)
+def get_inventories(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db), page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100)) -> dict:
+    return list_inventories(db, current_user, page=page, page_size=page_size)
 
 
 @router.get("/{inventory_id}")
-def get_inventory_route(inventory_id: int, _: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    return {"item": get_inventory(db, inventory_id)}
+def get_inventory_route(inventory_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return {"item": get_inventory(db, inventory_id, current_user)}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

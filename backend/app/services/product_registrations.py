@@ -10,6 +10,7 @@ from app.schemas.common import build_pagination
 from app.schemas.product_registrations import ProductRegistrationCreatePayload, ProductRegistrationStatusUpdatePayload, ProductRegistrationUpdatePayload
 from app.services.contacts import save_supplier_contact
 from app.services.audit import log_audit_event
+from app.services.access_control import accessible_establishment_ids
 from app.services.card_sync import notify_product_registration_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.push_notifications import send_push_notification_event
@@ -31,8 +32,18 @@ class ProductRegistrationService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Приемка не найдена")
         return row
 
-    def list_product_registrations(self, *, page: int = 1, page_size: int = 20) -> dict:
-        rows, total = self.repository.list(page=page, page_size=page_size)
+    def get_accessible_product_registration_or_404(self, product_registration_id: int, current_user: dict):
+        # Ось B: доступна, если склад доступен ИЛИ пользователь — владелец; иначе 404.
+        row = self.get_product_registration_or_404(product_registration_id)
+        scoped = accessible_establishment_ids(self.db, current_user)
+        if scoped is not None and row.product_registration_establishment_id not in scoped and row.product_registration_owner_user_id != current_user["user_id"]:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Приемка не найдена")
+        return row
+
+    def list_product_registrations(self, current_user: dict, *, page: int = 1, page_size: int = 20) -> dict:
+        # Ось B: не-админ видит строго приёмки доступных складов.
+        scoped_establishment_ids = accessible_establishment_ids(self.db, current_user)
+        rows, total = self.repository.list(page=page, page_size=page_size, scoped_establishment_ids=scoped_establishment_ids)
         return {"items": [serialize_product_registration(item) for item in rows], "pagination": build_pagination(page, page_size, total)}
 
     def create_product_registration(self, payload: ProductRegistrationCreatePayload, current_user: dict) -> dict:
@@ -104,7 +115,7 @@ class ProductRegistrationService:
         return result
 
     def update_product_registration(self, product_registration_id: int, payload: ProductRegistrationUpdatePayload, current_user: dict) -> dict:
-        row = self.get_product_registration_or_404(product_registration_id)
+        row = self.get_accessible_product_registration_or_404(product_registration_id, current_user)
         get_establishment_or_404(self.db, payload.product_registration_establishment_id)
         status_id = row.product_registration_status_id
         if payload.product_registration_status_id:
@@ -145,7 +156,7 @@ class ProductRegistrationService:
         return serialize_product_registration(row)
 
     def update_product_registration_status(self, product_registration_id: int, payload: ProductRegistrationStatusUpdatePayload, current_user: dict) -> dict:
-        row = self.get_product_registration_or_404(product_registration_id)
+        row = self.get_accessible_product_registration_or_404(product_registration_id, current_user)
         status_row = get_status_or_404(self.db, payload.product_registration_status_id, expected_type="product_registration")
         row = self.repository.update(row, {"product_registration_status_id": status_row.status_id})
         log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_PRODUCT_REGISTRATION, entity_id=row.product_registration_id, event_type=EVENT_TYPE_PRODUCT_REGISTRATION_UPDATE, event_payload={"product_registration_status_id": status_row.status_id})
@@ -153,12 +164,12 @@ class ProductRegistrationService:
         return serialize_product_registration(row)
 
 
-def list_product_registrations(db: Session, *, page: int = 1, page_size: int = 20) -> dict:
-    return ProductRegistrationService(db).list_product_registrations(page=page, page_size=page_size)
+def list_product_registrations(db: Session, current_user: dict, *, page: int = 1, page_size: int = 20) -> dict:
+    return ProductRegistrationService(db).list_product_registrations(current_user, page=page, page_size=page_size)
 
 
-def get_product_registration(db: Session, product_registration_id: int) -> dict:
-    return serialize_product_registration(ProductRegistrationService(db).get_product_registration_or_404(product_registration_id))
+def get_product_registration(db: Session, product_registration_id: int, current_user: dict) -> dict:
+    return serialize_product_registration(ProductRegistrationService(db).get_accessible_product_registration_or_404(product_registration_id, current_user))
 
 
 def create_product_registration(db: Session, payload: ProductRegistrationCreatePayload, current_user: dict) -> dict:

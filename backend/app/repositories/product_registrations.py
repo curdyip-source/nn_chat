@@ -21,8 +21,11 @@ class ProductRegistrationRepository:
     def get_by_id(self, product_registration_id: int) -> ProductRegistration | None:
         return self._base_query().filter(ProductRegistration.product_registration_id == product_registration_id).first()
 
-    def list(self, *, page: int = 1, page_size: int = 20) -> tuple[list[ProductRegistration], int]:
+    def list(self, *, page: int = 1, page_size: int = 20, scoped_establishment_ids: set[int] | None = None) -> tuple[list[ProductRegistration], int]:
         query = self._base_query()
+        # Ось B: не-админ видит приёмки строго доступных складов.
+        if scoped_establishment_ids is not None:
+            query = query.filter(ProductRegistration.product_registration_establishment_id.in_(scoped_establishment_ids))
         total = query.count()
         items = (
             query.order_by(ProductRegistration.product_registration_created_at.desc(), ProductRegistration.product_registration_id.desc())
