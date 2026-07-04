@@ -19,23 +19,23 @@ _SSE_HEARTBEAT_SECONDS = 20
 
 @router.get("")
 def get_messages(
-    _: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
     before_message_id: int | None = Query(default=None, ge=1),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
 ) -> dict:
-    return list_messages(db, before_message_id=before_message_id, page=page, page_size=page_size)
+    return list_messages(db, current_user, before_message_id=before_message_id, page=page, page_size=page_size)
 
 
 @router.get("/sync")
 def sync_messages_route(
-    _: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=200, ge=1, le=500),
 ) -> dict:
-    return sync_messages(db, cursor=cursor, limit=limit)
+    return sync_messages(db, current_user, cursor=cursor, limit=limit)
 
 
 @router.get("/stream")

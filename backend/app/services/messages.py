@@ -13,6 +13,7 @@ from app.repositories.user_devices import UserDeviceRepository
 from app.repositories.users import UserRepository
 from app.schemas.common import build_pagination
 from app.schemas.messages import MessageCreatePayload, MessageUpdatePayload
+from app.services.access_control import list_visibility
 from app.services.audit import log_audit_event
 from app.services.message_stream import broker
 from app.services.push_notifications import send_mention_push_event, send_push_notification_event
@@ -36,17 +37,55 @@ def _decode_sync_cursor(cursor: str | None) -> tuple[datetime | None, int | None
         return None, None
 
 
-def sync_messages(db: Session, *, cursor: str | None, limit: int) -> dict:
+def _card_establishment_owner(row) -> tuple[int, int] | None:
+    """(establishment_id, owner_user_id) встроенной карточки-документа, либо None для
+    обычного текстового сообщения (общего для всех в чате)."""
+    if row.message_order_id is not None and row.order is not None:
+        return row.order.order_establishment_id, row.order.order_owner_user_id
+    if row.message_inventory_id is not None and row.inventory is not None:
+        return row.inventory.inventory_establishment_id, row.inventory.inventory_owner_user_id
+    if row.message_product_registration_id is not None and row.product_registration is not None:
+        return (
+            row.product_registration.product_registration_establishment_id,
+            row.product_registration.product_registration_owner_user_id,
+        )
+    return None
+
+
+def _card_visibility_predicate(db: Session, current_user: dict):
+    """Предикат видимости карточки для ленты чата. list_visibility считаем ОДИН раз (а не
+    запрос на каждую строку). Обычные сообщения и tombstone — всегда видимы; карточки —
+    по правам склада (склад ∈ full ИЛИ (склад ∈ own И владелец=я))."""
+    full_ids, own_ids, uid = list_visibility(db, current_user)
+    if full_ids is None:
+        return lambda row: True  # админ — обходит фильтрацию
+
+    def _visible(row) -> bool:
+        scope = _card_establishment_owner(row)
+        if scope is None:
+            return True
+        establishment_id, owner_user_id = scope
+        return establishment_id in full_ids or (establishment_id in own_ids and owner_user_id == uid)
+
+    return _visible
+
+
+def sync_messages(db: Session, current_user: dict, *, cursor: str | None, limit: int) -> dict:
     since_updated_at, since_message_id = _decode_sync_cursor(cursor)
     rows = MessageRepository(db).list_changes(
         since_updated_at=since_updated_at,
         since_message_id=since_message_id,
         limit=limit,
     )
-    items = [
-        serialize_message_tombstone(row) if row.message_deleted_at is not None else serialize_message(row)
-        for row in rows
-    ]
+    # Карточки заказов/инвентаризаций/приёмок фильтруем по доступу к складу (как в списках).
+    # Курсор считаем по ПОЛНОМУ набору строк (не по видимым) — пагинация не ломается.
+    visible = _card_visibility_predicate(db, current_user)
+    items: list[dict] = []
+    for row in rows:
+        if row.message_deleted_at is not None:
+            items.append(serialize_message_tombstone(row))
+        elif visible(row):
+            items.append(serialize_message(row))
     if rows:
         last = rows[-1]
         next_cursor = _encode_sync_cursor(last.message_updated_at, last.message_id)
@@ -73,10 +112,11 @@ class MessageService:
         self.attachment_asset_repository = MessageAttachmentAssetRepository(db)
         self.device_repository = UserDeviceRepository(db)
 
-    def list_messages(self, *, before_message_id: int | None = None, page: int = 1, page_size: int = 50) -> dict:
+    def list_messages(self, current_user: dict, *, before_message_id: int | None = None, page: int = 1, page_size: int = 50) -> dict:
         rows, total = self.repository.list(before_message_id=before_message_id, page=page, page_size=page_size)
+        visible = _card_visibility_predicate(self.db, current_user)
         return {
-            "items": [serialize_message(item) for item in rows],
+            "items": [serialize_message(item) for item in rows if visible(item)],
             "pagination": build_pagination(page, page_size, total),
             "filters": {"before_message_id": before_message_id},
         }
@@ -236,8 +276,8 @@ class MessageService:
         broker.publish({"type": "deleted", "message_id": message_id})
 
 
-def list_messages(db: Session, *, before_message_id: int | None = None, page: int = 1, page_size: int = 50) -> dict:
-    return MessageService(db).list_messages(before_message_id=before_message_id, page=page, page_size=page_size)
+def list_messages(db: Session, current_user: dict, *, before_message_id: int | None = None, page: int = 1, page_size: int = 50) -> dict:
+    return MessageService(db).list_messages(current_user, before_message_id=before_message_id, page=page, page_size=page_size)
 
 
 def create_message(db: Session, payload: MessageCreatePayload, current_user: dict) -> dict:

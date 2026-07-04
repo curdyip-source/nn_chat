@@ -85,3 +85,23 @@ def can_create_on_establishment(db: Session, user: dict, establishment_id: int) 
         return True
     membership = _memberships(db, user).get(establishment_id)
     return bool(membership and membership.user_establishment_role_can_create)
+
+
+def can_view_message_card(db: Session, user: dict, message) -> bool:
+    """Видима ли пользователю карточка-документ (заказ/инвентаризация/приёмка), встроенная
+    в сообщение чата. Обычные текстовые сообщения (без документа) видимы всегда — в чате они
+    общие. Для карточек — те же права по складу, что и в списках (can_view_document)."""
+    if user.get("user_admin"):
+        return True
+    order = message.order
+    if order is not None:
+        return can_view_document(db, user, order.order_establishment_id, order.order_owner_user_id)
+    inventory = message.inventory
+    if inventory is not None:
+        return can_view_document(db, user, inventory.inventory_establishment_id, inventory.inventory_owner_user_id)
+    registration = message.product_registration
+    if registration is not None:
+        return can_view_document(
+            db, user, registration.product_registration_establishment_id, registration.product_registration_owner_user_id
+        )
+    return True  # обычное сообщение — общее
