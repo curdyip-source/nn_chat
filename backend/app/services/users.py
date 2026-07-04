@@ -10,6 +10,7 @@ from app.core.audit_types import (
     EVENT_TYPE_USER_REGISTER,
     EVENT_TYPE_USER_CREATE,
     EVENT_TYPE_USER_DELETE,
+    EVENT_TYPE_USER_ROLES_UPDATE,
     EVENT_TYPE_USER_UPDATE,
 )
 from app.core.security import hash_password
@@ -17,11 +18,13 @@ from app.core.session import generate_session_token, get_session_expires_at
 from app.core.tokens import create_access_token
 from app.repositories.sessions import SessionRepository
 from app.repositories.users import UserRepository
+from app.repositories.user_establishment_roles import UserEstablishmentRoleRepository
 from app.repositories.profile_photos import ProfilePhotoRepository
 from app.schemas.auth import RegisterPayload
 from app.schemas.common import build_pagination, model_to_dict
-from app.schemas.users import UserCreatePayload, UserProfileUpdatePayload, UserUpdatePayload
+from app.schemas.users import UserCreatePayload, UserEstablishmentRolesPayload, UserProfileUpdatePayload, UserUpdatePayload
 from app.services.audit import log_audit_event
+from app.services.domain_common import get_establishment_or_404
 from app.services.profile_photos import build_profile_photo_storage_key
 from app.services.serializers import serialize_chat_participant, serialize_datetime, serialize_user
 
@@ -197,6 +200,29 @@ class UserService:
         )
         return serialize_user(row)
 
+    def set_establishment_roles(self, user_id: int, payload: UserEstablishmentRolesPayload, actor_user: dict) -> dict:
+        # Полная замена набора складских ролей пользователя (только админ вызывает).
+        # Роль валидируется схемой (Literal viewer/editor/manager); проверяем лишь
+        # существование складов. Дубли по складу схлопывает репозиторий.
+        user = self.get_user_by_id_or_404(user_id)
+        pairs: list[tuple[int, str]] = []
+        for assignment in payload.roles:
+            get_establishment_or_404(self.db, assignment.establishment_id)
+            pairs.append((assignment.establishment_id, assignment.role))
+        UserEstablishmentRoleRepository(self.db).replace_for_user(user_id, pairs)
+        # Сессия с expire_on_commit=False — коллекция user.establishment_roles после
+        # записи устаревшая; инвалидируем, чтобы serialize_user перечитал свежие роли.
+        self.db.expire(user, ["establishment_roles"])
+        log_audit_event(
+            self.db,
+            actor_user_id=actor_user["user_id"],
+            entity_type=ENTITY_TYPE_USER,
+            entity_id=user_id,
+            event_type=EVENT_TYPE_USER_ROLES_UPDATE,
+            event_payload={"roles": [{"establishment_id": establishment_id, "role": role} for establishment_id, role in pairs]},
+        )
+        return serialize_user(user)
+
     def update_profile(self, user_id: int, payload: UserProfileUpdatePayload) -> dict:
         user = self.get_user_by_id_or_404(user_id)
         data = model_to_dict(payload)
@@ -266,6 +292,10 @@ def register_user(db: Session, payload: RegisterPayload) -> dict:
 
 def update_user(db: Session, user_id: int, payload: UserUpdatePayload, actor_user: dict) -> dict:
     return UserService(db).update_user(user_id, payload, actor_user)
+
+
+def set_user_establishment_roles(db: Session, user_id: int, payload: UserEstablishmentRolesPayload, actor_user: dict) -> dict:
+    return UserService(db).set_establishment_roles(user_id, payload, actor_user)
 
 
 def update_user_profile(db: Session, user_id: int, payload: UserProfileUpdatePayload) -> dict:

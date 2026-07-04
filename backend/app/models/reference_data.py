@@ -26,6 +26,7 @@ class Establishment(Base):
     inventories = relationship("Inventory", back_populates="establishment")
     product_registrations = relationship("ProductRegistration", back_populates="establishment")
     contacts = relationship("Contact", back_populates="establishment")
+    user_roles = relationship("UserEstablishmentRole", back_populates="establishment", cascade="all, delete-orphan")
 
 
 class OrderMethod(Base):

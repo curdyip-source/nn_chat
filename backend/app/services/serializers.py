@@ -31,6 +31,13 @@ def serialize_user(row) -> dict:
         "user_verified_user_id": row.user_verified_user_id,
         "user_verified_user_login": verified_by.user_login if verified_by else None,
         "user_created_at": serialize_datetime(row.user_created_at),
+        "user_establishment_roles": [
+            {
+                "establishment_id": role.user_establishment_role_establishment_id,
+                "role": role.user_establishment_role_role,
+            }
+            for role in (getattr(row, "establishment_roles", None) or [])
+        ],
     }
 
 

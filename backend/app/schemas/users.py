@@ -1,6 +1,15 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+class EstablishmentRoleAssignment(BaseModel):
+    establishment_id: int
+    role: Literal["viewer", "editor", "manager"]
+
+
+class UserEstablishmentRolesPayload(BaseModel):
+    roles: list[EstablishmentRoleAssignment] = Field(default_factory=list)
 
 
 class UserCreatePayload(BaseModel):

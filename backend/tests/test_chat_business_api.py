@@ -1096,3 +1096,87 @@ def test_delete_order_allowed_for_admin(client, integration_db_session, integrat
     order_id = _create_simple_order(client, owner_token)
     assert client.delete(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {admin_token}"}).status_code == 204
     assert client.get(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {admin_token}"}).status_code == 404
+
+
+def _first_establishment_ids(client, token, n=2):
+    ref = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {token}"}).json()
+    ests = ref["establishments"]
+    return [e["establishment_id"] for e in ests[:n]]
+
+
+def test_admin_assigns_establishment_roles_and_they_reach_user(client, integration_db_session, integration_user, integration_admin):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+    est = _first_establishment_ids(client, admin_token, 2)
+
+    # админ назначает роли обычному пользователю
+    resp = client.put(
+        f"{API_PREFIX}/users/{integration_user.user_id}/establishment-roles",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"roles": [{"establishment_id": est[0], "role": "editor"}, {"establishment_id": est[1], "role": "viewer"}]},
+    )
+    assert resp.status_code == 200
+    roles = {r["establishment_id"]: r["role"] for r in resp.json()["item"]["user_establishment_roles"]}
+    assert roles == {est[0]: "editor", est[1]: "viewer"}
+
+    # роли доходят до самого пользователя при логине
+    login_payload = login(client, "worker", "WorkerPass123")
+    user_roles = {r["establishment_id"]: r["role"] for r in login_payload["user"]["user_establishment_roles"]}
+    assert user_roles == {est[0]: "editor", est[1]: "viewer"}
+
+
+def test_set_establishment_roles_replaces_previous(client, integration_db_session, integration_user, integration_admin):
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+    est = _first_establishment_ids(client, admin_token, 2)
+    uid = integration_user.user_id
+
+    client.put(f"{API_PREFIX}/users/{uid}/establishment-roles", headers={"Authorization": f"Bearer {admin_token}"},
+               json={"roles": [{"establishment_id": est[0], "role": "viewer"}]})
+    resp = client.put(f"{API_PREFIX}/users/{uid}/establishment-roles", headers={"Authorization": f"Bearer {admin_token}"},
+                      json={"roles": [{"establishment_id": est[1], "role": "manager"}]})
+    roles = {r["establishment_id"]: r["role"] for r in resp.json()["item"]["user_establishment_roles"]}
+    assert roles == {est[1]: "manager"}  # прежняя роль на est[0] снята
+
+
+def test_non_admin_cannot_assign_establishment_roles(client, integration_db_session, integration_user, integration_admin):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    worker_token = login(client, "worker", "WorkerPass123")["token"]
+    est = _first_establishment_ids(client, worker_token, 1)
+    resp = client.put(
+        f"{API_PREFIX}/users/{integration_user.user_id}/establishment-roles",
+        headers={"Authorization": f"Bearer {worker_token}"},
+        json={"roles": [{"establishment_id": est[0], "role": "editor"}]},
+    )
+    assert resp.status_code == 403
+
+
+def test_admin_can_delete_other_users_chat_message(client, integration_db_session, integration_user, integration_admin):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    worker_token = login(client, "worker", "WorkerPass123")["token"]
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+
+    mid = client.post(f"{API_PREFIX}/messages", headers={"Authorization": f"Bearer {worker_token}"},
+                      json={"message_type": "message", "message_text": "чужое сообщение"}).json()["item"]["message_id"]
+
+    # админ удаляет чужое сообщение → 204
+    assert client.delete(f"{API_PREFIX}/messages/{mid}", headers={"Authorization": f"Bearer {admin_token}"}).status_code == 204
+
+
+def test_non_admin_cannot_delete_other_users_message(client, integration_db_session, integration_user, integration_admin):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    worker_token = login(client, "worker", "WorkerPass123")["token"]
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+
+    # сообщение от админа, обычный пользователь пытается удалить → 403
+    mid = client.post(f"{API_PREFIX}/messages", headers={"Authorization": f"Bearer {admin_token}"},
+                      json={"message_type": "message", "message_text": "сообщение админа"}).json()["item"]["message_id"]
+    assert client.delete(f"{API_PREFIX}/messages/{mid}", headers={"Authorization": f"Bearer {worker_token}"}).status_code == 403

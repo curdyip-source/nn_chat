@@ -94,10 +94,13 @@ class MessageService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Можно изменить или удалить только обычное текстовое сообщение")
 
     def _ensure_deletable_chat_message(self, row, current_user: dict) -> None:
-        if row.message_owner_user_id != current_user["user_id"]:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Можно управлять только своими сообщениями")
+        # Карточки заказа/инвентаризации/приёмки этим путём не удаляются (ни
+        # владельцем, ни админом) — они убираются вместе со своей сущностью.
         if row.message_order_id or row.message_inventory_id or row.message_product_registration_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Можно удалить только обычное сообщение или сообщение с вложением")
+        # Своё сообщение удаляет владелец; чужие обычные чат-сообщения — только админ.
+        if row.message_owner_user_id != current_user["user_id"] and not current_user["user_admin"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Удалять чужие сообщения может только администратор")
 
     def create_message(self, payload: MessageCreatePayload, current_user: dict) -> dict:
         attachments = []

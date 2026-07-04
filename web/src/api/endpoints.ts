@@ -6,6 +6,7 @@ import type {
   Contact,
   Currency,
   Establishment,
+  EstablishmentRole,
   Inventory,
   Order,
   OrderCreate,
@@ -341,6 +342,16 @@ export function updateUser(
   patch: Partial<Pick<User, 'user_active' | 'user_admin'>>,
 ) {
   return apiRequest<{ item: User }>(`/users/${userId}`, { method: 'PUT', body: patch })
+}
+
+export function setUserEstablishmentRoles(
+  userId: number,
+  roles: EstablishmentRole[],
+) {
+  return apiRequest<{ item: User }>(`/users/${userId}/establishment-roles`, {
+    method: 'PUT',
+    body: { roles },
+  })
 }
 
 // ---------- Audit ----------

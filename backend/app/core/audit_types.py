@@ -18,6 +18,7 @@ EVENT_TYPE_USER_BOOTSTRAP = "user.bootstrap"
 EVENT_TYPE_USER_REGISTER = "user.register"
 EVENT_TYPE_USER_CREATE = "user.create"
 EVENT_TYPE_USER_UPDATE = "user.update"
+EVENT_TYPE_USER_ROLES_UPDATE = "user.roles.update"
 EVENT_TYPE_USER_DELETE = "user.delete"
 
 EVENT_TYPE_DOCUMENT_CREATE = "document.create"

@@ -11,6 +11,7 @@ from app.models.product_registrations import ProductRegistration, ProductRegistr
 from app.models.reference_data import Currency, Establishment, OrderMethod, Product, Status
 from app.models.user_sessions import UserSession
 from app.models.user_devices import UserDevice
+from app.models.user_establishment_roles import UserEstablishmentRole
 from app.models.users import User
 
 __all__ = [
@@ -38,4 +39,5 @@ __all__ = [
 	"ProductRegistration",
 	"ProductRegistrationItem",
 	"UserDevice",
+	"UserEstablishmentRole",
 ]

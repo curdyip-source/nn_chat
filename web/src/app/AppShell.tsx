@@ -21,6 +21,7 @@ type Section = {
   icon: string
   render: () => ReactNode
   ready: boolean
+  adminOnly?: boolean
 }
 
 const SECTIONS: Section[] = [
@@ -29,9 +30,10 @@ const SECTIONS: Section[] = [
   { key: 'inventory', label: 'Инвентаризации', icon: '📊', render: () => <DocumentsPage kind={INVENTORY_KIND} />, ready: true },
   { key: 'registrations', label: 'Приёмки', icon: '📥', render: () => <DocumentsPage kind={REGISTRATION_KIND} />, ready: true },
   { key: 'contacts', label: 'Контрагенты', icon: '👥', render: () => <ContactsPage />, ready: true },
-  { key: 'reference', label: 'Справочники', icon: '⚙️', render: () => <ReferencePage />, ready: true },
-  { key: 'users', label: 'Пользователи', icon: '👤', render: () => <UsersPage />, ready: true },
-  { key: 'audit', label: 'Аудит', icon: '📜', render: () => <AuditPage />, ready: true },
+  // Административные разделы — только для админа (управление правами/системой).
+  { key: 'reference', label: 'Справочники', icon: '⚙️', render: () => <ReferencePage />, ready: true, adminOnly: true },
+  { key: 'users', label: 'Пользователи', icon: '👤', render: () => <UsersPage />, ready: true, adminOnly: true },
+  { key: 'audit', label: 'Аудит', icon: '📜', render: () => <AuditPage />, ready: true, adminOnly: true },
   { key: 'chat', label: 'Чат', icon: '💬', render: () => <ChatPage />, ready: true },
   { key: 'price', label: 'Прайс', icon: '💲', render: () => <PriceSection />, ready: true },
 ]
@@ -48,7 +50,9 @@ function AppShellInner() {
   const { user, logout } = useAuth()
   const { sidebarHidden, setSidebarHidden } = useLayout()
   const [active, setActive] = useState('orders')
-  const section = SECTIONS.find((s) => s.key === active) ?? SECTIONS[0]
+  // Не-админам административные разделы не показываем и не даём открыть.
+  const visibleSections = SECTIONS.filter((s) => !s.adminOnly || user?.user_admin)
+  const section = visibleSections.find((s) => s.key === active) ?? visibleSections[0]
 
   return (
     <div className={[styles.layout, sidebarHidden ? styles.noSidebar : ''].join(' ')}>
@@ -59,7 +63,7 @@ function AppShellInner() {
             <span>NufNaf</span>
           </div>
           <nav className={styles.nav}>
-            {SECTIONS.map((s) => (
+            {visibleSections.map((s) => (
               <button
                 key={s.key}
                 className={[styles.navItem, s.key === active ? styles.navActive : ''].join(' ')}

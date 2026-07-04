@@ -6,9 +6,9 @@ from sqlalchemy.orm import Session
 from app.core.config import FIRST_ADMIN_PASS
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_admin
-from app.schemas.users import BootstrapFirstAdminPayload, UserCreatePayload, UserProfileUpdatePayload, UserUpdatePayload
+from app.schemas.users import BootstrapFirstAdminPayload, UserCreatePayload, UserEstablishmentRolesPayload, UserProfileUpdatePayload, UserUpdatePayload
 from app.services.profile_photos import upload_profile_photo
-from app.services.users import UserService, bootstrap_first_user, create_user, delete_user, list_chat_participants, list_users, update_user, update_user_profile
+from app.services.users import UserService, bootstrap_first_user, create_user, delete_user, list_chat_participants, list_users, set_user_establishment_roles, update_user, update_user_profile
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -51,6 +51,11 @@ def create_user_route(payload: UserCreatePayload, current_user: dict = Depends(r
 @router.put("/{user_id}")
 def update_user_route(user_id: int, payload: UserUpdatePayload, current_user: dict = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
     return {"item": update_user(db, user_id, payload, current_user)}
+
+
+@router.put("/{user_id}/establishment-roles")
+def set_user_establishment_roles_route(user_id: int, payload: UserEstablishmentRolesPayload, current_user: dict = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    return {"item": set_user_establishment_roles(db, user_id, payload, current_user)}
 
 
 @router.delete("/{user_id}")

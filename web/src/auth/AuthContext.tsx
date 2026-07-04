@@ -26,6 +26,14 @@ type AuthState = {
 
 const AuthCtx = createContext<AuthState | null>(null)
 
+// Доступ в веб: администратор ИЛИ пользователь, которому назначена хотя бы одна
+// роль на складе (= сотрудник). Обычный чат-пользователь без ролей в веб не
+// заходит. Управление правами (страница «Пользователи» и пр.) остаётся под
+// проверкой user_admin отдельно.
+export function hasWebAccess(user: User): boolean {
+  return user.user_admin || (user.user_establishment_roles?.length ?? 0) > 0
+}
+
 function readStoredUser(): User | null {
   try {
     return JSON.parse(localStorage.getItem(USER_KEY) ?? 'null')
@@ -67,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchMe()
       .then(({ user }) => {
         if (cancelled) return
-        if (!user.user_admin) {
+        if (!hasWebAccess(user)) {
           signOut()
           return
         }
@@ -85,8 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (loginValue: string, password: string) => {
     const res = await apiLogin(loginValue, password)
-    if (!res.user.user_admin) {
-      throw new Error('Войти в админку может только пользователь с правами администратора')
+    if (!hasWebAccess(res.user)) {
+      throw new Error('Нет доступа в веб: обратитесь к администратору за назначением роли')
     }
     setAccessToken(res.access_token ?? res.token ?? '')
     setRefreshToken(res.refresh_token ?? '')

@@ -40,6 +40,7 @@ class User(Base):
     inventories = relationship("Inventory", back_populates="owner")
     product_registrations = relationship("ProductRegistration", back_populates="owner")
     user_devices = relationship("UserDevice", back_populates="user", cascade="all, delete-orphan")
+    establishment_roles = relationship("UserEstablishmentRole", back_populates="user", cascade="all, delete-orphan")
     owned_establishments = relationship("Establishment", back_populates="owner")
     owned_order_methods = relationship("OrderMethod", back_populates="owner")
     owned_statuses = relationship("Status", back_populates="owner")

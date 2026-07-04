@@ -1,5 +1,10 @@
 // Типы API. Имена полей повторяют сериализаторы бэкенда (snake_case).
 
+export type EstablishmentRole = {
+  establishment_id: number
+  role: 'viewer' | 'editor' | 'manager'
+}
+
 export type User = {
   user_id: number
   user_login: string
@@ -7,6 +12,7 @@ export type User = {
   user_second_name?: string | null
   user_admin: boolean
   user_active?: boolean
+  user_establishment_roles?: EstablishmentRole[]
 }
 
 export type AuthResponse = {
