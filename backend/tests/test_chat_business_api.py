@@ -3,6 +3,7 @@ from openpyxl import Workbook
 from app.core.audit_types import EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_UPDATE
 from app.core.security import hash_password
 from app.models import User
+from app.models.user_establishment_roles import UserEstablishmentRole
 from app.models.reference_data import Establishment, Status
 
 
@@ -1080,7 +1081,17 @@ def test_delete_order_forbidden_for_non_owner_non_admin(client, integration_db_s
     owner_token = login(client, "worker", "WorkerPass123")["token"]
     other_token = login(client, "worker2", "Worker2Pass123")["token"]
 
+    est_id = _first_establishment_ids(client, owner_token, 1)[0]
     order_id = _create_simple_order(client, owner_token)
+    # worker2 получает доступ к складу заказа (видит его), но не владелец → удаление 403.
+    integration_db_session.add(
+        UserEstablishmentRole(
+            user_establishment_role_user_id=other.user_id,
+            user_establishment_role_establishment_id=est_id,
+            user_establishment_role_role="editor",
+        )
+    )
+    integration_db_session.commit()
     forbidden = client.delete(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {other_token}"})
     assert forbidden.status_code == 403
     assert client.get(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {owner_token}"}).status_code == 200
@@ -1180,3 +1191,47 @@ def test_non_admin_cannot_delete_other_users_message(client, integration_db_sess
     mid = client.post(f"{API_PREFIX}/messages", headers={"Authorization": f"Bearer {admin_token}"},
                       json={"message_type": "message", "message_text": "сообщение админа"}).json()["item"]["message_id"]
     assert client.delete(f"{API_PREFIX}/messages/{mid}", headers={"Authorization": f"Bearer {worker_token}"}).status_code == 403
+
+
+def test_orders_list_scoped_to_accessible_establishments(client, integration_db_session, integration_user, integration_admin):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+    worker_token = login(client, "worker", "WorkerPass123")["token"]
+    est = _first_establishment_ids(client, admin_token, 2)
+    ref = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {admin_token}"}).json()
+    method_id = ref["order_methods"][0]["order_method_id"]
+
+    def make_order(token, establishment_id, customer):
+        return client.post(f"{API_PREFIX}/orders", headers={"Authorization": f"Bearer {token}"},
+            json={"order_establishment_id": establishment_id, "order_method_id": method_id, "order_customer": customer, "order_info": "x",
+                  "items": [{"product_article": "SC-1", "product_name": "P", "order_item_quantity": 1, "order_item_price": "5.00"}]}).json()["item"]["order_id"]
+
+    # админ создаёт заказы на обоих складах
+    o_est0 = make_order(admin_token, est[0], "на складе 0")
+    o_est1 = make_order(admin_token, est[1], "на складе 1")
+
+    # без ролей worker видит только свои (пусто из админских)
+    seen = client.get(f"{API_PREFIX}/orders?page=1&page_size=100", headers={"Authorization": f"Bearer {worker_token}"}).json()["items"]
+    assert all(o["order_id"] not in (o_est0, o_est1) for o in seen)
+
+    # даём worker роль только на est[0]
+    client.put(f"{API_PREFIX}/users/{integration_user.user_id}/establishment-roles", headers={"Authorization": f"Bearer {admin_token}"},
+               json={"roles": [{"establishment_id": est[0], "role": "viewer"}]})
+
+    ids = {o["order_id"] for o in client.get(f"{API_PREFIX}/orders?page=1&page_size=100", headers={"Authorization": f"Bearer {worker_token}"}).json()["items"]}
+    assert o_est0 in ids           # склад доступен — виден
+    assert o_est1 not in ids       # склад недоступен — скрыт
+
+    # даже свой заказ на НЕдоступном складе скрыт из списка (строго по складу —
+    # пользователь работает в рамках своих точек).
+    own_on_est1 = make_order(worker_token, est[1], "мой на складе 1")
+    ids2 = {o["order_id"] for o in client.get(f"{API_PREFIX}/orders?page=1&page_size=100", headers={"Authorization": f"Bearer {worker_token}"}).json()["items"]}
+    assert own_on_est1 not in ids2  # свой заказ на недоступном складе — скрыт
+    assert o_est0 in ids2           # доступный склад — по-прежнему виден
+    assert o_est1 not in ids2       # чужой на недоступном складе — скрыт
+
+    # админ видит все
+    admin_ids = {o["order_id"] for o in client.get(f"{API_PREFIX}/orders?page=1&page_size=100", headers={"Authorization": f"Bearer {admin_token}"}).json()["items"]}
+    assert {o_est0, o_est1, own_on_est1}.issubset(admin_ids)

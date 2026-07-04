@@ -17,6 +17,7 @@ from app.schemas.common import build_pagination
 from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
 from app.services.contacts import save_buyer_contact_from_order, save_supplier_contact
 from app.services.audit import log_audit_event
+from app.services.access_control import accessible_establishment_ids
 from app.services.card_sync import notify_cards_deleted, notify_order_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.messages import resolve_mention_recipient_ids
@@ -218,9 +219,21 @@ class OrderService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Заказ не найден")
         return row
 
-    def list_orders(self, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, establishment_ids: list[int] | None = None, search: str | None = None, date_from: date | None = None, date_to: date | None = None) -> dict:
-        rows, total = self.repository.list(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, search=search, date_from=date_from, date_to=date_to)
-        currency_totals = self.repository.totals_by_currency(status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, search=search, date_from=date_from, date_to=date_to)
+    def get_accessible_order_or_404(self, order_id: int, current_user: dict):
+        # Ось B: заказ доступен, если он на доступном пользователю складе ЛИБО пользователь
+        # его владелец (свой заказ не теряется при отсутствии роли на складе). Иначе — 404
+        # (не 403, чтобы не раскрывать наличие чужих заказов вне области видимости).
+        row = self.get_order_or_404(order_id)
+        scoped = accessible_establishment_ids(self.db, current_user)
+        if scoped is not None and row.order_establishment_id not in scoped and row.order_owner_user_id != current_user["user_id"]:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Заказ не найден")
+        return row
+
+    def list_orders(self, current_user: dict, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, establishment_ids: list[int] | None = None, search: str | None = None, date_from: date | None = None, date_to: date | None = None) -> dict:
+        # Ось B: не-админ видит СТРОГО заказы доступных ему складов. None = все (админ).
+        scoped_establishment_ids = accessible_establishment_ids(self.db, current_user)
+        rows, total = self.repository.list(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, scoped_establishment_ids=scoped_establishment_ids, search=search, date_from=date_from, date_to=date_to)
+        currency_totals = self.repository.totals_by_currency(status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, scoped_establishment_ids=scoped_establishment_ids, search=search, date_from=date_from, date_to=date_to)
         totals = [
             {"currency_id": currency_id, "currency_sign": currency_sign, "amount": amount}
             for currency_id, currency_sign, amount in currency_totals
@@ -350,7 +363,7 @@ class OrderService:
         return result
 
     def update_order(self, order_id: int, payload: OrderUpdatePayload, current_user: dict) -> dict:
-        row = self.get_order_or_404(order_id)
+        row = self.get_accessible_order_or_404(order_id, current_user)
         before_snapshot = serialize_order(row)
         get_establishment_or_404(self.db, payload.order_establishment_id)
         order_method_row = get_order_method_or_404(self.db, payload.order_method_id)
@@ -448,7 +461,7 @@ class OrderService:
         return serialize_order(row)
 
     def update_order_status(self, order_id: int, payload: OrderStatusUpdatePayload, current_user: dict) -> dict:
-        row = self.get_order_or_404(order_id)
+        row = self.get_accessible_order_or_404(order_id, current_user)
         before_snapshot = serialize_order(row)
         status_row = get_status_or_404(self.db, payload.order_status_id, expected_type="orders")
         row = self.repository.update(row, {"order_status_id": status_row.status_id})
@@ -464,7 +477,7 @@ class OrderService:
         return serialize_order(row)
 
     def delete_order(self, order_id: int, current_user: dict) -> None:
-        row = self.get_order_or_404(order_id)
+        row = self.get_accessible_order_or_404(order_id, current_user)
         # Право на удаление: только владелец заказа или администратор.
         if row.order_owner_user_id != current_user["user_id"] and not current_user["user_admin"]:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Удалять заказ может только его владелец или администратор")
@@ -489,8 +502,8 @@ class OrderService:
         # 3) Realtime: убрать погашенные карточки из ленты у всех подключённых клиентов.
         notify_cards_deleted(message_ids)
 
-    def list_order_comments(self, order_id: int) -> dict:
-        row = self.get_order_or_404(order_id)
+    def list_order_comments(self, order_id: int, current_user: dict) -> dict:
+        row = self.get_accessible_order_or_404(order_id, current_user)
         items = sorted(
             row.comments,
             key=lambda item: (item.order_comment_created_at.isoformat() if item.order_comment_created_at else "", item.order_comment_id),
@@ -498,7 +511,7 @@ class OrderService:
         return {"items": [serialize_order_comment(item) for item in items]}
 
     def add_order_comment(self, order_id: int, payload: OrderCommentCreatePayload, current_user: dict) -> dict:
-        self.get_order_or_404(order_id)
+        self.get_accessible_order_or_404(order_id, current_user)
         attachments = []
         for item in payload.attachments:
             asset = self.attachment_asset_repository.get_by_storage_key(item.attachment_storage_key)
@@ -599,7 +612,7 @@ class OrderService:
         сборку»; всё остальное (ожидаемые + отменённые) уходит в новый заказ-дубль со
         статусом исходного. Статусы остающихся позиций сохраняются («Собрано» не
         сбрасывается). Атомарно — один commit."""
-        order = self.get_order_or_404(order_id)
+        order = self.get_accessible_order_or_404(order_id, current_user)
 
         reference = ReferenceDataRepository(self.db)
         in_stock_status = reference.get_status_by_type_and_name("order_products", "В наличии")
@@ -706,12 +719,12 @@ class OrderService:
         return source_establishment_id, destination_establishment_id
 
 
-def list_orders(db: Session, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, establishment_ids: list[int] | None = None, search: str | None = None, date_from: date | None = None, date_to: date | None = None) -> dict:
-    return OrderService(db).list_orders(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, search=search, date_from=date_from, date_to=date_to)
+def list_orders(db: Session, current_user: dict, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, establishment_ids: list[int] | None = None, search: str | None = None, date_from: date | None = None, date_to: date | None = None) -> dict:
+    return OrderService(db).list_orders(current_user, page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, search=search, date_from=date_from, date_to=date_to)
 
 
-def get_order(db: Session, order_id: int) -> dict:
-    return serialize_order(OrderService(db).get_order_or_404(order_id))
+def get_order(db: Session, order_id: int, current_user: dict) -> dict:
+    return serialize_order(OrderService(db).get_accessible_order_or_404(order_id, current_user))
 
 
 def create_order(db: Session, payload: OrderCreatePayload, current_user: dict) -> dict:
@@ -734,8 +747,8 @@ def delete_order(db: Session, order_id: int, current_user: dict) -> None:
     OrderService(db).delete_order(order_id, current_user)
 
 
-def list_order_comments(db: Session, order_id: int) -> dict:
-    return OrderService(db).list_order_comments(order_id)
+def list_order_comments(db: Session, order_id: int, current_user: dict) -> dict:
+    return OrderService(db).list_order_comments(order_id, current_user)
 
 
 def add_order_comment(db: Session, order_id: int, payload: OrderCommentCreatePayload, current_user: dict) -> dict:

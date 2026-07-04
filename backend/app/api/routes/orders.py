@@ -13,7 +13,7 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 
 @router.get("")
 def get_orders(
-    _: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -24,12 +24,12 @@ def get_orders(
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
 ) -> dict:
-    return list_orders(db, page=page, page_size=page_size, status_ids=status_id, method_ids=method_id, establishment_ids=establishment_id, search=search, date_from=date_from, date_to=date_to)
+    return list_orders(db, current_user, page=page, page_size=page_size, status_ids=status_id, method_ids=method_id, establishment_ids=establishment_id, search=search, date_from=date_from, date_to=date_to)
 
 
 @router.get("/{order_id}")
-def get_order_route(order_id: int, _: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    return {"item": get_order(db, order_id)}
+def get_order_route(order_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return {"item": get_order(db, order_id, current_user)}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -59,8 +59,8 @@ def split_order_route(order_id: int, current_user: dict = Depends(get_current_us
 
 
 @router.get("/{order_id}/comments")
-def get_order_comments(order_id: int, _: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    return list_order_comments(db, order_id)
+def get_order_comments(order_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return list_order_comments(db, order_id, current_user)
 
 
 @router.post("/{order_id}/comments", status_code=status.HTTP_201_CREATED)

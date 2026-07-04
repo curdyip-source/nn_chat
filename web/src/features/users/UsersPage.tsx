@@ -4,11 +4,12 @@ import type { EstablishmentRole, User } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
 import { TextInput } from '../../ui/Field'
+import { Modal } from '../../ui/Modal'
 import { useDebouncedValue } from '../../ui/useDebouncedValue'
 import styles from './UsersPage.module.css'
 
 const ROLE_OPTIONS: { value: '' | EstablishmentRole['role']; label: string }[] = [
-  { value: '', label: '—' },
+  { value: '', label: 'Нет доступа' },
   { value: 'viewer', label: 'Просмотр' },
   { value: 'editor', label: 'Редактор' },
   { value: 'manager', label: 'Менеджер' },
@@ -26,9 +27,13 @@ export function UsersPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [savingId, setSavingId] = useState<number | null>(null)
+  const [openUserId, setOpenUserId] = useState<number | null>(null)
   const debouncedSearch = useDebouncedValue(search.trim(), 300)
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  // Открытый в панели пользователь берётся из списка по id — так панель всегда
+  // отражает свежее состояние после действий (patch/setRole обновляют users).
+  const openUser = users.find((u) => u.user_id === openUserId) ?? null
 
   useEffect(() => {
     setPage(1)
@@ -81,6 +86,8 @@ export function UsersPage() {
     }
   }
 
+  const fullName = (u: User) => [u.user_first_name, u.user_second_name].filter(Boolean).join(' ') || u.user_login
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -132,54 +139,77 @@ export function UsersPage() {
             <div
               key={u.user_id}
               className={[styles.row, u.user_active ? '' : styles.pending].join(' ')}
+              onClick={() => setOpenUserId(u.user_id)}
+              style={{ cursor: 'pointer' }}
+              title="Открыть управление пользователем"
             >
               <div className={styles.info}>
                 <div className={styles.name}>
-                  {[u.user_first_name, u.user_second_name].filter(Boolean).join(' ') || u.user_login}
+                  {fullName(u)}
                   {u.user_admin && <span className={styles.adminBadge}>админ</span>}
                   {!u.user_active && <span className={styles.pendingBadge}>не подтверждён</span>}
                 </div>
                 <div className={styles.login}>@{u.user_login}</div>
               </div>
-              <div className={styles.actions}>
-                {u.user_active ? (
-                  <Button
-                    variant="ghost"
-                    loading={savingId === u.user_id}
-                    onClick={() => patch(u, { user_active: false })}
-                  >
-                    Деактивировать
-                  </Button>
-                ) : (
-                  <Button
-                    variant="primary"
-                    loading={savingId === u.user_id}
-                    onClick={() => patch(u, { user_active: true })}
-                  >
-                    Подтвердить
-                  </Button>
-                )}
-                <Button
-                  variant="secondary"
-                  loading={savingId === u.user_id}
-                  onClick={() => patch(u, { user_admin: !u.user_admin })}
-                >
-                  {u.user_admin ? 'Снять админа' : 'Сделать админом'}
-                </Button>
+              <span style={{ color: 'var(--text-muted)', fontSize: 18, marginLeft: 'auto' }}>›</span>
+            </div>
+          ))}
+        </div>
+      )}
+      </div>
+
+      <Modal
+        open={openUser != null}
+        title="Управление пользователем"
+        onClose={() => setOpenUserId(null)}
+        width={480}
+      >
+        {openUser && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {fullName(openUser)}
+                {openUser.user_admin && <span className={styles.adminBadge}>админ</span>}
+                {!openUser.user_active && <span className={styles.pendingBadge}>не подтверждён</span>}
               </div>
-              {!u.user_admin && establishments.length > 0 && (
-                <div style={{ flexBasis: '100%', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border, rgba(128,128,128,0.2))' }}>
-                  <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Доступ к складам:</span>
+              <div className={styles.login}>@{openUser.user_login}</div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {openUser.user_active ? (
+                <Button variant="ghost" loading={savingId === openUser.user_id} onClick={() => patch(openUser, { user_active: false })}>
+                  Деактивировать
+                </Button>
+              ) : (
+                <Button variant="primary" loading={savingId === openUser.user_id} onClick={() => patch(openUser, { user_active: true })}>
+                  Подтвердить
+                </Button>
+              )}
+              <Button variant="secondary" loading={savingId === openUser.user_id} onClick={() => patch(openUser, { user_admin: !openUser.user_admin })}>
+                {openUser.user_admin ? 'Снять админа' : 'Сделать админом'}
+              </Button>
+            </div>
+
+            <div style={{ paddingTop: 12, borderTop: '1px solid var(--border, rgba(128,128,128,0.2))' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Доступ к складам</div>
+              {openUser.user_admin ? (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                  Администратор имеет полный доступ ко всем складам.
+                </div>
+              ) : establishments.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Складов пока нет.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {establishments.map((e) => {
-                    const cur = u.user_establishment_roles?.find((r) => r.establishment_id === e.establishment_id)?.role ?? ''
+                    const cur = openUser.user_establishment_roles?.find((r) => r.establishment_id === e.establishment_id)?.role ?? ''
                     return (
-                      <label key={e.establishment_id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                      <label key={e.establishment_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, fontSize: 14 }}>
                         <span>{e.establishment_name}</span>
                         <select
                           value={cur}
-                          disabled={savingId === u.user_id}
-                          onChange={(ev) => setRole(u, e.establishment_id, ev.target.value as '' | EstablishmentRole['role'])}
-                          style={{ padding: '2px 6px', borderRadius: 6 }}
+                          disabled={savingId === openUser.user_id}
+                          onChange={(ev) => setRole(openUser, e.establishment_id, ev.target.value as '' | EstablishmentRole['role'])}
+                          style={{ padding: '4px 8px', borderRadius: 6, minWidth: 140 }}
                         >
                           {ROLE_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
@@ -193,10 +223,9 @@ export function UsersPage() {
                 </div>
               )}
             </div>
-          ))}
-        </div>
-      )}
-      </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

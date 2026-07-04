@@ -37,10 +37,16 @@ class OrderRepository:
         status_ids: list[int] | None,
         method_ids: list[int] | None,
         establishment_ids: list[int] | None,
+        scoped_establishment_ids: set[int] | None = None,
         search: str | None,
         date_from: date | None,
         date_to: date | None,
     ):
+        # Область видимости (ось B): None = без ограничения (админ); иначе список показывает
+        # СТРОГО заказы доступных складов (свои заказы на недоступном складе тоже скрыты —
+        # пользователь работает в рамках своих точек). Поверх пользовательского фильтра.
+        if scoped_establishment_ids is not None:
+            query = query.filter(Order.order_establishment_id.in_(scoped_establishment_ids))
         if status_ids:
             query = query.filter(Order.order_status_id.in_(status_ids))
         if method_ids:
@@ -66,6 +72,7 @@ class OrderRepository:
         status_ids: list[int] | None = None,
         method_ids: list[int] | None = None,
         establishment_ids: list[int] | None = None,
+        scoped_establishment_ids: set[int] | None = None,
         search: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
@@ -75,6 +82,7 @@ class OrderRepository:
             status_ids=status_ids,
             method_ids=method_ids,
             establishment_ids=establishment_ids,
+            scoped_establishment_ids=scoped_establishment_ids,
             search=search,
             date_from=date_from,
             date_to=date_to,
@@ -94,6 +102,7 @@ class OrderRepository:
         status_ids: list[int] | None = None,
         method_ids: list[int] | None = None,
         establishment_ids: list[int] | None = None,
+        scoped_establishment_ids: set[int] | None = None,
         search: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
@@ -114,6 +123,7 @@ class OrderRepository:
             status_ids=status_ids,
             method_ids=method_ids,
             establishment_ids=establishment_ids,
+            scoped_establishment_ids=scoped_establishment_ids,
             search=search,
             date_from=date_from,
             date_to=date_to,
