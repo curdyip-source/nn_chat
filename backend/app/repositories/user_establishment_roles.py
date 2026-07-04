@@ -15,18 +15,27 @@ class UserEstablishmentRoleRepository:
             .all()
         )
 
-    def replace_for_user(self, user_id: int, establishment_ids: list[int]) -> list[UserEstablishmentRole]:
-        # Полная замена набора складов-членств пользователя. Удаляем через ORM-объекты
-        # (а не bulk delete), чтобы identity map оставалась консистентной — иначе
-        # переиспользование PK в SQLite даёт устаревшее чтение.
+    def replace_for_user(self, user_id: int, settings: list[dict]) -> list[UserEstablishmentRole]:
+        # Полная замена настроек прав пользователя по складам. settings — список dict со
+        # ключами establishment_id, view_scope, can_create, edit_scope, delete_scope.
+        # Удаляем через ORM-объекты (не bulk), чтобы identity map оставалась консистентной.
         for existing in self.list_for_user(user_id):
             self.db.delete(existing)
         self.db.flush()
-        for establishment_id in dict.fromkeys(establishment_ids):  # уникальные, порядок сохранён
+        seen: set[int] = set()
+        for entry in settings:
+            establishment_id = entry["establishment_id"]
+            if establishment_id in seen:
+                continue
+            seen.add(establishment_id)
             self.db.add(
                 UserEstablishmentRole(
                     user_establishment_role_user_id=user_id,
                     user_establishment_role_establishment_id=establishment_id,
+                    user_establishment_role_view_scope=entry["view_scope"],
+                    user_establishment_role_can_create=entry["can_create"],
+                    user_establishment_role_edit_scope=entry["edit_scope"],
+                    user_establishment_role_delete_scope=entry["delete_scope"],
                 )
             )
         self.db.commit()

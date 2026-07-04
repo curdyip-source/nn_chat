@@ -1,10 +1,8 @@
-"""Права доступа к документам складов (ось C) — профиль на пользователе + членство.
+"""Права доступа к документам складов — настройки на каждый склад (per-warehouse).
 
-Модель (Вариант 1):
-- Членство в складах (user_establishment_roles) — множество складов «мои».
-- Профиль прав на пользователе: view/edit/delete scope и can_create.
-  scope: own = только свои документы; establishment = в моих складах; all = во всех.
-Администратор обходит все проверки.
+У пользователя на каждом складе-членстве свой набор: view/edit/delete scope и
+can_create. scope: own = только свои документы этого склада; establishment = любые
+документы этого склада. Администратор обходит все проверки.
 """
 
 from sqlalchemy.orm import Session
@@ -14,69 +12,76 @@ from app.repositories.user_establishment_roles import UserEstablishmentRoleRepos
 SCOPE_NONE = "none"
 SCOPE_OWN = "own"
 SCOPE_ESTABLISHMENT = "establishment"
-SCOPE_ALL = "all"
 
-VIEW_SCOPES = (SCOPE_OWN, SCOPE_ESTABLISHMENT, SCOPE_ALL)
-ACTION_SCOPES = (SCOPE_NONE, SCOPE_OWN, SCOPE_ESTABLISHMENT, SCOPE_ALL)
+VIEW_SCOPES = (SCOPE_OWN, SCOPE_ESTABLISHMENT)
+ACTION_SCOPES = (SCOPE_NONE, SCOPE_OWN, SCOPE_ESTABLISHMENT)
 
 
-def member_establishment_ids(db: Session, user: dict) -> set[int]:
-    """Склады, в которых пользователь состоит (его «мои склады»)."""
+def _memberships(db: Session, user: dict) -> dict[int, "object"]:
     return {
-        row.user_establishment_role_establishment_id
+        row.user_establishment_role_establishment_id: row
         for row in UserEstablishmentRoleRepository(db).list_for_user(user["user_id"])
     }
 
 
-def _scope_allows(db: Session, user: dict, scope: str, establishment_id: int, owner_user_id: int) -> bool:
-    if scope == SCOPE_ALL:
-        return True
+def _scope_allows(scope: str, is_owner: bool) -> bool:
     if scope == SCOPE_ESTABLISHMENT:
-        return establishment_id in member_establishment_ids(db, user)
+        return True
     if scope == SCOPE_OWN:
-        return owner_user_id == user["user_id"]
+        return is_owner
     return False  # none
 
 
-def list_visibility(db: Session, user: dict) -> tuple[set[int] | None, int | None]:
-    """Как фильтровать список документов под область видимости пользователя.
+def list_visibility(db: Session, user: dict) -> tuple[set[int] | None, set[int], int]:
+    """Как фильтровать список документов.
 
-    Возвращает (establishment_ids, owner_user_id):
-    - (None, None)  — без ограничения (админ или view=all);
-    - (set, None)   — только документы этих складов (view=establishment);
-    - (None, uid)   — только свои документы (view=own).
+    Возвращает (full_ids, own_ids, user_id):
+    - full_ids None      — без ограничения (администратор);
+    - full_ids (set)     — склады, где видны ВСЕ документы (view=establishment);
+    - own_ids (set)      — склады, где видны только СВОИ документы (view=own).
+    Документ виден, если его склад ∈ full_ids ИЛИ (его склад ∈ own_ids и владелец=user).
     """
-    if user.get("user_admin") or user.get("user_view_scope") == SCOPE_ALL:
-        return None, None
-    if user.get("user_view_scope") == SCOPE_OWN:
-        return None, user["user_id"]
-    return member_establishment_ids(db, user), None  # establishment
+    if user.get("user_admin"):
+        return None, set(), user["user_id"]
+    full: set[int] = set()
+    own: set[int] = set()
+    for establishment_id, membership in _memberships(db, user).items():
+        if membership.user_establishment_role_view_scope == SCOPE_ESTABLISHMENT:
+            full.add(establishment_id)
+        else:
+            own.add(establishment_id)
+    return full, own, user["user_id"]
 
 
 def can_view_document(db: Session, user: dict, establishment_id: int, owner_user_id: int) -> bool:
     if user.get("user_admin"):
         return True
-    return _scope_allows(db, user, user.get("user_view_scope", SCOPE_OWN), establishment_id, owner_user_id)
+    membership = _memberships(db, user).get(establishment_id)
+    if membership is None:
+        return False
+    return _scope_allows(membership.user_establishment_role_view_scope, owner_user_id == user["user_id"])
 
 
 def can_edit_document(db: Session, user: dict, establishment_id: int, owner_user_id: int) -> bool:
     if user.get("user_admin"):
         return True
-    return _scope_allows(db, user, user.get("user_edit_scope", SCOPE_NONE), establishment_id, owner_user_id)
+    membership = _memberships(db, user).get(establishment_id)
+    if membership is None:
+        return False
+    return _scope_allows(membership.user_establishment_role_edit_scope, owner_user_id == user["user_id"])
 
 
 def can_delete_document(db: Session, user: dict, establishment_id: int, owner_user_id: int) -> bool:
     if user.get("user_admin"):
         return True
-    return _scope_allows(db, user, user.get("user_delete_scope", SCOPE_NONE), establishment_id, owner_user_id)
+    membership = _memberships(db, user).get(establishment_id)
+    if membership is None:
+        return False
+    return _scope_allows(membership.user_establishment_role_delete_scope, owner_user_id == user["user_id"])
 
 
 def can_create_on_establishment(db: Session, user: dict, establishment_id: int) -> bool:
     if user.get("user_admin"):
         return True
-    if not user.get("user_can_create"):
-        return False
-    # Создавать можно в складах-членствах (или в любом, если область создания = все склады).
-    if user.get("user_view_scope") == SCOPE_ALL or user.get("user_edit_scope") == SCOPE_ALL:
-        return True
-    return establishment_id in member_establishment_ids(db, user)
+    membership = _memberships(db, user).get(establishment_id)
+    return bool(membership and membership.user_establishment_role_can_create)

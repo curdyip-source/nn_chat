@@ -45,8 +45,8 @@ class ProductRegistrationService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для изменения этой приёмки")
 
     def list_product_registrations(self, current_user: dict, *, page: int = 1, page_size: int = 20) -> dict:
-        scoped_establishment_ids, scoped_owner_user_id = list_visibility(self.db, current_user)
-        rows, total = self.repository.list(page=page, page_size=page_size, scoped_establishment_ids=scoped_establishment_ids, scoped_owner_user_id=scoped_owner_user_id)
+        scoped_full_ids, scoped_own_ids, scoped_user_id = list_visibility(self.db, current_user)
+        rows, total = self.repository.list(page=page, page_size=page_size, scoped_full_ids=scoped_full_ids, scoped_own_ids=scoped_own_ids, scoped_user_id=scoped_user_id)
         return {"items": [serialize_product_registration(item) for item in rows], "pagination": build_pagination(page, page_size, total)}
 
     def create_product_registration(self, payload: ProductRegistrationCreatePayload, current_user: dict) -> dict:

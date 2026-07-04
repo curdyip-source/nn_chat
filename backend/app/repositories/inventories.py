@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import delete
+from sqlalchemy import and_, delete, false, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.inventories import Inventory, InventoryItem
@@ -21,13 +21,17 @@ class InventoryRepository:
     def get_by_id(self, inventory_id: int) -> Inventory | None:
         return self._base_query().filter(Inventory.inventory_id == inventory_id).first()
 
-    def list(self, *, page: int = 1, page_size: int = 20, scoped_establishment_ids: set[int] | None = None, scoped_owner_user_id: int | None = None) -> tuple[list[Inventory], int]:
+    def list(self, *, page: int = 1, page_size: int = 20, scoped_full_ids: set[int] | None = None, scoped_own_ids: set[int] | None = None, scoped_user_id: int | None = None) -> tuple[list[Inventory], int]:
         query = self._base_query()
-        # Видимость по профилю: свои (owner) ИЛИ по складам ИЛИ без ограничения (админ/all).
-        if scoped_owner_user_id is not None:
-            query = query.filter(Inventory.inventory_owner_user_id == scoped_owner_user_id)
-        elif scoped_establishment_ids is not None:
-            query = query.filter(Inventory.inventory_establishment_id.in_(scoped_establishment_ids))
+        # Видимость per-warehouse: full_ids None → без ограничения (админ); иначе склад ∈ full
+        # ИЛИ (склад ∈ own и владелец=user).
+        if scoped_full_ids is not None:
+            conditions = []
+            if scoped_full_ids:
+                conditions.append(Inventory.inventory_establishment_id.in_(scoped_full_ids))
+            if scoped_own_ids:
+                conditions.append(and_(Inventory.inventory_establishment_id.in_(scoped_own_ids), Inventory.inventory_owner_user_id == scoped_user_id))
+            query = query.filter(or_(*conditions) if conditions else false())
         total = query.count()
         items = (
             query.order_by(Inventory.inventory_created_at.desc(), Inventory.inventory_id.desc())

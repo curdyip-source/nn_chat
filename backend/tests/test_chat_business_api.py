@@ -267,6 +267,7 @@ def test_order_create_succeeds_when_push_dispatch_fails(client, integration_db_s
     integration_db_session.commit()
 
     user_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, user_token)
 
     def failing_push(*args, **kwargs):
         raise RuntimeError("simulated push failure")
@@ -309,6 +310,7 @@ def test_order_create_allows_method_with_submethods_without_submethod(client, in
     integration_user.user_password = hash_password("WorkerPass123")
     integration_db_session.commit()
     user_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, user_token)
 
     reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
     establishment_id = reference_payload["establishments"][0]["establishment_id"]
@@ -345,6 +347,7 @@ def test_order_create_rejects_unknown_contact_method(client, integration_db_sess
     integration_user.user_password = hash_password("WorkerPass123")
     integration_db_session.commit()
     user_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, user_token)
 
     reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
     establishment_id = reference_payload["establishments"][0]["establishment_id"]
@@ -379,6 +382,7 @@ def test_order_inventory_and_product_registration_create_messages(client, integr
     integration_db_session.commit()
 
     user_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, user_token)
 
     reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
     establishment_id = reference_payload["establishments"][0]["establishment_id"]
@@ -599,6 +603,7 @@ def test_order_audit_payload_contains_field_and_item_changes(client, integration
 
     admin_token = login(client, "admin", "AdminPass123")["token"]
     user_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, user_token)
 
     reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
     establishment_id = reference_payload["establishments"][0]["establishment_id"]
@@ -743,6 +748,7 @@ def test_order_info_can_be_empty_on_create_and_update(client, integration_db_ses
     integration_db_session.commit()
 
     user_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, user_token)
 
     reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
     establishment_id = reference_payload["establishments"][0]["establishment_id"]
@@ -937,6 +943,7 @@ def test_order_update_sends_push_when_items_added_or_removed(client, integration
     integration_user.user_password = hash_password("WorkerPass123")
     integration_db_session.commit()
     user_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, user_token)
 
     reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
     establishment_id = reference_payload["establishments"][0]["establishment_id"]
@@ -996,6 +1003,7 @@ def test_order_update_does_not_push_when_items_unchanged(client, integration_db_
     integration_user.user_password = hash_password("WorkerPass123")
     integration_db_session.commit()
     user_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, user_token)
 
     reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
     establishment_id = reference_payload["establishments"][0]["establishment_id"]
@@ -1060,6 +1068,7 @@ def test_delete_order_by_owner_removes_order_and_tombstones_card(client, integra
     integration_user.user_password = hash_password("WorkerPass123")
     integration_db_session.commit()
     token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, token)
     order_id = _create_simple_order(client, token)
 
     messages = client.get(f"{API_PREFIX}/messages?page=1&page_size=20", headers={"Authorization": f"Bearer {token}"}).json()["items"]
@@ -1079,6 +1088,7 @@ def test_delete_order_forbidden_for_non_owner_non_admin(client, integration_db_s
     integration_db_session.add(other)
     integration_db_session.commit()
     owner_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, owner_token)
     other_token = login(client, "worker2", "Worker2Pass123")["token"]
 
     est_id = _first_establishment_ids(client, owner_token, 1)[0]
@@ -1096,6 +1106,7 @@ def test_delete_order_allowed_for_admin(client, integration_db_session, integrat
     integration_admin.user_password = hash_password("AdminPass123")
     integration_db_session.commit()
     owner_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, owner_token)
     admin_token = login(client, "admin", "AdminPass123")["token"]
 
     order_id = _create_simple_order(client, owner_token)
@@ -1119,18 +1130,18 @@ def test_admin_sets_permission_profile_and_it_reaches_user(client, integration_d
     resp = _set_profile_api(client, admin_token, integration_user.user_id,
                             establishment_ids=est, view_scope="establishment", can_create=True, edit_scope="own", delete_scope="own")
     assert resp.status_code == 200
-    item = resp.json()["item"]
-    assert set(item["user_establishment_ids"]) == set(est)
-    assert item["user_view_scope"] == "establishment" and item["user_can_create"] is True
-    assert item["user_edit_scope"] == "own" and item["user_delete_scope"] == "own"
+    roles = {r["establishment_id"]: r for r in resp.json()["item"]["user_establishment_roles"]}
+    assert set(roles) == set(est)
+    assert roles[est[0]]["view_scope"] == "establishment" and roles[est[0]]["can_create"] is True
+    assert roles[est[0]]["edit_scope"] == "own" and roles[est[0]]["delete_scope"] == "own"
 
-    # профиль доходит до пользователя при логине
+    # настройки доходят до пользователя при логине
     user = login(client, "worker", "WorkerPass123")["user"]
-    assert set(user["user_establishment_ids"]) == set(est)
-    assert user["user_edit_scope"] == "own"
+    user_roles = {r["establishment_id"]: r for r in user["user_establishment_roles"]}
+    assert set(user_roles) == set(est) and user_roles[est[0]]["edit_scope"] == "own"
 
 
-def test_set_permission_profile_replaces_previous_membership(client, integration_db_session, integration_user, integration_admin):
+def test_set_permissions_replaces_previous(client, integration_db_session, integration_user, integration_admin):
     integration_admin.user_password = hash_password("AdminPass123")
     integration_db_session.commit()
     admin_token = login(client, "admin", "AdminPass123")["token"]
@@ -1138,18 +1149,18 @@ def test_set_permission_profile_replaces_previous_membership(client, integration
     uid = integration_user.user_id
 
     _set_profile_api(client, admin_token, uid, establishment_ids=[est[0]], view_scope="establishment")
-    resp = _set_profile_api(client, admin_token, uid, establishment_ids=[est[1]], view_scope="all", edit_scope="all")
-    item = resp.json()["item"]
-    assert set(item["user_establishment_ids"]) == {est[1]}  # членство на est[0] снято
-    assert item["user_view_scope"] == "all" and item["user_edit_scope"] == "all"
+    resp = _set_profile_api(client, admin_token, uid, establishment_ids=[est[1]], view_scope="own", edit_scope="establishment")
+    roles = {r["establishment_id"]: r for r in resp.json()["item"]["user_establishment_roles"]}
+    assert set(roles) == {est[1]}  # доступ к est[0] снят
+    assert roles[est[1]]["view_scope"] == "own" and roles[est[1]]["edit_scope"] == "establishment"
 
 
-def test_non_admin_cannot_set_permission_profile(client, integration_db_session, integration_user, integration_admin):
+def test_non_admin_cannot_set_permissions(client, integration_db_session, integration_user, integration_admin):
     integration_user.user_password = hash_password("WorkerPass123")
     integration_db_session.commit()
     worker_token = login(client, "worker", "WorkerPass123")["token"]
     est = _first_establishment_ids(client, worker_token, 1)
-    resp = _set_profile_api(client, worker_token, integration_user.user_id, establishment_ids=est, view_scope="all")
+    resp = _set_profile_api(client, worker_token, integration_user.user_id, establishment_ids=est, view_scope="establishment")
     assert resp.status_code == 403
 
 
@@ -1214,10 +1225,10 @@ def test_orders_list_scoped_by_profile(client, integration_db_session, integrati
     assert own0 in ids_own
     assert o_est0 not in ids_own and o_est1 not in ids_own
 
-    # view=all → видит всё
-    _set_profile_db(integration_db_session, integration_user, establishment_ids=[est[0]], view_scope="all")
-    ids_all = worker_ids()
-    assert {o_est0, o_est1, own0}.issubset(ids_all)
+    # член ОБОИХ складов (view=establishment на каждом) → видит всё из обоих
+    _set_profile_db(integration_db_session, integration_user, establishment_ids=[est[0], est[1]], view_scope="establishment")
+    ids_both = worker_ids()
+    assert {o_est0, o_est1, own0}.issubset(ids_both)
 
 
 def test_inventories_and_registrations_scoped_to_accessible_establishments(client, integration_db_session, integration_user, integration_admin):
@@ -1255,12 +1266,8 @@ def test_inventories_and_registrations_scoped_to_accessible_establishments(clien
 
 
 def _set_profile_db(db_session, user, *, establishment_ids=(), view_scope="establishment", can_create=False, edit_scope="none", delete_scope="none"):
-    # Задать профиль прав + членство напрямую через БД (для тестов прав). Прежние
-    # членства чистим (ORM-удалением) — можно вызывать несколько раз в одном тесте.
-    user.user_view_scope = view_scope
-    user.user_can_create = can_create
-    user.user_edit_scope = edit_scope
-    user.user_delete_scope = delete_scope
+    # Задать права по складам напрямую через БД (для тестов прав). Один и тот же набор
+    # scope применяется к каждому складу из establishment_ids. Прежние членства чистим.
     for existing in db_session.query(UserEstablishmentRole).filter(UserEstablishmentRole.user_establishment_role_user_id == user.user_id).all():
         db_session.delete(existing)
     db_session.flush()
@@ -1268,16 +1275,28 @@ def _set_profile_db(db_session, user, *, establishment_ids=(), view_scope="estab
         db_session.add(UserEstablishmentRole(
             user_establishment_role_user_id=user.user_id,
             user_establishment_role_establishment_id=establishment_id,
+            user_establishment_role_view_scope=view_scope,
+            user_establishment_role_can_create=can_create,
+            user_establishment_role_edit_scope=edit_scope,
+            user_establishment_role_delete_scope=delete_scope,
         ))
     db_session.commit()
 
 
 def _set_profile_api(client, admin_token, user_id, *, establishment_ids, view_scope="establishment", can_create=False, edit_scope="none", delete_scope="none"):
+    establishments = [{"establishment_id": e, "view_scope": view_scope, "can_create": can_create, "edit_scope": edit_scope, "delete_scope": delete_scope} for e in establishment_ids]
     return client.put(
-        f"{API_PREFIX}/users/{user_id}/permission-profile",
+        f"{API_PREFIX}/users/{user_id}/permissions",
         headers={"Authorization": f"Bearer {admin_token}"},
-        json={"establishment_ids": establishment_ids, "view_scope": view_scope, "can_create": can_create, "edit_scope": edit_scope, "delete_scope": delete_scope},
+        json={"establishments": establishments},
     )
+
+
+def _grant_full_access(client, db_session, user, token):
+    # Полный доступ (менеджер) на всех складах — чтобы функциональные тесты работали.
+    ref = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {token}"}).json()
+    _set_profile_db(db_session, user, establishment_ids=[e["establishment_id"] for e in ref["establishments"]],
+                    view_scope="establishment", can_create=True, edit_scope="establishment", delete_scope="establishment")
 
 
 def _orders_status_id(client, token):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import delete, func, or_
+from sqlalchemy import and_, delete, false, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.orders import Order, OrderComment, OrderCommentAttachment, OrderItem
@@ -37,19 +37,22 @@ class OrderRepository:
         status_ids: list[int] | None,
         method_ids: list[int] | None,
         establishment_ids: list[int] | None,
-        scoped_establishment_ids: set[int] | None = None,
-        scoped_owner_user_id: int | None = None,
+        scoped_full_ids: set[int] | None = None,
+        scoped_own_ids: set[int] | None = None,
+        scoped_user_id: int | None = None,
         search: str | None,
         date_from: date | None,
         date_to: date | None,
     ):
-        # Область видимости по профилю (взаимоисключающе, поверх пользовательского фильтра):
-        # scoped_owner_user_id → только свои; иначе scoped_establishment_ids → только эти
-        # склады; оба None → без ограничения (админ / view=all).
-        if scoped_owner_user_id is not None:
-            query = query.filter(Order.order_owner_user_id == scoped_owner_user_id)
-        elif scoped_establishment_ids is not None:
-            query = query.filter(Order.order_establishment_id.in_(scoped_establishment_ids))
+        # Область видимости (per-warehouse): scoped_full_ids None → без ограничения (админ).
+        # Иначе виден заказ, если его склад ∈ full (видны все) ИЛИ (склад ∈ own и владелец=user).
+        if scoped_full_ids is not None:
+            conditions = []
+            if scoped_full_ids:
+                conditions.append(Order.order_establishment_id.in_(scoped_full_ids))
+            if scoped_own_ids:
+                conditions.append(and_(Order.order_establishment_id.in_(scoped_own_ids), Order.order_owner_user_id == scoped_user_id))
+            query = query.filter(or_(*conditions) if conditions else false())
         if status_ids:
             query = query.filter(Order.order_status_id.in_(status_ids))
         if method_ids:
@@ -75,8 +78,9 @@ class OrderRepository:
         status_ids: list[int] | None = None,
         method_ids: list[int] | None = None,
         establishment_ids: list[int] | None = None,
-        scoped_establishment_ids: set[int] | None = None,
-        scoped_owner_user_id: int | None = None,
+        scoped_full_ids: set[int] | None = None,
+        scoped_own_ids: set[int] | None = None,
+        scoped_user_id: int | None = None,
         search: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
@@ -86,8 +90,9 @@ class OrderRepository:
             status_ids=status_ids,
             method_ids=method_ids,
             establishment_ids=establishment_ids,
-            scoped_establishment_ids=scoped_establishment_ids,
-            scoped_owner_user_id=scoped_owner_user_id,
+            scoped_full_ids=scoped_full_ids,
+            scoped_own_ids=scoped_own_ids,
+            scoped_user_id=scoped_user_id,
             search=search,
             date_from=date_from,
             date_to=date_to,
@@ -107,8 +112,9 @@ class OrderRepository:
         status_ids: list[int] | None = None,
         method_ids: list[int] | None = None,
         establishment_ids: list[int] | None = None,
-        scoped_establishment_ids: set[int] | None = None,
-        scoped_owner_user_id: int | None = None,
+        scoped_full_ids: set[int] | None = None,
+        scoped_own_ids: set[int] | None = None,
+        scoped_user_id: int | None = None,
         search: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
@@ -129,8 +135,9 @@ class OrderRepository:
             status_ids=status_ids,
             method_ids=method_ids,
             establishment_ids=establishment_ids,
-            scoped_establishment_ids=scoped_establishment_ids,
-            scoped_owner_user_id=scoped_owner_user_id,
+            scoped_full_ids=scoped_full_ids,
+            scoped_own_ids=scoped_own_ids,
+            scoped_user_id=scoped_user_id,
             search=search,
             date_from=date_from,
             date_to=date_to,

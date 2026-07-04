@@ -6,8 +6,8 @@ import type {
   Contact,
   Currency,
   Establishment,
+  EstablishmentPermission,
   Inventory,
-  PermissionProfile,
   Order,
   OrderCreate,
   OrderMethod,
@@ -344,13 +344,13 @@ export function updateUser(
   return apiRequest<{ item: User }>(`/users/${userId}`, { method: 'PUT', body: patch })
 }
 
-export function setUserPermissionProfile(
+export function setUserPermissions(
   userId: number,
-  profile: PermissionProfile,
+  establishments: EstablishmentPermission[],
 ) {
-  return apiRequest<{ item: User }>(`/users/${userId}/permission-profile`, {
+  return apiRequest<{ item: User }>(`/users/${userId}/permissions`, {
     method: 'PUT',
-    body: profile,
+    body: { establishments },
   })
 }
 

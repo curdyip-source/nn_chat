@@ -232,10 +232,10 @@ class OrderService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для изменения этого заказа")
 
     def list_orders(self, current_user: dict, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, establishment_ids: list[int] | None = None, search: str | None = None, date_from: date | None = None, date_to: date | None = None) -> dict:
-        # Область видимости по профилю: (склады | владелец | без ограничения).
-        scoped_establishment_ids, scoped_owner_user_id = list_visibility(self.db, current_user)
-        rows, total = self.repository.list(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, scoped_establishment_ids=scoped_establishment_ids, scoped_owner_user_id=scoped_owner_user_id, search=search, date_from=date_from, date_to=date_to)
-        currency_totals = self.repository.totals_by_currency(status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, scoped_establishment_ids=scoped_establishment_ids, scoped_owner_user_id=scoped_owner_user_id, search=search, date_from=date_from, date_to=date_to)
+        # Область видимости per-warehouse: (склады «видны все» | склады «только свои» | user).
+        scoped_full_ids, scoped_own_ids, scoped_user_id = list_visibility(self.db, current_user)
+        rows, total = self.repository.list(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, scoped_full_ids=scoped_full_ids, scoped_own_ids=scoped_own_ids, scoped_user_id=scoped_user_id, search=search, date_from=date_from, date_to=date_to)
+        currency_totals = self.repository.totals_by_currency(status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, scoped_full_ids=scoped_full_ids, scoped_own_ids=scoped_own_ids, scoped_user_id=scoped_user_id, search=search, date_from=date_from, date_to=date_to)
         totals = [
             {"currency_id": currency_id, "currency_sign": currency_sign, "amount": amount}
             for currency_id, currency_sign, amount in currency_totals

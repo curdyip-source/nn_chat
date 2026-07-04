@@ -3,14 +3,18 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-class UserPermissionProfilePayload(BaseModel):
-    # Членство: в каких складах работает пользователь.
-    establishment_ids: list[int] = Field(default_factory=list)
-    # Профиль прав (действует в рамках членств). scope: own | establishment | all.
-    view_scope: Literal["own", "establishment", "all"] = "establishment"
+class EstablishmentPermission(BaseModel):
+    # Настройки прав пользователя на конкретном складе. scope: own | establishment.
+    establishment_id: int
+    view_scope: Literal["own", "establishment"] = "establishment"
     can_create: bool = False
-    edit_scope: Literal["none", "own", "establishment", "all"] = "none"
-    delete_scope: Literal["none", "own", "establishment", "all"] = "none"
+    edit_scope: Literal["none", "own", "establishment"] = "none"
+    delete_scope: Literal["none", "own", "establishment"] = "none"
+
+
+class UserPermissionsPayload(BaseModel):
+    # Полный набор складов с настройками. Отсутствие склада = нет доступа к нему.
+    establishments: list[EstablishmentPermission] = Field(default_factory=list)
 
 
 class UserCreatePayload(BaseModel):
