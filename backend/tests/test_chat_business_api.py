@@ -1274,3 +1274,58 @@ def test_inventories_and_registrations_scoped_to_accessible_establishments(clien
     # одиночный доступ: недоступный склад → 404
     assert client.get(f"{API_PREFIX}/inventories/{inv1}", headers={"Authorization": f"Bearer {worker_token}"}).status_code == 404
     assert client.get(f"{API_PREFIX}/inventories/{inv0}", headers={"Authorization": f"Bearer {worker_token}"}).status_code == 200
+
+
+def _grant_role(db_session, user_id, establishment_id, role):
+    db_session.add(UserEstablishmentRole(
+        user_establishment_role_user_id=user_id,
+        user_establishment_role_establishment_id=establishment_id,
+        user_establishment_role_role=role,
+    ))
+    db_session.commit()
+
+
+def test_viewer_cannot_edit_others_order_editor_can(client, integration_db_session, integration_user, integration_admin):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+    worker_token = login(client, "worker", "WorkerPass123")["token"]
+    est = _first_establishment_ids(client, admin_token, 1)[0]
+
+    # заказ создаёт админ (владелец — админ, не worker)
+    order_id = _create_simple_order(client, admin_token)
+    ref = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {admin_token}"}).json()
+    new_status = ref["statuses"][0]["status_id"]
+    for s in ref["statuses"]:
+        if s["status_type"] == "orders":
+            new_status = s["status_id"]; break
+
+    # worker = viewer на складе → видит заказ, но менять чужой не может → 403
+    _grant_role(integration_db_session, integration_user.user_id, est, "viewer")
+    assert client.get(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {worker_token}"}).status_code == 200
+    resp = client.put(f"{API_PREFIX}/orders/{order_id}/status", headers={"Authorization": f"Bearer {worker_token}"}, json={"order_status_id": new_status})
+    assert resp.status_code == 403
+
+    # повышаем до editor → теперь может менять статус чужого заказа склада
+    integration_db_session.query(UserEstablishmentRole).filter(
+        UserEstablishmentRole.user_establishment_role_user_id == integration_user.user_id
+    ).update({UserEstablishmentRole.user_establishment_role_role: "editor"}, synchronize_session=False)
+    integration_db_session.commit()
+    resp2 = client.put(f"{API_PREFIX}/orders/{order_id}/status", headers={"Authorization": f"Bearer {worker_token}"}, json={"order_status_id": new_status})
+    assert resp2.status_code == 200
+
+
+def test_owner_viewer_can_edit_own_order(client, integration_db_session, integration_user, integration_admin):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    worker_token = login(client, "worker", "WorkerPass123")["token"]
+    est = _first_establishment_ids(client, worker_token, 1)[0]
+    _grant_role(integration_db_session, integration_user.user_id, est, "viewer")
+
+    # worker (viewer) создаёт свой заказ и меняет его статус — своё править можно
+    order_id = _create_simple_order(client, worker_token)
+    ref = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {worker_token}"}).json()
+    order_status = next(s["status_id"] for s in ref["statuses"] if s["status_type"] == "orders")
+    resp = client.put(f"{API_PREFIX}/orders/{order_id}/status", headers={"Authorization": f"Bearer {worker_token}"}, json={"order_status_id": order_status})
+    assert resp.status_code == 200

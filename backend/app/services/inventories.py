@@ -10,7 +10,7 @@ from app.schemas.common import build_pagination
 from app.schemas.inventories import InventoryCreatePayload, InventoryStatusUpdatePayload, InventoryUpdatePayload
 from app.services.contacts import save_supplier_contact
 from app.services.audit import log_audit_event
-from app.services.access_control import accessible_establishment_ids
+from app.services.access_control import accessible_establishment_ids, can_edit_establishment_document
 from app.services.card_sync import notify_inventory_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.push_notifications import send_push_notification_event
@@ -39,6 +39,11 @@ class InventoryService:
         if scoped is not None and row.inventory_establishment_id not in scoped and row.inventory_owner_user_id != current_user["user_id"]:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Инвентаризация не найдена")
         return row
+
+    def _ensure_inventory_editable(self, row, current_user: dict) -> None:
+        # Ось C: править может админ, владелец, либо editor/manager склада.
+        if not can_edit_establishment_document(self.db, current_user, row.inventory_establishment_id, row.inventory_owner_user_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для изменения инвентаризации: нужна роль «Редактор» или «Менеджер» на складе")
 
     def list_inventories(self, current_user: dict, *, page: int = 1, page_size: int = 20) -> dict:
         # Ось B: не-админ видит строго инвентаризации доступных складов.
@@ -116,6 +121,7 @@ class InventoryService:
 
     def update_inventory(self, inventory_id: int, payload: InventoryUpdatePayload, current_user: dict) -> dict:
         row = self.get_accessible_inventory_or_404(inventory_id, current_user)
+        self._ensure_inventory_editable(row, current_user)
         get_establishment_or_404(self.db, payload.inventory_establishment_id)
         status_id = row.inventory_status_id
         if payload.inventory_status_id:
@@ -157,6 +163,7 @@ class InventoryService:
 
     def update_inventory_status(self, inventory_id: int, payload: InventoryStatusUpdatePayload, current_user: dict) -> dict:
         row = self.get_accessible_inventory_or_404(inventory_id, current_user)
+        self._ensure_inventory_editable(row, current_user)
         status_row = get_status_or_404(self.db, payload.inventory_status_id, expected_type="inventory")
         row = self.repository.update(row, {"inventory_status_id": status_row.status_id})
         log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_INVENTORY, entity_id=row.inventory_id, event_type=EVENT_TYPE_INVENTORY_UPDATE, event_payload={"inventory_status_id": status_row.status_id})
