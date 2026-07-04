@@ -10,9 +10,17 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 320px;
+  /* Фиксированная бо́льшая высота вместо max-height 320 — оверлей чата крупнее и
+     стабильного размера независимо от числа сообщений (лишнее скроллится). */
+  height: 62vh;
   overflow-y: auto;
   padding-right: 4px;
+}
+/* Якорь к низу: когда сообщений мало — прижимаем их к нижней части (над инпутом),
+   как в чат-режиме. При переполнении margin-top:auto → 0, скролл работает штатно. */
+.list::before {
+  content: '';
+  margin-top: auto;
 }
 .empty {
   font-size: 13px;

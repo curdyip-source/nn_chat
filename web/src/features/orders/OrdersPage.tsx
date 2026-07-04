@@ -13,7 +13,7 @@ import { useDebouncedValue } from '../../ui/useDebouncedValue'
 import { formatAmount } from '../../lib/format'
 import { ItemStatusExtraModal } from './ItemStatusExtraModal'
 import { statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
-import { OrderSelectionContext, type BulkApplyFn, type BulkRemoveFn, type OrderSelection } from './orderSelection'
+import { OrderSelectionContext, type BulkApplyFn, type BulkCollectFn, type BulkItemInfo, type BulkRemoveFn, type OrderSelection } from './orderSelection'
 import { OrderCreate } from './OrderCreate'
 import { OrdersTable } from './OrdersTable'
 import styles from './OrdersPage.module.css'
@@ -85,7 +85,9 @@ export function OrdersPage() {
   const [deletingOrders, setDeletingOrders] = useState(false)
   const applyFns = useRef<Map<number, BulkApplyFn>>(new Map())
   const removeFns = useRef<Map<number, BulkRemoveFn>>(new Map())
+  const collectFns = useRef<Map<number, BulkCollectFn>>(new Map())
   const selectionCount = useMemo(() => Object.values(selected).reduce((n, arr) => n + arr.length, 0), [selected])
+  const [actionMenuOpen, setActionMenuOpen] = useState(false)
 
   const registerApply = useCallback((orderId: number, fn: BulkApplyFn) => {
     applyFns.current.set(orderId, fn)
@@ -98,6 +100,12 @@ export function OrdersPage() {
   }, [])
   const unregisterRemove = useCallback((orderId: number) => {
     removeFns.current.delete(orderId)
+  }, [])
+  const registerCollect = useCallback((orderId: number, fn: BulkCollectFn) => {
+    collectFns.current.set(orderId, fn)
+  }, [])
+  const unregisterCollect = useCallback((orderId: number) => {
+    collectFns.current.delete(orderId)
   }, [])
   // --- Массовое выделение целых заказов (чекбоксы у свёрнутых строк) ---
   const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set())
@@ -119,6 +127,8 @@ export function OrdersPage() {
       unregisterApply,
       registerRemove,
       unregisterRemove,
+      registerCollect,
+      unregisterCollect,
       isOrderSelected: (orderId) => selectedOrders.has(orderId),
       toggleOrder: (orderId) =>
         setSelectedOrders((prev) => {
@@ -128,8 +138,27 @@ export function OrdersPage() {
           return next
         }),
     }),
-    [selected, selectedOrders, registerApply, unregisterApply, registerRemove, unregisterRemove],
+    [selected, selectedOrders, registerApply, unregisterApply, registerRemove, unregisterRemove, registerCollect, unregisterCollect],
   )
+
+  // Собрать данные всех отмеченных позиций (для копирования).
+  const collectSelectedItems = () => {
+    const out: BulkItemInfo[] = []
+    for (const [orderId, uids] of Object.entries(selected)) {
+      const fn = collectFns.current.get(Number(orderId))
+      if (fn) out.push(...fn(uids))
+    }
+    return out
+  }
+  const copyItems = (withQtyPrice: boolean) => {
+    const items = collectSelectedItems()
+    const fmtPrice = (p: string) => Number(p).toLocaleString('de-DE', { maximumFractionDigits: 2 })
+    const text = items
+      .map((i) => (withQtyPrice ? `${i.quantity} шт. *  ${i.name} *  ${fmtPrice(i.price)}${i.sign}` : i.name))
+      .join('\n')
+    void navigator.clipboard?.writeText(text)
+    setActionMenuOpen(false)
+  }
 
   const onBulkOrderStatus = async (statusId: number) => {
     const ids = [...selectedOrders]
@@ -265,36 +294,49 @@ export function OrdersPage() {
             {itemStatusOptions.length > 0 && (
               <div className={styles.bulkActions}>
                 {orderSelectionCount > 0 ? (
-                  // Выбраны целые заказы (свёрнутые строки) — статусы заказа + удаление заказов.
-                  <>
-                    <span title={`Статус для ${orderSelectionCount} заказ.`}>
-                      <StatusSelect value={null} options={orderStatusOptions} onChange={onBulkOrderStatus} />
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.bulkDelete}
-                      onClick={() => setConfirmDeleteOrders(true)}
-                      title={`Удалить ${orderSelectionCount} заказ.`}
-                    >
-                      Удалить
-                    </button>
-                  </>
+                  <span title={`Статус для ${orderSelectionCount} заказ.`}>
+                    <StatusSelect value={null} options={orderStatusOptions} onChange={onBulkOrderStatus} />
+                  </span>
                 ) : (
-                  <>
-                    <span title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Статус для ${selectionCount} поз.`}>
-                      <StatusSelect value={null} options={itemStatusOptions} onChange={onBulkStatus} saving={selectionCount === 0} />
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.bulkDelete}
-                      disabled={selectionCount === 0}
-                      onClick={() => setConfirmDelete(true)}
-                      title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Удалить ${selectionCount} поз.`}
-                    >
-                      Удалить
-                    </button>
-                  </>
+                  <span title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Статус для ${selectionCount} поз.`}>
+                    <StatusSelect value={null} options={itemStatusOptions} onChange={onBulkStatus} saving={selectionCount === 0} />
+                  </span>
                 )}
+                <div className={styles.actionWrap}>
+                  <button
+                    type="button"
+                    className={styles.bulkAction}
+                    disabled={orderSelectionCount === 0 && selectionCount === 0}
+                    onClick={() => setActionMenuOpen((v) => !v)}
+                    title="Действия с выбранным"
+                  >
+                    Действие ▾
+                  </button>
+                  {actionMenuOpen && (
+                    <>
+                      <div className={styles.actionBackdrop} onClick={() => setActionMenuOpen(false)} />
+                      <div className={styles.actionMenu}>
+                        {orderSelectionCount > 0 ? (
+                          <button onClick={() => { setActionMenuOpen(false); setConfirmDeleteOrders(true) }}>
+                            Удалить заказы ({orderSelectionCount})
+                          </button>
+                        ) : (
+                          <>
+                            <button disabled={selectionCount === 0} onClick={() => copyItems(false)}>
+                              Скопировать номенклатуру
+                            </button>
+                            <button disabled={selectionCount === 0} onClick={() => copyItems(true)}>
+                              Скопировать с кол-вом и ценой
+                            </button>
+                            <button className={styles.actionDanger} disabled={selectionCount === 0} onClick={() => { setActionMenuOpen(false); setConfirmDelete(true) }}>
+                              Удалить позиции ({selectionCount})
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             )}
             <span className={styles.expandToggle} title={expandAll ? 'Свернуть все заказы' : 'Развернуть все заказы'}>

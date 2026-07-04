@@ -134,6 +134,71 @@
   opacity: 0.5;
   cursor: default;
 }
+
+.actionWrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+.bulkAction {
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.bulkAction:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+.bulkAction:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.actionBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+}
+.actionMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 901;
+  min-width: 220px;
+  background: var(--surface-solid, #fff);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md, 14px);
+  box-shadow: 0 8px 24px var(--shadow-strong, rgba(0, 0, 0, 0.16));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.actionMenu button {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text);
+  white-space: nowrap;
+}
+.actionMenu button + button {
+  border-top: 1px solid var(--stroke);
+}
+.actionMenu button:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.actionMenu button:disabled {
+  color: var(--text-dim);
+  cursor: default;
+}
+.actionDanger {
+  color: var(--danger) !important;
+}
 .pager {
   display: flex;
   align-items: center;

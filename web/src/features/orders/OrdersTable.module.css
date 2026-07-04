@@ -13,7 +13,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 52px 48px minmax(110px, 0.85fr) minmax(210px, 2fr) 190px 44px 120px minmax(100px, auto) 60px;
+  grid-template-columns: 52px 48px minmax(110px, 0.85fr) minmax(210px, 2fr) 190px 120px 210px 60px;
   gap: 10px;
   align-items: center;
   padding: 8px 12px;
@@ -25,9 +25,18 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  min-width: 0;
+}
+.totalValue {
+  width: 100%;
+  text-align: right;
   font-weight: 700;
   font-size: 14px;
+  /* Одна строка в фикс.колонке (150px): не растит высоту и не двигает колонки;
+     длинное мультивалютное значение — многоточием (полное — в title). */
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .totalLabel {
   font-size: 10px;
@@ -35,6 +44,63 @@
   text-transform: uppercase;
   letter-spacing: 0.4px;
   color: var(--text-dim);
+}
+
+.orderCreated {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  color: var(--text-dim);
+  min-width: 0;
+}
+.createdBy {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cdekTrack {
+  cursor: pointer;
+  color: var(--accent, #2b6cff);
+}
+.cdekBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+}
+.cdekMenu {
+  position: fixed;
+  z-index: 901;
+  background: var(--surface-solid, #fff);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-sm, 10px);
+  box-shadow: 0 6px 20px var(--shadow-strong, rgba(0, 0, 0, 0.16));
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  overflow: hidden;
+}
+.cdekMenu button + button {
+  border-top: 1px solid var(--stroke);
+}
+.cdekMenu button {
+  text-align: left;
+  padding: 9px 12px;
+  font-size: 13px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text);
+  white-space: nowrap;
+}
+.cdekMenu button:hover {
+  background: var(--surface-2);
+}
+.cdekMenu button:disabled {
+  color: var(--text-dim);
+  cursor: default;
 }
 
 .rowLead {
@@ -79,6 +145,40 @@
 .editBtn:hover {
   opacity: 1;
   background: var(--surface);
+}
+/* Кнопка чата заказа: подсветка по состоянию (эмодзи 💬 цветом не красится) + бейдж. */
+.chatBtn {
+  position: relative;
+  overflow: visible;
+}
+.chatUnread {
+  opacity: 1;
+  background: rgba(229, 52, 42, 0.14);
+}
+.chatRead {
+  opacity: 1;
+  background: rgba(22, 163, 74, 0.14);
+}
+.chatBadge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  font-size: 8.5px;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
+  color: #fff;
+  box-shadow: 0 0 0 1.5px var(--surface-2);
+}
+.badgeUnread {
+  background: var(--danger);
+}
+.badgeRead {
+  background: var(--success);
 }
 .no {
   font-weight: 700;

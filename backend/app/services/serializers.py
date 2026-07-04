@@ -264,6 +264,8 @@ def serialize_order(row) -> dict:
         "order_status_color": status.status_color if status else None,
         "order_owner_user_id": row.order_owner_user_id,
         "order_owner_user_login": owner.user_login if owner else None,
+        "order_owner_first_name": owner.user_first_name if owner else None,
+        "order_owner_second_name": owner.user_second_name if owner else None,
         "order_created_at": serialize_datetime(row.order_created_at),
         "cdek": {
             "has_waybill": bool(row.order_cdek_uuid),

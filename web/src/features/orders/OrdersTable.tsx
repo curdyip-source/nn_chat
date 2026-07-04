@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { cdekDeleteWaybill, cdekWaybillStatus, updateOrder, updateOrderStatus } from '../../api/endpoints'
 import type { Order, OrderUpdateItem, Product } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
@@ -13,7 +14,7 @@ import { newUid } from './cart'
 import { ItemStatusExtraModal } from './ItemStatusExtraModal'
 import { showsMovement, showsSupplier, statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
 import { OrderChat } from './OrderChat'
-import { useOrderSelection, type BulkApplyFn, type BulkRemoveFn } from './orderSelection'
+import { useOrderSelection, type BulkApplyFn, type BulkCollectFn, type BulkRemoveFn } from './orderSelection'
 import { orderToUpdate } from './orderUpdate'
 import styles from './OrdersTable.module.css'
 
@@ -102,6 +103,20 @@ function OrderRow({
   }, [expandSignal.expanded, expandSignal.nonce])
   const [addOpen, setAddOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  // Состояние чата заказа: непрочитанные (красноватый) / прочитанные (зеленоватый).
+  // Прочтение отслеживаем локально (нет серверного трекинга): запоминаем последний
+  // id комментария при открытии чата.
+  const orderComments = order.comments ?? []
+  const commentCount = orderComments.length
+  const latestCommentId = commentCount ? Math.max(...orderComments.map((c) => c.order_comment_id)) : 0
+  const chatSeenKey = `nn.orderChatSeen.${order.order_id}`
+  const [chatSeenId, setChatSeenId] = useState(() => Number(localStorage.getItem(chatSeenKey) ?? 0))
+  const chatUnread = commentCount > 0 && latestCommentId > chatSeenId
+  const openChat = () => {
+    setChatOpen(true)
+    localStorage.setItem(chatSeenKey, String(latestCommentId))
+    setChatSeenId(latestCommentId)
+  }
   const [pendingExtra, setPendingExtra] = useState<{ uid: string; statusId: number; mode: ExtraMode } | null>(null)
   const [customer, setCustomer] = useState(order.order_customer)
   const [info, setInfo] = useState(order.order_info)
@@ -109,6 +124,17 @@ function OrderRow({
   const [cdekOpen, setCdekOpen] = useState(false)
   const [cdek, setCdek] = useState(order.cdek ?? null)
   const [cdekBusy, setCdekBusy] = useState(false)
+  const [cdekMenuOpen, setCdekMenuOpen] = useState(false)
+  const [cdekMenuPos, setCdekMenuPos] = useState<{ top: number; left: number } | null>(null)
+  const openCdekMenu = (e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    // Портал висит в body с глобальным zoom (0.8) — fixed-координаты интерпретируются
+    // в pre-zoom пространстве, а rect даёт визуальные пиксели. Делим на zoom.
+    const zoom = Number(getComputedStyle(document.body).zoom) || 1
+    // Открываем ПОД треком, как выпадающие селекты.
+    setCdekMenuPos({ top: rect.bottom / zoom + 4, left: rect.left / zoom })
+    setCdekMenuOpen(true)
+  }
   const isCdek = order.order_method_name === 'СДЭК' || order.order_sub_method === 'СДЭК'
 
   // Сброс накладной (удалить в CDEK + очистить) и открыть форму пересоздания.
@@ -273,6 +299,17 @@ function OrderRow({
     return () => selection.unregisterRemove(order.order_id)
   }, [order.order_id, selection.registerRemove, selection.unregisterRemove])
 
+  const collectRef = useRef<BulkCollectFn>(() => [])
+  collectRef.current = (uids) =>
+    drafts
+      .filter((d) => uids.includes(d.uid))
+      .map((d) => ({ name: d.name, quantity: d.quantity, price: String(d.price), sign: currencySign(d.currencyId) || '' }))
+  useEffect(() => {
+    const fn: BulkCollectFn = (uids) => collectRef.current(uids)
+    selection.registerCollect(order.order_id, fn)
+    return () => selection.unregisterCollect(order.order_id)
+  }, [order.order_id, selection.registerCollect, selection.unregisterCollect])
+
   const onItemStatus = (d: ItemDraft, sid: number) => {
     const name = itemStatusOptions.find((o) => o.id === sid)?.label
     const mode = statusExtraMode(name)
@@ -312,6 +349,8 @@ function OrderRow({
   // Порядок: способ связи · склад · метод · подметод (+ действие СДЭК инлайн ниже).
   const metaParts = [order.order_contact_method, order.order_establishment_name, order.order_method_name, order.order_sub_method].filter(Boolean)
   const metaText = metaParts.join(' · ')
+  // Кто создал заказ: Фамилия Имя (иначе логин).
+  const creator = [order.order_owner_second_name, order.order_owner_first_name].filter(Boolean).join(' ') || order.order_owner_user_login || ''
 
   return (
     <div className={styles.orderBlock}>
@@ -339,16 +378,28 @@ function OrderRow({
             (cdek?.has_waybill ? (
               <span title={cdek.status ?? ''}>
                 {' · '}
-                {cdek.track_number ?? '…'}
-                {cdek.status ? ` · ${cdek.status}` : ''}
-                {' · '}
-                <span
-                  onClick={recreateCdek}
-                  style={{ cursor: cdekBusy ? 'default' : 'pointer', color: 'var(--accent, #2b6cff)', opacity: cdekBusy ? 0.5 : 1 }}
-                  title="Сбросить и создать накладную заново"
-                >
-                  {cdekBusy ? 'Сброс…' : 'Пересоздать'}
+                <span className={styles.cdekTrack} onClick={openCdekMenu} title="Действия с накладной">
+                  {cdek.track_number ?? '…'}
+                  {cdek.status ? ` · ${cdek.status}` : ''}
                 </span>
+                {cdekMenuOpen && cdekMenuPos &&
+                  createPortal(
+                    <>
+                      <div className={styles.cdekBackdrop} onClick={() => setCdekMenuOpen(false)} />
+                      <div className={styles.cdekMenu} style={{ top: cdekMenuPos.top, left: cdekMenuPos.left }}>
+                        <button
+                          disabled={!cdek.track_number}
+                          onClick={() => { if (cdek.track_number) void navigator.clipboard?.writeText(cdek.track_number); setCdekMenuOpen(false) }}
+                        >
+                          Скопировать трек-номер
+                        </button>
+                        <button disabled={cdekBusy} onClick={() => { setCdekMenuOpen(false); void recreateCdek() }}>
+                          {cdekBusy ? 'Сброс…' : 'Пересоздать накладную'}
+                        </button>
+                      </div>
+                    </>,
+                    document.body,
+                  )}
               </span>
             ) : (
               <>
@@ -360,15 +411,26 @@ function OrderRow({
             ))}
         </span>
         <StatusSelect size="sm" value={order.order_status_id} options={orderStatusOptions} onChange={changeStatus} />
-        <span className={styles.right}>{drafts.length}</span>
-        <span className={styles.dim}>{formatDateTime(order.order_created_at)}</span>
+        <span className={styles.orderCreated}>
+          {creator && <span className={styles.createdBy}>{creator}</span>}
+          {formatDateTime(order.order_created_at)}
+        </span>
         <span className={styles.orderTotal}>
           <span className={styles.totalLabel}>Итого</span>
-          {totalText || '—'}
+          <span className={styles.totalValue} title={totalText}>{totalText || '—'}</span>
         </span>
         <div className={styles.rowActions}>
-          <button className={styles.editBtn} onClick={() => setChatOpen(true)} title="Чат заказа">
+          <button
+            className={[styles.editBtn, styles.chatBtn, chatUnread ? styles.chatUnread : commentCount > 0 ? styles.chatRead : ''].filter(Boolean).join(' ')}
+            onClick={openChat}
+            title={commentCount > 0 ? `Чат заказа · ${commentCount} сообщ.${chatUnread ? ' (есть новые)' : ''}` : 'Чат заказа'}
+          >
             💬
+            {commentCount > 0 && (
+              <span className={[styles.chatBadge, chatUnread ? styles.badgeUnread : styles.badgeRead].join(' ')}>
+                {commentCount > 99 ? '99+' : commentCount}
+              </span>
+            )}
           </button>
           <button className={styles.editBtn} onClick={() => onEdit(order)} title="Редактировать заказ">
             ✏️
@@ -451,7 +513,7 @@ function OrderRow({
       )}
 
       {chatOpen && (
-        <Modal open title={`Чат заказа №${order.order_id}`} onClose={() => setChatOpen(false)} width={560}>
+        <Modal open title={`Чат заказа №${order.order_id}`} onClose={() => setChatOpen(false)} width={700}>
           <OrderChat orderId={order.order_id} />
         </Modal>
       )}
