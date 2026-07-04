@@ -250,10 +250,10 @@
   padding: 8px 0;
 }
 .cardFooter {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
   margin-top: 16px;
+}
+.cardFooter > button {
+  width: 100%;
 }
 .hint {
   font-size: 13px;

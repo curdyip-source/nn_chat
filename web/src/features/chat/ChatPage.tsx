@@ -141,6 +141,9 @@ export function ChatPage() {
           <>
             {[...messages].reverse().map((m) => {
               const own = m.message_owner_user_id === user?.user_id
+              // Удаляемо только обычное сообщение/вложение (не карточка заказа/инвент/приёмки).
+              const deletable = !m.message_order_id && !m.message_inventory_id && !m.message_product_registration_id
+              const canDelete = deletable && (own || !!user?.user_admin)
               const author = [m.message_owner_first_name, m.message_owner_second_name].filter(Boolean).join(' ') || m.message_owner_user_login || 'Пользователь'
               return (
                 <div key={m.message_id} className={[styles.msgRow, own ? styles.own : ''].join(' ')}>
@@ -183,10 +186,12 @@ export function ChatPage() {
 
                     <div className={styles.meta}>
                       <span>{formatDateTime(m.message_created_at)}</span>
-                      {own && m.message_type === 'message' && editingId !== m.message_id && (
+                      {editingId !== m.message_id && (own || canDelete) && (
                         <span className={styles.actions}>
-                          <button onClick={() => { setEditingId(m.message_id); setEditText(m.message_text ?? '') }}>✏️</button>
-                          <button onClick={() => remove(m.message_id)}>🗑️</button>
+                          {own && m.message_type === 'message' && (
+                            <button onClick={() => { setEditingId(m.message_id); setEditText(m.message_text ?? '') }}>✏️</button>
+                          )}
+                          {canDelete && <button onClick={() => remove(m.message_id)}>🗑️</button>}
                         </span>
                       )}
                     </div>
