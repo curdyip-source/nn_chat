@@ -3,13 +3,14 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-class EstablishmentRoleAssignment(BaseModel):
-    establishment_id: int
-    role: Literal["viewer", "editor", "manager"]
-
-
-class UserEstablishmentRolesPayload(BaseModel):
-    roles: list[EstablishmentRoleAssignment] = Field(default_factory=list)
+class UserPermissionProfilePayload(BaseModel):
+    # Членство: в каких складах работает пользователь.
+    establishment_ids: list[int] = Field(default_factory=list)
+    # Профиль прав (действует в рамках членств). scope: own | establishment | all.
+    view_scope: Literal["own", "establishment", "all"] = "establishment"
+    can_create: bool = False
+    edit_scope: Literal["none", "own", "establishment", "all"] = "none"
+    delete_scope: Literal["none", "own", "establishment", "all"] = "none"
 
 
 class UserCreatePayload(BaseModel):

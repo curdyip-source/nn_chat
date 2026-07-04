@@ -1,18 +1,16 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
 SQL_ID_TYPE = BigInteger().with_variant(Integer, "sqlite")
 
-# Уровень доступа пользователя на конкретном складе. Членство в складе (наличие
-# строки) = видимость склада; role = что пользователь может делать с документами
-# этого склада: viewer (правит только свои), editor (любые склада), manager
-# (+удаление/создание приёмок-инвентаризаций). Удаление документов — всё равно
-# только владелец или админ (решение пользователя), независимо от роли склада.
-ESTABLISHMENT_ROLES = ("viewer", "editor", "manager")
+# Членство пользователя в складе: наличие строки = пользователь работает на этом
+# складе. Что именно он может делать (view/create/edit/delete) задаёт профиль прав
+# на самом пользователе (users.user_*_scope / user_can_create), а членство определяет
+# область «мои склады» для scope=establishment.
 
 
 class UserEstablishmentRole(Base):
@@ -32,7 +30,6 @@ class UserEstablishmentRole(Base):
     user_establishment_role_establishment_id: Mapped[int] = mapped_column(
         SQL_ID_TYPE, ForeignKey("establishments.establishment_id", ondelete="CASCADE"), nullable=False, index=True
     )
-    user_establishment_role_role: Mapped[str] = mapped_column(String(20), nullable=False)
     user_establishment_role_created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
     user = relationship("User", back_populates="establishment_roles")

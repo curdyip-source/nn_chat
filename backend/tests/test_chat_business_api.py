@@ -1083,15 +1083,9 @@ def test_delete_order_forbidden_for_non_owner_non_admin(client, integration_db_s
 
     est_id = _first_establishment_ids(client, owner_token, 1)[0]
     order_id = _create_simple_order(client, owner_token)
-    # worker2 получает доступ к складу заказа (видит его), но не владелец → удаление 403.
-    integration_db_session.add(
-        UserEstablishmentRole(
-            user_establishment_role_user_id=other.user_id,
-            user_establishment_role_establishment_id=est_id,
-            user_establishment_role_role="editor",
-        )
-    )
-    integration_db_session.commit()
+    # worker2 видит склад заказа (view=establishment), но удаляет только свои
+    # (delete_scope=own) → чужой заказ удалить не может → 403.
+    _set_profile_db(integration_db_session, other, establishment_ids=[est_id], view_scope="establishment", delete_scope="own")
     forbidden = client.delete(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {other_token}"})
     assert forbidden.status_code == 403
     assert client.get(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {owner_token}"}).status_code == 200
@@ -1115,54 +1109,47 @@ def _first_establishment_ids(client, token, n=2):
     return [e["establishment_id"] for e in ests[:n]]
 
 
-def test_admin_assigns_establishment_roles_and_they_reach_user(client, integration_db_session, integration_user, integration_admin):
+def test_admin_sets_permission_profile_and_it_reaches_user(client, integration_db_session, integration_user, integration_admin):
     integration_user.user_password = hash_password("WorkerPass123")
     integration_admin.user_password = hash_password("AdminPass123")
     integration_db_session.commit()
     admin_token = login(client, "admin", "AdminPass123")["token"]
     est = _first_establishment_ids(client, admin_token, 2)
 
-    # админ назначает роли обычному пользователю
-    resp = client.put(
-        f"{API_PREFIX}/users/{integration_user.user_id}/establishment-roles",
-        headers={"Authorization": f"Bearer {admin_token}"},
-        json={"roles": [{"establishment_id": est[0], "role": "editor"}, {"establishment_id": est[1], "role": "viewer"}]},
-    )
+    resp = _set_profile_api(client, admin_token, integration_user.user_id,
+                            establishment_ids=est, view_scope="establishment", can_create=True, edit_scope="own", delete_scope="own")
     assert resp.status_code == 200
-    roles = {r["establishment_id"]: r["role"] for r in resp.json()["item"]["user_establishment_roles"]}
-    assert roles == {est[0]: "editor", est[1]: "viewer"}
+    item = resp.json()["item"]
+    assert set(item["user_establishment_ids"]) == set(est)
+    assert item["user_view_scope"] == "establishment" and item["user_can_create"] is True
+    assert item["user_edit_scope"] == "own" and item["user_delete_scope"] == "own"
 
-    # роли доходят до самого пользователя при логине
-    login_payload = login(client, "worker", "WorkerPass123")
-    user_roles = {r["establishment_id"]: r["role"] for r in login_payload["user"]["user_establishment_roles"]}
-    assert user_roles == {est[0]: "editor", est[1]: "viewer"}
+    # профиль доходит до пользователя при логине
+    user = login(client, "worker", "WorkerPass123")["user"]
+    assert set(user["user_establishment_ids"]) == set(est)
+    assert user["user_edit_scope"] == "own"
 
 
-def test_set_establishment_roles_replaces_previous(client, integration_db_session, integration_user, integration_admin):
+def test_set_permission_profile_replaces_previous_membership(client, integration_db_session, integration_user, integration_admin):
     integration_admin.user_password = hash_password("AdminPass123")
     integration_db_session.commit()
     admin_token = login(client, "admin", "AdminPass123")["token"]
     est = _first_establishment_ids(client, admin_token, 2)
     uid = integration_user.user_id
 
-    client.put(f"{API_PREFIX}/users/{uid}/establishment-roles", headers={"Authorization": f"Bearer {admin_token}"},
-               json={"roles": [{"establishment_id": est[0], "role": "viewer"}]})
-    resp = client.put(f"{API_PREFIX}/users/{uid}/establishment-roles", headers={"Authorization": f"Bearer {admin_token}"},
-                      json={"roles": [{"establishment_id": est[1], "role": "manager"}]})
-    roles = {r["establishment_id"]: r["role"] for r in resp.json()["item"]["user_establishment_roles"]}
-    assert roles == {est[1]: "manager"}  # прежняя роль на est[0] снята
+    _set_profile_api(client, admin_token, uid, establishment_ids=[est[0]], view_scope="establishment")
+    resp = _set_profile_api(client, admin_token, uid, establishment_ids=[est[1]], view_scope="all", edit_scope="all")
+    item = resp.json()["item"]
+    assert set(item["user_establishment_ids"]) == {est[1]}  # членство на est[0] снято
+    assert item["user_view_scope"] == "all" and item["user_edit_scope"] == "all"
 
 
-def test_non_admin_cannot_assign_establishment_roles(client, integration_db_session, integration_user, integration_admin):
+def test_non_admin_cannot_set_permission_profile(client, integration_db_session, integration_user, integration_admin):
     integration_user.user_password = hash_password("WorkerPass123")
     integration_db_session.commit()
     worker_token = login(client, "worker", "WorkerPass123")["token"]
     est = _first_establishment_ids(client, worker_token, 1)
-    resp = client.put(
-        f"{API_PREFIX}/users/{integration_user.user_id}/establishment-roles",
-        headers={"Authorization": f"Bearer {worker_token}"},
-        json={"roles": [{"establishment_id": est[0], "role": "editor"}]},
-    )
+    resp = _set_profile_api(client, worker_token, integration_user.user_id, establishment_ids=est, view_scope="all")
     assert resp.status_code == 403
 
 
@@ -1193,7 +1180,7 @@ def test_non_admin_cannot_delete_other_users_message(client, integration_db_sess
     assert client.delete(f"{API_PREFIX}/messages/{mid}", headers={"Authorization": f"Bearer {worker_token}"}).status_code == 403
 
 
-def test_orders_list_scoped_to_accessible_establishments(client, integration_db_session, integration_user, integration_admin):
+def test_orders_list_scoped_by_profile(client, integration_db_session, integration_user, integration_admin):
     integration_user.user_password = hash_password("WorkerPass123")
     integration_admin.user_password = hash_password("AdminPass123")
     integration_db_session.commit()
@@ -1208,33 +1195,29 @@ def test_orders_list_scoped_to_accessible_establishments(client, integration_db_
             json={"order_establishment_id": establishment_id, "order_method_id": method_id, "order_customer": customer, "order_info": "x",
                   "items": [{"product_article": "SC-1", "product_name": "P", "order_item_quantity": 1, "order_item_price": "5.00"}]}).json()["item"]["order_id"]
 
-    # админ создаёт заказы на обоих складах
-    o_est0 = make_order(admin_token, est[0], "на складе 0")
-    o_est1 = make_order(admin_token, est[1], "на складе 1")
+    o_est0 = make_order(admin_token, est[0], "склад 0")
+    o_est1 = make_order(admin_token, est[1], "склад 1")
 
-    # без ролей worker видит только свои (пусто из админских)
-    seen = client.get(f"{API_PREFIX}/orders?page=1&page_size=100", headers={"Authorization": f"Bearer {worker_token}"}).json()["items"]
-    assert all(o["order_id"] not in (o_est0, o_est1) for o in seen)
+    def worker_ids():
+        return {o["order_id"] for o in client.get(f"{API_PREFIX}/orders?page=1&page_size=100", headers={"Authorization": f"Bearer {worker_token}"}).json()["items"]}
 
-    # даём worker роль только на est[0]
-    client.put(f"{API_PREFIX}/users/{integration_user.user_id}/establishment-roles", headers={"Authorization": f"Bearer {admin_token}"},
-               json={"roles": [{"establishment_id": est[0], "role": "viewer"}]})
+    # view=establishment, член только est[0] + может создавать → видит est[0], не est[1]
+    _set_profile_db(integration_db_session, integration_user, establishment_ids=[est[0]], view_scope="establishment", can_create=True, edit_scope="own")
+    own0 = make_order(worker_token, est[0], "мой на складе 0")
+    ids = worker_ids()
+    assert o_est0 in ids and own0 in ids
+    assert o_est1 not in ids
 
-    ids = {o["order_id"] for o in client.get(f"{API_PREFIX}/orders?page=1&page_size=100", headers={"Authorization": f"Bearer {worker_token}"}).json()["items"]}
-    assert o_est0 in ids           # склад доступен — виден
-    assert o_est1 not in ids       # склад недоступен — скрыт
+    # view=own → видит только свои
+    _set_profile_db(integration_db_session, integration_user, establishment_ids=[est[0]], view_scope="own")
+    ids_own = worker_ids()
+    assert own0 in ids_own
+    assert o_est0 not in ids_own and o_est1 not in ids_own
 
-    # даже свой заказ на НЕдоступном складе скрыт из списка (строго по складу —
-    # пользователь работает в рамках своих точек).
-    own_on_est1 = make_order(worker_token, est[1], "мой на складе 1")
-    ids2 = {o["order_id"] for o in client.get(f"{API_PREFIX}/orders?page=1&page_size=100", headers={"Authorization": f"Bearer {worker_token}"}).json()["items"]}
-    assert own_on_est1 not in ids2  # свой заказ на недоступном складе — скрыт
-    assert o_est0 in ids2           # доступный склад — по-прежнему виден
-    assert o_est1 not in ids2       # чужой на недоступном складе — скрыт
-
-    # админ видит все
-    admin_ids = {o["order_id"] for o in client.get(f"{API_PREFIX}/orders?page=1&page_size=100", headers={"Authorization": f"Bearer {admin_token}"}).json()["items"]}
-    assert {o_est0, o_est1, own_on_est1}.issubset(admin_ids)
+    # view=all → видит всё
+    _set_profile_db(integration_db_session, integration_user, establishment_ids=[est[0]], view_scope="all")
+    ids_all = worker_ids()
+    assert {o_est0, o_est1, own0}.issubset(ids_all)
 
 
 def test_inventories_and_registrations_scoped_to_accessible_establishments(client, integration_db_session, integration_user, integration_admin):
@@ -1258,13 +1241,8 @@ def test_inventories_and_registrations_scoped_to_accessible_establishments(clien
     inv0, inv1 = make_inv(est[0]), make_inv(est[1])
     reg0, reg1 = make_reg(est[0]), make_reg(est[1])
 
-    # worker без ролей не видит ничего из админских
-    inv_seen = client.get(f"{API_PREFIX}/inventories?page=1&page_size=100", headers={"Authorization": f"Bearer {worker_token}"}).json()["items"]
-    assert all(i["inventory_id"] not in (inv0, inv1) for i in inv_seen)
-
-    # даём роль на est[0]
-    client.put(f"{API_PREFIX}/users/{integration_user.user_id}/establishment-roles", headers={"Authorization": f"Bearer {admin_token}"},
-               json={"roles": [{"establishment_id": est[0], "role": "viewer"}]})
+    # worker: view=establishment, член только est[0] → видит только est[0]
+    _set_profile_db(integration_db_session, integration_user, establishment_ids=[est[0]], view_scope="establishment")
 
     inv_ids = {i["inventory_id"] for i in client.get(f"{API_PREFIX}/inventories?page=1&page_size=100", headers={"Authorization": f"Bearer {worker_token}"}).json()["items"]}
     assert inv0 in inv_ids and inv1 not in inv_ids
@@ -1276,56 +1254,88 @@ def test_inventories_and_registrations_scoped_to_accessible_establishments(clien
     assert client.get(f"{API_PREFIX}/inventories/{inv0}", headers={"Authorization": f"Bearer {worker_token}"}).status_code == 200
 
 
-def _grant_role(db_session, user_id, establishment_id, role):
-    db_session.add(UserEstablishmentRole(
-        user_establishment_role_user_id=user_id,
-        user_establishment_role_establishment_id=establishment_id,
-        user_establishment_role_role=role,
-    ))
+def _set_profile_db(db_session, user, *, establishment_ids=(), view_scope="establishment", can_create=False, edit_scope="none", delete_scope="none"):
+    # Задать профиль прав + членство напрямую через БД (для тестов прав). Прежние
+    # членства чистим (ORM-удалением) — можно вызывать несколько раз в одном тесте.
+    user.user_view_scope = view_scope
+    user.user_can_create = can_create
+    user.user_edit_scope = edit_scope
+    user.user_delete_scope = delete_scope
+    for existing in db_session.query(UserEstablishmentRole).filter(UserEstablishmentRole.user_establishment_role_user_id == user.user_id).all():
+        db_session.delete(existing)
+    db_session.flush()
+    for establishment_id in dict.fromkeys(establishment_ids):
+        db_session.add(UserEstablishmentRole(
+            user_establishment_role_user_id=user.user_id,
+            user_establishment_role_establishment_id=establishment_id,
+        ))
     db_session.commit()
 
 
-def test_viewer_cannot_edit_others_order_editor_can(client, integration_db_session, integration_user, integration_admin):
+def _set_profile_api(client, admin_token, user_id, *, establishment_ids, view_scope="establishment", can_create=False, edit_scope="none", delete_scope="none"):
+    return client.put(
+        f"{API_PREFIX}/users/{user_id}/permission-profile",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"establishment_ids": establishment_ids, "view_scope": view_scope, "can_create": can_create, "edit_scope": edit_scope, "delete_scope": delete_scope},
+    )
+
+
+def _orders_status_id(client, token):
+    ref = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {token}"}).json()
+    return next(s["status_id"] for s in ref["statuses"] if s["status_type"] == "orders")
+
+
+def test_edit_scope_none_forbids_edit_establishment_allows(client, integration_db_session, integration_user, integration_admin):
     integration_user.user_password = hash_password("WorkerPass123")
     integration_admin.user_password = hash_password("AdminPass123")
     integration_db_session.commit()
     admin_token = login(client, "admin", "AdminPass123")["token"]
     worker_token = login(client, "worker", "WorkerPass123")["token"]
     est = _first_establishment_ids(client, admin_token, 1)[0]
+    order_id = _create_simple_order(client, admin_token)  # владелец — админ
+    new_status = _orders_status_id(client, admin_token)
 
-    # заказ создаёт админ (владелец — админ, не worker)
-    order_id = _create_simple_order(client, admin_token)
-    ref = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {admin_token}"}).json()
-    new_status = ref["statuses"][0]["status_id"]
-    for s in ref["statuses"]:
-        if s["status_type"] == "orders":
-            new_status = s["status_id"]; break
-
-    # worker = viewer на складе → видит заказ, но менять чужой не может → 403
-    _grant_role(integration_db_session, integration_user.user_id, est, "viewer")
+    # view=establishment, edit=none (просмотр) → видит, но менять нельзя → 403
+    _set_profile_db(integration_db_session, integration_user, establishment_ids=[est], view_scope="establishment", edit_scope="none")
     assert client.get(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {worker_token}"}).status_code == 200
-    resp = client.put(f"{API_PREFIX}/orders/{order_id}/status", headers={"Authorization": f"Bearer {worker_token}"}, json={"order_status_id": new_status})
-    assert resp.status_code == 403
+    assert client.put(f"{API_PREFIX}/orders/{order_id}/status", headers={"Authorization": f"Bearer {worker_token}"}, json={"order_status_id": new_status}).status_code == 403
 
-    # повышаем до editor → теперь может менять статус чужого заказа склада
-    integration_db_session.query(UserEstablishmentRole).filter(
-        UserEstablishmentRole.user_establishment_role_user_id == integration_user.user_id
-    ).update({UserEstablishmentRole.user_establishment_role_role: "editor"}, synchronize_session=False)
+    # edit=establishment (менеджер) → правит любой заказ склада → 200
+    _set_profile_db(integration_db_session, integration_user, establishment_ids=[est], view_scope="establishment", edit_scope="establishment")
+    assert client.put(f"{API_PREFIX}/orders/{order_id}/status", headers={"Authorization": f"Bearer {worker_token}"}, json={"order_status_id": new_status}).status_code == 200
+
+
+def test_edit_scope_own_edits_own_not_others(client, integration_db_session, integration_user, integration_admin):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_admin.user_password = hash_password("AdminPass123")
     integration_db_session.commit()
-    resp2 = client.put(f"{API_PREFIX}/orders/{order_id}/status", headers={"Authorization": f"Bearer {worker_token}"}, json={"order_status_id": new_status})
-    assert resp2.status_code == 200
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+    worker_token = login(client, "worker", "WorkerPass123")["token"]
+    est = _first_establishment_ids(client, admin_token, 1)[0]
+    others_order = _create_simple_order(client, admin_token)  # владелец — админ
+    new_status = _orders_status_id(client, admin_token)
+
+    # editor: view=establishment, can_create, edit=own → свои правит, чужие — нет
+    _set_profile_db(integration_db_session, integration_user, establishment_ids=[est], view_scope="establishment", can_create=True, edit_scope="own")
+    own_order = _create_simple_order(client, worker_token)
+    assert client.put(f"{API_PREFIX}/orders/{own_order}/status", headers={"Authorization": f"Bearer {worker_token}"}, json={"order_status_id": new_status}).status_code == 200
+    assert client.put(f"{API_PREFIX}/orders/{others_order}/status", headers={"Authorization": f"Bearer {worker_token}"}, json={"order_status_id": new_status}).status_code == 403
 
 
-def test_owner_viewer_can_edit_own_order(client, integration_db_session, integration_user, integration_admin):
+def test_can_create_required_to_create_order(client, integration_db_session, integration_user, integration_admin):
     integration_user.user_password = hash_password("WorkerPass123")
     integration_db_session.commit()
     worker_token = login(client, "worker", "WorkerPass123")["token"]
     est = _first_establishment_ids(client, worker_token, 1)[0]
-    _grant_role(integration_db_session, integration_user.user_id, est, "viewer")
-
-    # worker (viewer) создаёт свой заказ и меняет его статус — своё править можно
-    order_id = _create_simple_order(client, worker_token)
     ref = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {worker_token}"}).json()
-    order_status = next(s["status_id"] for s in ref["statuses"] if s["status_type"] == "orders")
-    resp = client.put(f"{API_PREFIX}/orders/{order_id}/status", headers={"Authorization": f"Bearer {worker_token}"}, json={"order_status_id": order_status})
-    assert resp.status_code == 200
+    method_id = ref["order_methods"][0]["order_method_id"]
+    body = {"order_establishment_id": est, "order_method_id": method_id, "order_customer": "C", "order_info": "x",
+            "items": [{"product_article": "CR-1", "product_name": "P", "order_item_quantity": 1, "order_item_price": "5.00"}]}
+
+    # can_create=False → 403
+    _set_profile_db(integration_db_session, integration_user, establishment_ids=[est], view_scope="establishment", can_create=False)
+    assert client.post(f"{API_PREFIX}/orders", headers={"Authorization": f"Bearer {worker_token}"}, json=body).status_code == 403
+
+    # can_create=True, член склада → 201
+    _set_profile_db(integration_db_session, integration_user, establishment_ids=[est], view_scope="establishment", can_create=True)
+    assert client.post(f"{API_PREFIX}/orders", headers={"Authorization": f"Bearer {worker_token}"}, json=body).status_code == 201

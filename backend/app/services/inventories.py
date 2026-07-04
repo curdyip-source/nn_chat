@@ -10,7 +10,7 @@ from app.schemas.common import build_pagination
 from app.schemas.inventories import InventoryCreatePayload, InventoryStatusUpdatePayload, InventoryUpdatePayload
 from app.services.contacts import save_supplier_contact
 from app.services.audit import log_audit_event
-from app.services.access_control import accessible_establishment_ids, can_edit_establishment_document
+from app.services.access_control import can_create_on_establishment, can_edit_document, can_view_document, list_visibility
 from app.services.card_sync import notify_inventory_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.push_notifications import send_push_notification_event
@@ -33,26 +33,26 @@ class InventoryService:
         return row
 
     def get_accessible_inventory_or_404(self, inventory_id: int, current_user: dict):
-        # Ось B: доступна, если склад доступен ИЛИ пользователь — владелец; иначе 404.
+        # Видимость по профилю (view_scope): вне области → 404.
         row = self.get_inventory_or_404(inventory_id)
-        scoped = accessible_establishment_ids(self.db, current_user)
-        if scoped is not None and row.inventory_establishment_id not in scoped and row.inventory_owner_user_id != current_user["user_id"]:
+        if not can_view_document(self.db, current_user, row.inventory_establishment_id, row.inventory_owner_user_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Инвентаризация не найдена")
         return row
 
     def _ensure_inventory_editable(self, row, current_user: dict) -> None:
-        # Ось C: править может админ, владелец, либо editor/manager склада.
-        if not can_edit_establishment_document(self.db, current_user, row.inventory_establishment_id, row.inventory_owner_user_id):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для изменения инвентаризации: нужна роль «Редактор» или «Менеджер» на складе")
+        # Право на редактирование (профиль edit_scope).
+        if not can_edit_document(self.db, current_user, row.inventory_establishment_id, row.inventory_owner_user_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для изменения этой инвентаризации")
 
     def list_inventories(self, current_user: dict, *, page: int = 1, page_size: int = 20) -> dict:
-        # Ось B: не-админ видит строго инвентаризации доступных складов.
-        scoped_establishment_ids = accessible_establishment_ids(self.db, current_user)
-        rows, total = self.repository.list(page=page, page_size=page_size, scoped_establishment_ids=scoped_establishment_ids)
+        scoped_establishment_ids, scoped_owner_user_id = list_visibility(self.db, current_user)
+        rows, total = self.repository.list(page=page, page_size=page_size, scoped_establishment_ids=scoped_establishment_ids, scoped_owner_user_id=scoped_owner_user_id)
         return {"items": [serialize_inventory(item) for item in rows], "pagination": build_pagination(page, page_size, total)}
 
     def create_inventory(self, payload: InventoryCreatePayload, current_user: dict) -> dict:
         get_establishment_or_404(self.db, payload.inventory_establishment_id)
+        if not can_create_on_establishment(self.db, current_user, payload.inventory_establishment_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для создания инвентаризации на этом складе")
         status_row = get_status_or_404(self.db, payload.inventory_status_id, expected_type="inventory") if payload.inventory_status_id else get_default_status_or_400(self.db, status_type="inventory")
         default_currency = get_default_currency_or_400(self.db)
         items = []

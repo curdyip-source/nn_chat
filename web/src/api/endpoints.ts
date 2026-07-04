@@ -6,8 +6,8 @@ import type {
   Contact,
   Currency,
   Establishment,
-  EstablishmentRole,
   Inventory,
+  PermissionProfile,
   Order,
   OrderCreate,
   OrderMethod,
@@ -344,13 +344,13 @@ export function updateUser(
   return apiRequest<{ item: User }>(`/users/${userId}`, { method: 'PUT', body: patch })
 }
 
-export function setUserEstablishmentRoles(
+export function setUserPermissionProfile(
   userId: number,
-  roles: EstablishmentRole[],
+  profile: PermissionProfile,
 ) {
-  return apiRequest<{ item: User }>(`/users/${userId}/establishment-roles`, {
+  return apiRequest<{ item: User }>(`/users/${userId}/permission-profile`, {
     method: 'PUT',
-    body: { roles },
+    body: profile,
   })
 }
 

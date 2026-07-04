@@ -17,6 +17,12 @@ class User(Base):
     user_password: Mapped[str] = mapped_column(Text, nullable=False)
     user_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     user_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=func.false())
+    # Профиль прав (ось C), действует в рамках складов-членств (см. establishment_roles).
+    # scope: own = только свои документы; establishment = в моих складах; all = во всех складах.
+    user_view_scope: Mapped[str] = mapped_column(String(20), nullable=False, default="establishment", server_default="establishment")
+    user_can_create: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=func.false())
+    user_edit_scope: Mapped[str] = mapped_column(String(20), nullable=False, default="none", server_default="none")
+    user_delete_scope: Mapped[str] = mapped_column(String(20), nullable=False, default="none", server_default="none")
     user_first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     user_second_name: Mapped[str] = mapped_column(String(100), nullable=False)
     user_profile_photo: Mapped[str | None] = mapped_column(Text, nullable=True)

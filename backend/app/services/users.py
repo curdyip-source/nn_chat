@@ -22,7 +22,7 @@ from app.repositories.user_establishment_roles import UserEstablishmentRoleRepos
 from app.repositories.profile_photos import ProfilePhotoRepository
 from app.schemas.auth import RegisterPayload
 from app.schemas.common import build_pagination, model_to_dict
-from app.schemas.users import UserCreatePayload, UserEstablishmentRolesPayload, UserProfileUpdatePayload, UserUpdatePayload
+from app.schemas.users import UserCreatePayload, UserPermissionProfilePayload, UserProfileUpdatePayload, UserUpdatePayload
 from app.services.audit import log_audit_event
 from app.services.domain_common import get_establishment_or_404
 from app.services.profile_photos import build_profile_photo_storage_key
@@ -200,18 +200,19 @@ class UserService:
         )
         return serialize_user(row)
 
-    def set_establishment_roles(self, user_id: int, payload: UserEstablishmentRolesPayload, actor_user: dict) -> dict:
-        # Полная замена набора складских ролей пользователя (только админ вызывает).
-        # Роль валидируется схемой (Literal viewer/editor/manager); проверяем лишь
-        # существование складов. Дубли по складу схлопывает репозиторий.
+    def set_permission_profile(self, user_id: int, payload: UserPermissionProfilePayload, actor_user: dict) -> dict:
+        # Профиль прав + членство в складах (только админ вызывает). scope-значения
+        # валидирует схема; проверяем существование складов.
         user = self.get_user_by_id_or_404(user_id)
-        pairs: list[tuple[int, str]] = []
-        for assignment in payload.roles:
-            get_establishment_or_404(self.db, assignment.establishment_id)
-            pairs.append((assignment.establishment_id, assignment.role))
-        UserEstablishmentRoleRepository(self.db).replace_for_user(user_id, pairs)
-        # Сессия с expire_on_commit=False — коллекция user.establishment_roles после
-        # записи устаревшая; инвалидируем, чтобы serialize_user перечитал свежие роли.
+        for establishment_id in payload.establishment_ids:
+            get_establishment_or_404(self.db, establishment_id)
+        user.user_view_scope = payload.view_scope
+        user.user_can_create = payload.can_create
+        user.user_edit_scope = payload.edit_scope
+        user.user_delete_scope = payload.delete_scope
+        # Членство (репозиторий commit'ит — заодно фиксирует поля профиля выше).
+        UserEstablishmentRoleRepository(self.db).replace_for_user(user_id, payload.establishment_ids)
+        # Сессия с expire_on_commit=False — коллекция membership после записи устаревшая.
         self.db.expire(user, ["establishment_roles"])
         log_audit_event(
             self.db,
@@ -219,7 +220,13 @@ class UserService:
             entity_type=ENTITY_TYPE_USER,
             entity_id=user_id,
             event_type=EVENT_TYPE_USER_ROLES_UPDATE,
-            event_payload={"roles": [{"establishment_id": establishment_id, "role": role} for establishment_id, role in pairs]},
+            event_payload={
+                "establishment_ids": list(payload.establishment_ids),
+                "view_scope": payload.view_scope,
+                "can_create": payload.can_create,
+                "edit_scope": payload.edit_scope,
+                "delete_scope": payload.delete_scope,
+            },
         )
         return serialize_user(user)
 
@@ -294,8 +301,8 @@ def update_user(db: Session, user_id: int, payload: UserUpdatePayload, actor_use
     return UserService(db).update_user(user_id, payload, actor_user)
 
 
-def set_user_establishment_roles(db: Session, user_id: int, payload: UserEstablishmentRolesPayload, actor_user: dict) -> dict:
-    return UserService(db).set_establishment_roles(user_id, payload, actor_user)
+def set_user_permission_profile(db: Session, user_id: int, payload: UserPermissionProfilePayload, actor_user: dict) -> dict:
+    return UserService(db).set_permission_profile(user_id, payload, actor_user)
 
 
 def update_user_profile(db: Session, user_id: int, payload: UserProfileUpdatePayload) -> dict:

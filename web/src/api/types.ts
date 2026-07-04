@@ -1,8 +1,14 @@
 // Типы API. Имена полей повторяют сериализаторы бэкенда (snake_case).
 
-export type EstablishmentRole = {
-  establishment_id: number
-  role: 'viewer' | 'editor' | 'manager'
+export type ViewScope = 'own' | 'establishment' | 'all'
+export type ActionScope = 'none' | 'own' | 'establishment' | 'all'
+
+export type PermissionProfile = {
+  establishment_ids: number[]
+  view_scope: ViewScope
+  can_create: boolean
+  edit_scope: ActionScope
+  delete_scope: ActionScope
 }
 
 export type User = {
@@ -12,7 +18,11 @@ export type User = {
   user_second_name?: string | null
   user_admin: boolean
   user_active?: boolean
-  user_establishment_roles?: EstablishmentRole[]
+  user_view_scope?: ViewScope
+  user_can_create?: boolean
+  user_edit_scope?: ActionScope
+  user_delete_scope?: ActionScope
+  user_establishment_ids?: number[]
 }
 
 export type AuthResponse = {

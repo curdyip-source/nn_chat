@@ -145,6 +145,12 @@ def integration_user(integration_db_session: Session) -> User:
         user_second_name="User",
         user_age=25,
         user_address="Worker Street",
+        # Полный профиль прав (view/edit/delete=all, создание) — чтобы функциональные
+        # тесты работали без настройки складов. Тесты про сами права задают профиль явно.
+        user_view_scope="all",
+        user_can_create=True,
+        user_edit_scope="all",
+        user_delete_scope="all",
     )
     integration_db_session.add(user)
     integration_db_session.commit()

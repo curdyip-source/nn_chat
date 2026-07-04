@@ -17,7 +17,7 @@ from app.schemas.common import build_pagination
 from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
 from app.services.contacts import save_buyer_contact_from_order, save_supplier_contact
 from app.services.audit import log_audit_event
-from app.services.access_control import accessible_establishment_ids, can_edit_establishment_document
+from app.services.access_control import can_create_on_establishment, can_delete_document, can_edit_document, can_view_document, list_visibility
 from app.services.card_sync import notify_cards_deleted, notify_order_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.messages import resolve_mention_recipient_ids
@@ -220,25 +220,22 @@ class OrderService:
         return row
 
     def get_accessible_order_or_404(self, order_id: int, current_user: dict):
-        # Ось B: заказ доступен, если он на доступном пользователю складе ЛИБО пользователь
-        # его владелец (свой заказ не теряется при отсутствии роли на складе). Иначе — 404
-        # (не 403, чтобы не раскрывать наличие чужих заказов вне области видимости).
+        # Область видимости (профиль view_scope): заказ вне области → 404 (не раскрываем).
         row = self.get_order_or_404(order_id)
-        scoped = accessible_establishment_ids(self.db, current_user)
-        if scoped is not None and row.order_establishment_id not in scoped and row.order_owner_user_id != current_user["user_id"]:
+        if not can_view_document(self.db, current_user, row.order_establishment_id, row.order_owner_user_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Заказ не найден")
         return row
 
     def _ensure_order_editable(self, row, current_user: dict) -> None:
-        # Ось C: править заказ может админ, владелец, либо editor/manager склада.
-        if not can_edit_establishment_document(self.db, current_user, row.order_establishment_id, row.order_owner_user_id):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для изменения заказа: нужна роль «Редактор» или «Менеджер» на складе")
+        # Право на редактирование (профиль edit_scope).
+        if not can_edit_document(self.db, current_user, row.order_establishment_id, row.order_owner_user_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для изменения этого заказа")
 
     def list_orders(self, current_user: dict, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, establishment_ids: list[int] | None = None, search: str | None = None, date_from: date | None = None, date_to: date | None = None) -> dict:
-        # Ось B: не-админ видит СТРОГО заказы доступных ему складов. None = все (админ).
-        scoped_establishment_ids = accessible_establishment_ids(self.db, current_user)
-        rows, total = self.repository.list(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, scoped_establishment_ids=scoped_establishment_ids, search=search, date_from=date_from, date_to=date_to)
-        currency_totals = self.repository.totals_by_currency(status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, scoped_establishment_ids=scoped_establishment_ids, search=search, date_from=date_from, date_to=date_to)
+        # Область видимости по профилю: (склады | владелец | без ограничения).
+        scoped_establishment_ids, scoped_owner_user_id = list_visibility(self.db, current_user)
+        rows, total = self.repository.list(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, scoped_establishment_ids=scoped_establishment_ids, scoped_owner_user_id=scoped_owner_user_id, search=search, date_from=date_from, date_to=date_to)
+        currency_totals = self.repository.totals_by_currency(status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, scoped_establishment_ids=scoped_establishment_ids, scoped_owner_user_id=scoped_owner_user_id, search=search, date_from=date_from, date_to=date_to)
         totals = [
             {"currency_id": currency_id, "currency_sign": currency_sign, "amount": amount}
             for currency_id, currency_sign, amount in currency_totals
@@ -248,6 +245,8 @@ class OrderService:
 
     def create_order(self, payload: OrderCreatePayload, current_user: dict) -> dict:
         get_establishment_or_404(self.db, payload.order_establishment_id)
+        if not can_create_on_establishment(self.db, current_user, payload.order_establishment_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для создания заказа на этом складе")
         order_method_row = get_order_method_or_404(self.db, payload.order_method_id)
         available_sub_methods = order_method_row.order_method_sub_methods or []
         normalized_order_sub_method = payload.order_sub_method.strip() if payload.order_sub_method else None
@@ -485,9 +484,9 @@ class OrderService:
 
     def delete_order(self, order_id: int, current_user: dict) -> None:
         row = self.get_accessible_order_or_404(order_id, current_user)
-        # Право на удаление: только владелец заказа или администратор.
-        if row.order_owner_user_id != current_user["user_id"] and not current_user["user_admin"]:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Удалять заказ может только его владелец или администратор")
+        # Право на удаление (профиль delete_scope).
+        if not can_delete_document(self.db, current_user, row.order_establishment_id, row.order_owner_user_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для удаления этого заказа")
         snapshot = serialize_order(row)
         # 1) Карточки заказа в чате гасим мягко (tombstone для дельта-синка) и отвязываем
         #    от заказа, чтобы каскад при удалении заказа их физически не снёс.
