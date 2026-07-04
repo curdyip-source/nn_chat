@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { listOrders, updateOrderStatus, type OrderTotal } from '../../api/endpoints'
+import { deleteOrder, listOrders, updateOrderStatus, type OrderTotal } from '../../api/endpoints'
 import type { Order } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { useRealtime } from '../../data/RealtimeContext'
@@ -55,6 +55,10 @@ export function OrdersPage() {
   const toggleExpandAll = (value: boolean) => {
     setExpandAll(value)
     setExpandNonce((n) => n + 1)
+    // Переключение режима меняет тип чекбоксов (позиции ↔ заказы) — старые отметки
+    // становятся неактуальными, сбрасываем оба набора.
+    setSelected({})
+    setSelectedOrders(new Set())
   }
 
   const hasActiveFilters =
@@ -77,6 +81,8 @@ export function OrdersPage() {
   const [selected, setSelected] = useState<Record<number, string[]>>({})
   const [bulkPending, setBulkPending] = useState<{ statusId: number; mode: ExtraMode } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmDeleteOrders, setConfirmDeleteOrders] = useState(false)
+  const [deletingOrders, setDeletingOrders] = useState(false)
   const applyFns = useRef<Map<number, BulkApplyFn>>(new Map())
   const removeFns = useRef<Map<number, BulkRemoveFn>>(new Map())
   const selectionCount = useMemo(() => Object.values(selected).reduce((n, arr) => n + arr.length, 0), [selected])
@@ -149,6 +155,19 @@ export function OrdersPage() {
     }
     setSelected({})
     setConfirmDelete(false)
+  }
+  // Удаление целых заказов (свёрнутый режим): та же кнопка «Удалить», но сносит
+  // заказы целиком через API. Право проверяет бэк (владелец или админ → иначе 403).
+  const applyOrderDelete = async () => {
+    const ids = [...selectedOrders]
+    setDeletingOrders(true)
+    const results = await Promise.allSettled(ids.map((id) => deleteOrder(id)))
+    setDeletingOrders(false)
+    setSelectedOrders(new Set())
+    setConfirmDeleteOrders(false)
+    const failed = results.filter((r) => r.status === 'rejected').length
+    setError(failed ? `Не удалось удалить заказов: ${failed} из ${ids.length} (нет прав — удалять можно только свои).` : null)
+    reload()
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -246,10 +265,20 @@ export function OrdersPage() {
             {itemStatusOptions.length > 0 && (
               <div className={styles.bulkActions}>
                 {orderSelectionCount > 0 ? (
-                  // Выбраны целые заказы (свёрнутые строки) — тот же селектор, но статусы заказа.
-                  <span title={`Статус для ${orderSelectionCount} заказ.`}>
-                    <StatusSelect value={null} options={orderStatusOptions} onChange={onBulkOrderStatus} />
-                  </span>
+                  // Выбраны целые заказы (свёрнутые строки) — статусы заказа + удаление заказов.
+                  <>
+                    <span title={`Статус для ${orderSelectionCount} заказ.`}>
+                      <StatusSelect value={null} options={orderStatusOptions} onChange={onBulkOrderStatus} />
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.bulkDelete}
+                      onClick={() => setConfirmDeleteOrders(true)}
+                      title={`Удалить ${orderSelectionCount} заказ.`}
+                    >
+                      Удалить
+                    </button>
+                  </>
                 ) : (
                   <>
                     <span title={selectionCount === 0 ? 'Отметьте позиции галочкой' : `Статус для ${selectionCount} поз.`}>
@@ -394,6 +423,30 @@ export function OrdersPage() {
         </p>
         <p style={{ margin: '10px 0 0', fontSize: 13, lineHeight: 1.5, color: 'var(--text-muted)' }}>
           Если в заказе всего один товар, он не будет удалён — заказ не может остаться без позиций.
+        </p>
+      </Modal>
+
+      <Modal
+        open={confirmDeleteOrders}
+        title="Удалить заказы"
+        onClose={() => setConfirmDeleteOrders(false)}
+        width={420}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmDeleteOrders(false)} disabled={deletingOrders}>
+              Отмена
+            </Button>
+            <Button variant="danger" onClick={applyOrderDelete} disabled={deletingOrders}>
+              {deletingOrders ? 'Удаление…' : 'Удалить'}
+            </Button>
+          </>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5 }}>
+          Точно удалить выбранные заказы ({orderSelectionCount}) целиком, вместе с позициями, комментариями и карточкой в чате? Действие необратимо.
+        </p>
+        <p style={{ margin: '10px 0 0', fontSize: 13, lineHeight: 1.5, color: 'var(--text-muted)' }}>
+          Удалить можно только свои заказы; чужие вправе удалять лишь администратор.
         </p>
       </Modal>
     </div>

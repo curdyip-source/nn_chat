@@ -1034,3 +1034,65 @@ def test_order_update_does_not_push_when_items_unchanged(client, integration_db_
     )
     assert update_response.status_code == 200
     assert captured == []
+
+
+def _create_simple_order(client, token):
+    ref = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {token}"}).json()
+    establishment_id = ref["establishments"][0]["establishment_id"]
+    order_method_id = ref["order_methods"][0]["order_method_id"]
+    response = client.post(
+        f"{API_PREFIX}/orders",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_customer": "Клиент",
+            "order_info": "инфо",
+            "items": [{"product_article": "DEL-001", "product_name": "Del Product", "order_item_quantity": 1, "order_item_price": "10.00"}],
+        },
+    )
+    assert response.status_code == 201
+    return response.json()["item"]["order_id"]
+
+
+def test_delete_order_by_owner_removes_order_and_tombstones_card(client, integration_db_session, integration_user):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    token = login(client, "worker", "WorkerPass123")["token"]
+    order_id = _create_simple_order(client, token)
+
+    messages = client.get(f"{API_PREFIX}/messages?page=1&page_size=20", headers={"Authorization": f"Bearer {token}"}).json()["items"]
+    assert any(m["message_type"] == "order" and m["message_order_id"] == order_id for m in messages)
+
+    delete_response = client.delete(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {token}"})
+    assert delete_response.status_code == 204
+
+    assert client.get(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {token}"}).status_code == 404
+    messages_after = client.get(f"{API_PREFIX}/messages?page=1&page_size=20", headers={"Authorization": f"Bearer {token}"}).json()["items"]
+    assert not any(m.get("message_order_id") == order_id for m in messages_after)
+
+
+def test_delete_order_forbidden_for_non_owner_non_admin(client, integration_db_session, integration_user):
+    integration_user.user_password = hash_password("WorkerPass123")
+    other = User(user_login="worker2", user_password=hash_password("Worker2Pass123"), user_admin=False, user_active=True, user_first_name="Worker2", user_second_name="User", user_age=27, user_address="Street 2")
+    integration_db_session.add(other)
+    integration_db_session.commit()
+    owner_token = login(client, "worker", "WorkerPass123")["token"]
+    other_token = login(client, "worker2", "Worker2Pass123")["token"]
+
+    order_id = _create_simple_order(client, owner_token)
+    forbidden = client.delete(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {other_token}"})
+    assert forbidden.status_code == 403
+    assert client.get(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {owner_token}"}).status_code == 200
+
+
+def test_delete_order_allowed_for_admin(client, integration_db_session, integration_user, integration_admin):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    owner_token = login(client, "worker", "WorkerPass123")["token"]
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+
+    order_id = _create_simple_order(client, owner_token)
+    assert client.delete(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {admin_token}"}).status_code == 204
+    assert client.get(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {admin_token}"}).status_code == 404

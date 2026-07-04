@@ -217,6 +217,10 @@ export function updateOrderStatus(orderId: number, statusId: number) {
   })
 }
 
+export function deleteOrder(orderId: number) {
+  return apiRequest<void>(`/orders/${orderId}`, { method: 'DELETE' })
+}
+
 export function updateOrder(orderId: number, payload: OrderUpdate) {
   return apiRequest<{ item: Order }>(`/orders/${orderId}`, { method: 'PUT', body: payload })
 }

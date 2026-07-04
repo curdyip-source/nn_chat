@@ -114,6 +114,24 @@ class MessageRepository:
     def touch_for_product_registration(self, product_registration_id: int) -> list[int]:
         return self._touch(Message.message_product_registration_id == product_registration_id)
 
+    def soft_delete_for_order(self, order_id: int) -> list[int]:
+        # Гасим карточки-сообщения заказа мягко (tombstone для дельта-синка) и
+        # отвязываем message_order_id, чтобы последующее жёсткое удаление заказа
+        # не снесло tombstone каскадом (FK message_order_id ON DELETE CASCADE).
+        rows = (
+            self.db.query(Message.message_id)
+            .filter(Message.message_order_id == order_id, Message.message_deleted_at.is_(None))
+            .all()
+        )
+        ids = [row[0] for row in rows]
+        if ids:
+            self.db.query(Message).filter(Message.message_id.in_(ids)).update(
+                {Message.message_deleted_at: func.now(), Message.message_order_id: None},
+                synchronize_session=False,
+            )
+            self.db.commit()
+        return ids
+
     def create(self, data: dict, attachments: list[dict] | None = None) -> Message:
         row = Message(**data)
         self.db.add(row)

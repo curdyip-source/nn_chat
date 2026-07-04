@@ -151,6 +151,13 @@ class OrderRepository:
         self.db.refresh(row)
         return self.get_by_id(row.order_id)
 
+    def delete(self, row: Order) -> None:
+        # Жёсткое удаление: позиции и комментарии уходят каскадом (relationship
+        # cascade="all, delete-orphan"). Карточку-сообщение чата гасим отдельно
+        # (мягко, с отвязкой) до вызова — см. OrderService.delete_order.
+        self.db.delete(row)
+        self.db.commit()
+
     def add_comment(self, order_id: int, data: dict, attachments: list[dict] | None = None) -> OrderComment:
         row = OrderComment(**data, order_comment_order_id=order_id)
         self.db.add(row)

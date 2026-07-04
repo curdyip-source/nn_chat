@@ -26,6 +26,13 @@ def notify_order_changed(db: Session, order_id: int) -> None:
     _emit_updated(db, MessageRepository(db).touch_for_order(order_id))
 
 
+def notify_cards_deleted(message_ids: list[int]) -> None:
+    # Карточки уже погашены мягко (tombstone). Публикуем SSE `deleted`, чтобы
+    # подключённые клиенты убрали их из ленты сразу (как delete_message).
+    for message_id in message_ids:
+        broker.publish({"type": "deleted", "message_id": message_id})
+
+
 def notify_inventory_changed(db: Session, inventory_id: int) -> None:
     _emit_updated(db, MessageRepository(db).touch_for_inventory(inventory_id))
 

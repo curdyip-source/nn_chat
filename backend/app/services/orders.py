@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
-from app.core.audit_types import ENTITY_TYPE_ORDER, EVENT_TYPE_ORDER_COMMENT_CREATE, EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_UPDATE
+from app.core.audit_types import ENTITY_TYPE_ORDER, EVENT_TYPE_ORDER_COMMENT_CREATE, EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_DELETE, EVENT_TYPE_ORDER_UPDATE
 from app.models.messages import Message
 from app.models.orders import Order, OrderItem
 from app.repositories.message_attachment_assets import MessageAttachmentAssetRepository
@@ -17,7 +17,7 @@ from app.schemas.common import build_pagination
 from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
 from app.services.contacts import save_buyer_contact_from_order, save_supplier_contact
 from app.services.audit import log_audit_event
-from app.services.card_sync import notify_order_changed
+from app.services.card_sync import notify_cards_deleted, notify_order_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.messages import resolve_mention_recipient_ids
 from app.services.push_notifications import send_mention_push_event, send_order_change_push_event, send_order_comment_push_event, send_push_notification_event
@@ -463,6 +463,32 @@ class OrderService:
         notify_order_changed(self.db, row.order_id)
         return serialize_order(row)
 
+    def delete_order(self, order_id: int, current_user: dict) -> None:
+        row = self.get_order_or_404(order_id)
+        # Право на удаление: только владелец заказа или администратор.
+        if row.order_owner_user_id != current_user["user_id"] and not current_user["user_admin"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Удалять заказ может только его владелец или администратор")
+        snapshot = serialize_order(row)
+        # 1) Карточки заказа в чате гасим мягко (tombstone для дельта-синка) и отвязываем
+        #    от заказа, чтобы каскад при удалении заказа их физически не снёс.
+        message_ids = self.message_repository.soft_delete_for_order(order_id)
+        # 2) Жёсткое удаление заказа — позиции и комментарии уходят каскадом.
+        self.repository.delete(row)
+        log_audit_event(
+            self.db,
+            actor_user_id=current_user["user_id"],
+            entity_type=ENTITY_TYPE_ORDER,
+            entity_id=order_id,
+            event_type=EVENT_TYPE_ORDER_DELETE,
+            event_payload={
+                "order_customer": snapshot.get("order_customer"),
+                "order_status": snapshot.get("order_status"),
+                "items_count": len(snapshot.get("items", [])),
+            },
+        )
+        # 3) Realtime: убрать погашенные карточки из ленты у всех подключённых клиентов.
+        notify_cards_deleted(message_ids)
+
     def list_order_comments(self, order_id: int) -> dict:
         row = self.get_order_or_404(order_id)
         items = sorted(
@@ -702,6 +728,10 @@ def update_order(db: Session, order_id: int, payload: OrderUpdatePayload, curren
 
 def split_order(db: Session, order_id: int, current_user: dict) -> dict:
     return OrderService(db).split_order(order_id, current_user)
+
+
+def delete_order(db: Session, order_id: int, current_user: dict) -> None:
+    OrderService(db).delete_order(order_id, current_user)
 
 
 def list_order_comments(db: Session, order_id: int) -> dict:
