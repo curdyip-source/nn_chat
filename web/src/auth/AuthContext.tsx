@@ -31,7 +31,11 @@ const AuthCtx = createContext<AuthState | null>(null)
 // заходит. Управление правами (страница «Пользователи» и пр.) остаётся под
 // проверкой user_admin отдельно.
 export function hasWebAccess(user: User): boolean {
-  return user.user_admin || (user.user_establishment_roles?.length ?? 0) > 0
+  if (user.user_admin) return true
+  if ((user.user_establishment_roles?.length ?? 0) > 0) return true
+  // Доступ есть и у тех, кому выданы разделы (напр. только «Прайс»).
+  // user_sections === null/undefined = все разделы; пустой список = доступа нет.
+  return user.user_sections == null || user.user_sections.length > 0
 }
 
 function readStoredUser(): User | null {
