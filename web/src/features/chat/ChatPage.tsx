@@ -25,7 +25,17 @@ export function ChatPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const { revision, lastEvent } = useRealtime()
+
+  // Авто-рост инпута сообщения под введённый текст (как textfield в приложении):
+  // сбрасываем высоту и подгоняем под содержимое; CSS max-height ограничивает и включает скролл.
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [text])
 
   // В column-reverse низ ленты (новейшее сообщение) — это scrollTop = 0.
   const scrollToBottom = () => {
@@ -212,6 +222,7 @@ export function ChatPage() {
 
       <div className={styles.composer}>
         <textarea
+          ref={inputRef}
           className={styles.input}
           placeholder="Сообщение…  (Enter — отправить, Shift+Enter — перенос)"
           value={text}
