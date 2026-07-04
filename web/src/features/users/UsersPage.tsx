@@ -199,6 +199,16 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
             </div>
             <div className={styles.login}>@{user.user_login}</div>
           </div>
+          <div className={styles.headActions}>
+            {user.user_active ? (
+              <Button variant="ghost" loading={saving === 'access'} onClick={() => setAccess({ user_active: false })}>Деактивировать</Button>
+            ) : (
+              <Button variant="primary" loading={saving === 'access'} onClick={() => setAccess({ user_active: true })}>Подтвердить</Button>
+            )}
+            <Button variant="secondary" loading={saving === 'access'} onClick={() => setAccess({ user_admin: !user.user_admin })}>
+              {user.user_admin ? 'Снять права админа' : 'Сделать администратором'}
+            </Button>
+          </div>
         </div>
 
         {error && <div className={styles.error}>{error}</div>}
@@ -233,23 +243,6 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
             </div>
             <div className={styles.cardFooter}>
               <Button variant="primary" disabled={!infoDirty} loading={saving === 'info'} onClick={saveInfo}>Сохранить данные</Button>
-            </div>
-          </section>
-
-          {/* Администрирование */}
-          <section className={styles.card}>
-            <div className={styles.cardHead}>
-              <div className={styles.cardTitle}><span className={styles.cardIcon}>🛡️</span> Доступ и статус</div>
-            </div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {user.user_active ? (
-                <Button variant="ghost" loading={saving === 'access'} onClick={() => setAccess({ user_active: false })}>Деактивировать</Button>
-              ) : (
-                <Button variant="primary" loading={saving === 'access'} onClick={() => setAccess({ user_active: true })}>Подтвердить</Button>
-              )}
-              <Button variant="secondary" loading={saving === 'access'} onClick={() => setAccess({ user_admin: !user.user_admin })}>
-                {user.user_admin ? 'Снять права админа' : 'Сделать администратором'}
-              </Button>
             </div>
           </section>
 
