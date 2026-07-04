@@ -269,16 +269,16 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
                         </label>
                         {on && perm && (
                           <div className={styles.whScopes}>
+                            <label className={styles.scopeRow}>
+                              <span>Может создавать</span>
+                              <input type="checkbox" checked={perm.can_create} onChange={(ev) => patchScopes(e.establishment_id, { can_create: ev.target.checked })} />
+                            </label>
                             <div className={styles.scopeRow}>
                               <span>Видит</span>
                               <select className={styles.scopeSelect} value={perm.view_scope} onChange={(ev) => patchScopes(e.establishment_id, { view_scope: ev.target.value as ViewScope })}>
                                 {VIEW_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                               </select>
                             </div>
-                            <label className={styles.scopeRow}>
-                              <span>Может создавать</span>
-                              <input type="checkbox" checked={perm.can_create} onChange={(ev) => patchScopes(e.establishment_id, { can_create: ev.target.checked })} />
-                            </label>
                             <div className={styles.scopeRow}>
                               <span>Редактирует</span>
                               <select className={styles.scopeSelect} value={perm.edit_scope} onChange={(ev) => patchScopes(e.establishment_id, { edit_scope: ev.target.value as ActionScope })}>
