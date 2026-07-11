@@ -36,7 +36,13 @@ const CRM_SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: 'registrations', label: 'Приёмки', icon: '📥' },
   { key: 'contacts', label: 'Контрагенты', icon: '👥' },
 ]
-const ALL_SECTION_KEYS = [...APP_MODES, ...CRM_SECTIONS].map((s) => s.key)
+// Вкладки СРМ в мобильном приложении (свой набор ключей, гейтят только iOS).
+const APP_CRM_SECTIONS: { key: string; label: string; icon: string }[] = [
+  { key: 'app_orders', label: 'Все заказы', icon: '📦' },
+  { key: 'app_products', label: 'Товары', icon: '🏷️' },
+  { key: 'app_shipments', label: 'Отгрузки', icon: '🚚' },
+]
+const ALL_SECTION_KEYS = [...APP_MODES, ...CRM_SECTIONS, ...APP_CRM_SECTIONS].map((s) => s.key)
 
 const PAGE_SIZE = 100
 const fullName = (u: User) => [u.user_first_name, u.user_second_name].filter(Boolean).join(' ') || u.user_login
@@ -290,7 +296,20 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
 
               {sections.includes('crm') && (
                 <>
-                  <div className={styles.fieldLabel} style={{ margin: '16px 0 8px' }}>Разделы СРМ</div>
+                  <div className={styles.fieldLabel} style={{ margin: '16px 0 8px' }}>Разделы приложения (СРМ)</div>
+                  <div className={styles.sectionGrid}>
+                    {APP_CRM_SECTIONS.map((s) => {
+                      const on = sections.includes(s.key)
+                      return (
+                        <button key={s.key} type="button" onClick={() => toggleSection(s.key)}
+                          className={[styles.sectionChip, on ? styles.sectionChipOn : ''].join(' ')}>
+                          <span>{s.icon}</span>{s.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <div className={styles.fieldLabel} style={{ margin: '16px 0 8px' }}>Разделы СРМ (веб)</div>
                   <div className={styles.sectionGrid}>
                     {CRM_SECTIONS.map((s) => {
                       const on = sections.includes(s.key)

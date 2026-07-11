@@ -3,9 +3,22 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 # Доступы, выдаваемые не-админу (админ-разделы недоступны через это). Режимы приложения:
-# chat / crm / price. Разделы внутри СРМ: orders / products / inventory / registrations /
-# contacts (видны только вместе с режимом crm).
-GRANTABLE_SECTIONS = ("chat", "crm", "price", "orders", "products", "inventory", "registrations", "contacts")
+# chat / crm / price. Разделы внутри СРМ веба: orders / products / inventory / registrations /
+# contacts (видны только вместе с режимом crm). Вкладки СРМ в приложении (свой набор, гейтят
+# только iOS): app_orders (Все заказы) / app_products (Товары) / app_shipments (Отгрузки).
+GRANTABLE_SECTIONS = (
+    "chat",
+    "crm",
+    "price",
+    "orders",
+    "products",
+    "inventory",
+    "registrations",
+    "contacts",
+    "app_orders",
+    "app_products",
+    "app_shipments",
+)
 
 
 class EstablishmentPermission(BaseModel):
