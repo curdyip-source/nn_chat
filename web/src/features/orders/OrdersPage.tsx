@@ -4,7 +4,7 @@ import type { Order } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { useRealtime } from '../../data/RealtimeContext'
 import { Button } from '../../ui/Button'
-import { MultiButtonGroup } from '../../ui/MultiButtonGroup'
+import { TriStateButtonGroup } from '../../ui/TriStateButtonGroup'
 import { TextInput } from '../../ui/Field'
 import { Modal } from '../../ui/Modal'
 import { StatusSelect } from '../../ui/StatusSelect'
@@ -38,9 +38,20 @@ export function OrdersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Фильтры: include = «показывать только эти», exclude = «скрыть эти» (второй клик по чипу).
   const [statusFilter, setStatusFilter] = useState<number[]>([])
+  const [statusExclude, setStatusExclude] = useState<number[]>([])
   const [methodFilter, setMethodFilter] = useState<number[]>([])
+  const [methodExclude, setMethodExclude] = useState<number[]>([])
   const [establishmentFilter, setEstablishmentFilter] = useState<number[]>([])
+  const [establishmentExclude, setEstablishmentExclude] = useState<number[]>([])
+  // Эффективный список id для запроса: include (минус исключённые) либо, если include пуст,
+  // все опции без исключённых; пусто = фильтр не применяется.
+  const effectiveIds = (include: number[], exclude: number[], allIds: number[]) => {
+    if (include.length) return include.filter((id) => !exclude.includes(id))
+    if (exclude.length) return allIds.filter((id) => !exclude.includes(id))
+    return []
+  }
   // По умолчанию — весь текущий год: 01.01 … 31.12.
   const defaultDateFrom = useMemo(() => `${new Date().getFullYear()}-01-01`, [])
   const defaultDateTo = useMemo(() => `${new Date().getFullYear()}-12-31`, [])
@@ -63,15 +74,21 @@ export function OrdersPage() {
 
   const hasActiveFilters =
     statusFilter.length > 0 ||
+    statusExclude.length > 0 ||
     methodFilter.length > 0 ||
+    methodExclude.length > 0 ||
     establishmentFilter.length > 0 ||
+    establishmentExclude.length > 0 ||
     dateFrom !== defaultDateFrom ||
     dateTo !== defaultDateTo ||
     search !== ''
   const resetAllFilters = () => {
     setStatusFilter([])
+    setStatusExclude([])
     setMethodFilter([])
+    setMethodExclude([])
     setEstablishmentFilter([])
+    setEstablishmentExclude([])
     setDateFrom(defaultDateFrom)
     setDateTo(defaultDateTo)
     setSearch('')
@@ -210,16 +227,25 @@ export function OrdersPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [statusFilter, methodFilter, establishmentFilter, debouncedSearch, dateFrom, dateTo])
+  }, [statusFilter, statusExclude, methodFilter, methodExclude, establishmentFilter, establishmentExclude, debouncedSearch, dateFrom, dateTo])
 
   // Состав строк меняется (фильтры/страница/режим) — сбрасываем отметки, чтобы uid не зависли.
   useEffect(() => {
     setSelected({})
-  }, [statusFilter, methodFilter, establishmentFilter, debouncedSearch, dateFrom, dateTo, page])
+  }, [statusFilter, statusExclude, methodFilter, methodExclude, establishmentFilter, establishmentExclude, debouncedSearch, dateFrom, dateTo, page])
 
   const reload = useCallback(() => {
     setLoading(true)
-    listOrders({ statusIds: statusFilter, methodIds: methodFilter, establishmentIds: establishmentFilter, search: debouncedSearch, dateFrom, dateTo, page, pageSize: PAGE_SIZE })
+    listOrders({
+      statusIds: effectiveIds(statusFilter, statusExclude, orderStatuses.map((s) => s.status_id)),
+      methodIds: effectiveIds(methodFilter, methodExclude, orderMethods.map((m) => m.order_method_id)),
+      establishmentIds: effectiveIds(establishmentFilter, establishmentExclude, establishments.map((e) => e.establishment_id)),
+      search: debouncedSearch,
+      dateFrom,
+      dateTo,
+      page,
+      pageSize: PAGE_SIZE,
+    })
       .then((res) => {
         setOrders(res.items)
         setTotals(res.totals ?? [])
@@ -228,7 +254,8 @@ export function OrdersPage() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
-  }, [statusFilter, methodFilter, establishmentFilter, debouncedSearch, dateFrom, dateTo, page])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, statusExclude, methodFilter, methodExclude, establishmentFilter, establishmentExclude, debouncedSearch, dateFrom, dateTo, page])
 
   useEffect(() => {
     if (!creating && editOrder == null) reload()
@@ -375,10 +402,14 @@ export function OrdersPage() {
           </div>
         </div>
         {orderStatuses.length > 0 && (
-          <MultiButtonGroup
+          <TriStateButtonGroup
             size="xs"
-            value={statusFilter}
-            onChange={setStatusFilter}
+            include={statusFilter}
+            exclude={statusExclude}
+            onChange={(inc, exc) => {
+              setStatusFilter(inc)
+              setStatusExclude(exc)
+            }}
             options={orderStatuses.map((s) => ({
               value: s.status_id,
               label: s.status_status,
@@ -387,10 +418,14 @@ export function OrdersPage() {
           />
         )}
         {orderMethods.length > 0 && (
-          <MultiButtonGroup
+          <TriStateButtonGroup
             size="xs"
-            value={methodFilter}
-            onChange={setMethodFilter}
+            include={methodFilter}
+            exclude={methodExclude}
+            onChange={(inc, exc) => {
+              setMethodFilter(inc)
+              setMethodExclude(exc)
+            }}
             options={orderMethods.map((m) => ({
               value: m.order_method_id,
               label: m.order_method_name,
@@ -398,10 +433,14 @@ export function OrdersPage() {
           />
         )}
         {establishments.length > 0 && (
-          <MultiButtonGroup
+          <TriStateButtonGroup
             size="xs"
-            value={establishmentFilter}
-            onChange={setEstablishmentFilter}
+            include={establishmentFilter}
+            exclude={establishmentExclude}
+            onChange={(inc, exc) => {
+              setEstablishmentFilter(inc)
+              setEstablishmentExclude(exc)
+            }}
             options={establishments.map((e) => ({
               value: e.establishment_id,
               label: e.establishment_name,

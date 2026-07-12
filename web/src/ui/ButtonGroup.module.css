@@ -50,6 +50,21 @@
   color: var(--accent-text);
 }
 
+/* Исключённое значение фильтра (второй клик) — красный фон + зачёркивание. */
+.excluded {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+.excluded:hover {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+.excluded .label {
+  text-decoration: line-through;
+}
+
 .label {
   overflow: hidden;
   text-overflow: ellipsis;
