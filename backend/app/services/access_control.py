@@ -87,15 +87,36 @@ def can_create_on_establishment(db: Session, user: dict, establishment_id: int) 
     return bool(membership and membership.user_establishment_role_can_create)
 
 
+def allowed_order_status_ids(user: dict) -> set[int] | None:
+    """Разрешённые статусы заказа для пользователя (ось C).
+
+    None = без ограничения (администратор или пустой/незаданный набор); set — только эти
+    статусы видны и назначаемы. Отгрузочному юзеру админ выставляет напр. {На сборку, Собран}.
+    """
+    if user.get("user_admin"):
+        return None
+    raw = user.get("user_order_statuses")
+    return set(raw) if raw else None
+
+
+def can_view_order_status(user: dict, order_status_id: int | None) -> bool:
+    allowed = allowed_order_status_ids(user)
+    return allowed is None or order_status_id in allowed
+
+
 def can_view_message_card(db: Session, user: dict, message) -> bool:
     """Видима ли пользователю карточка-документ (заказ/инвентаризация/приёмка), встроенная
     в сообщение чата. Обычные текстовые сообщения (без документа) видимы всегда — в чате они
-    общие. Для карточек — те же права по складу, что и в списках (can_view_document)."""
+    общие. Для карточек — те же права по складу, что и в списках (can_view_document); для
+    заказов дополнительно гейтим по статусу (ось C), иначе отгрузочный юзер видел бы в чате
+    карточки заказов в любом статусе."""
     if user.get("user_admin"):
         return True
     order = message.order
     if order is not None:
-        return can_view_document(db, user, order.order_establishment_id, order.order_owner_user_id)
+        return can_view_document(db, user, order.order_establishment_id, order.order_owner_user_id) and can_view_order_status(
+            user, order.order_status_id
+        )
     inventory = message.inventory
     if inventory is not None:
         return can_view_document(db, user, inventory.inventory_establishment_id, inventory.inventory_owner_user_id)

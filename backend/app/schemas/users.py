@@ -64,6 +64,9 @@ class UserUpdatePayload(BaseModel):
     # Разрешённые разделы меню (ось A). None = не менять; список = только эти разделы.
     # Валидация значений — в сервисе update_user (чистый HTTPException).
     user_sections: Optional[list[str]] = None
+    # Разрешённые статусы заказа (ось C). None = не менять; список status_id = только эти
+    # статусы (пустой список = снять ограничение). Валидация id — в сервисе update_user.
+    user_order_statuses: Optional[list[int]] = None
 
 
 class UserProfileUpdatePayload(BaseModel):

@@ -32,6 +32,7 @@ def serialize_user(row) -> dict:
         "user_verified_user_login": verified_by.user_login if verified_by else None,
         "user_created_at": serialize_datetime(row.user_created_at),
         "user_sections": row.user_sections,
+        "user_order_statuses": row.user_order_statuses,
         # Права по складам (per-warehouse): по строке настроек на каждый склад-членство.
         "user_establishment_roles": [
             {

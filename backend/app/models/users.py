@@ -19,6 +19,10 @@ class User(Base):
     user_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=func.false())
     # Разрешённые разделы меню (ось A). NULL = все операционные разделы; список = только эти.
     user_sections: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    # Разрешённые статусы заказа (ось C). NULL/пусто = без ограничения; список status_id =
+    # пользователь видит и может назначать только заказы в этих статусах (напр. отгрузочный —
+    # только «На сборку» и «Собран»). Гейтит и списки СРМ, и карточки заказов в чате.
+    user_order_statuses: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
     user_first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     user_second_name: Mapped[str] = mapped_column(String(100), nullable=False)
     user_profile_photo: Mapped[str | None] = mapped_column(Text, nullable=True)

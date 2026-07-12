@@ -17,7 +17,7 @@ from app.schemas.common import build_pagination
 from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
 from app.services.contacts import save_buyer_contact_from_order, save_supplier_contact
 from app.services.audit import log_audit_event
-from app.services.access_control import can_create_on_establishment, can_delete_document, can_edit_document, can_view_document, list_visibility
+from app.services.access_control import allowed_order_status_ids, can_create_on_establishment, can_delete_document, can_edit_document, can_view_document, can_view_order_status, list_visibility
 from app.services.card_sync import notify_cards_deleted, notify_order_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.messages import resolve_mention_recipient_ids
@@ -224,6 +224,9 @@ class OrderService:
         row = self.get_order_or_404(order_id)
         if not can_view_document(self.db, current_user, row.order_establishment_id, row.order_owner_user_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Заказ не найден")
+        # Гейтинг по статусу заказа (ось C): статус вне разрешённого набора → 404 (не раскрываем).
+        if not can_view_order_status(current_user, row.order_status_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Заказ не найден")
         return row
 
     def _ensure_order_editable(self, row, current_user: dict) -> None:
@@ -232,6 +235,13 @@ class OrderService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для изменения этого заказа")
 
     def list_orders(self, current_user: dict, *, page: int = 1, page_size: int = 20, status_ids: list[int] | None = None, method_ids: list[int] | None = None, establishment_ids: list[int] | None = None, search: str | None = None, date_from: date | None = None, date_to: date | None = None) -> dict:
+        # Гейтинг по статусу заказа (ось C): пересекаем запрошенный фильтр статусов с разрешёнными.
+        # Пустое пересечение (запросили только недоступные статусы) → отдаём пустой список.
+        allowed_statuses = allowed_order_status_ids(current_user)
+        if allowed_statuses is not None:
+            status_ids = [s for s in status_ids if s in allowed_statuses] if status_ids else list(allowed_statuses)
+            if not status_ids:
+                return {"items": [], "pagination": build_pagination(page, page_size, 0), "totals": []}
         # Область видимости per-warehouse: (склады «видны все» | склады «только свои» | user).
         scoped_full_ids, scoped_own_ids, scoped_user_id = list_visibility(self.db, current_user)
         rows, total = self.repository.list(page=page, page_size=page_size, status_ids=status_ids, method_ids=method_ids, establishment_ids=establishment_ids, scoped_full_ids=scoped_full_ids, scoped_own_ids=scoped_own_ids, scoped_user_id=scoped_user_id, search=search, date_from=date_from, date_to=date_to)
@@ -470,6 +480,9 @@ class OrderService:
         self._ensure_order_editable(row, current_user)
         before_snapshot = serialize_order(row)
         status_row = get_status_or_404(self.db, payload.order_status_id, expected_type="orders")
+        # Гейтинг по статусу заказа (ось C): переводить можно только в разрешённые статусы.
+        if not can_view_order_status(current_user, status_row.status_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для перевода заказа в этот статус")
         row = self.repository.update(row, {"order_status_id": status_row.status_id})
         log_audit_event(
             self.db,

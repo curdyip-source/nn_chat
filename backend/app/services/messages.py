@@ -13,7 +13,7 @@ from app.repositories.user_devices import UserDeviceRepository
 from app.repositories.users import UserRepository
 from app.schemas.common import build_pagination
 from app.schemas.messages import MessageCreatePayload, MessageUpdatePayload
-from app.services.access_control import list_visibility
+from app.services.access_control import allowed_order_status_ids, list_visibility
 from app.services.audit import log_audit_event
 from app.services.message_stream import broker
 from app.services.push_notifications import send_mention_push_event, send_push_notification_event
@@ -55,17 +55,24 @@ def _card_establishment_owner(row) -> tuple[int, int] | None:
 def _card_visibility_predicate(db: Session, current_user: dict):
     """Предикат видимости карточки для ленты чата. list_visibility считаем ОДИН раз (а не
     запрос на каждую строку). Обычные сообщения и tombstone — всегда видимы; карточки —
-    по правам склада (склад ∈ full ИЛИ (склад ∈ own И владелец=я))."""
+    по правам склада (склад ∈ full ИЛИ (склад ∈ own И владелец=я)) и, для заказов,
+    дополнительно по статусу заказа (ось C) — иначе отгрузочный юзер видел бы в чате
+    карточки заказов в любом статусе."""
     full_ids, own_ids, uid = list_visibility(db, current_user)
     if full_ids is None:
         return lambda row: True  # админ — обходит фильтрацию
+    allowed_statuses = allowed_order_status_ids(current_user)
 
     def _visible(row) -> bool:
         scope = _card_establishment_owner(row)
         if scope is None:
             return True
         establishment_id, owner_user_id = scope
-        return establishment_id in full_ids or (establishment_id in own_ids and owner_user_id == uid)
+        if not (establishment_id in full_ids or (establishment_id in own_ids and owner_user_id == uid)):
+            return False
+        if allowed_statuses is not None and row.message_order_id is not None and row.order is not None:
+            return row.order.order_status_id in allowed_statuses
+        return True
 
     return _visible
 

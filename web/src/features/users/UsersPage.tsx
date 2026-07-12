@@ -144,6 +144,9 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
 
   // Разделы меню — черновик (null user_sections = все разрешены).
   const [sections, setSections] = useState<string[]>(user.user_sections ?? ALL_SECTION_KEYS)
+  // Разрешённые статусы заказа (ось C) — черновик. Пусто = без ограничения (видит все статусы).
+  const orderStatuses = ref.statusesByType('orders')
+  const [allowedStatuses, setAllowedStatuses] = useState<number[]>(user.user_order_statuses ?? [])
 
   // Личные данные — черновик.
   const [info, setInfo] = useState({
@@ -177,7 +180,10 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
         for (const r of item.user_establishment_roles ?? []) map[r.establishment_id] = r
         setPerms(map)
       }
-      if (kind === 'sections') setSections(item.user_sections ?? ALL_SECTION_KEYS)
+      if (kind === 'sections') {
+        setSections(item.user_sections ?? ALL_SECTION_KEYS)
+        setAllowedStatuses(item.user_order_statuses ?? [])
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось сохранить')
     } finally {
@@ -196,8 +202,11 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
     )
   const setAccess = (body: Partial<Pick<User, 'user_active' | 'user_admin'>>) => run('access', () => updateUser(user.user_id, body))
   const savePerms = () => run('perms', () => setUserPermissions(user.user_id, Object.values(perms)))
-  const saveSections = () => run('sections', () => updateUser(user.user_id, { user_sections: sections }))
+  const saveSections = () =>
+    run('sections', () => updateUser(user.user_id, { user_sections: sections, user_order_statuses: allowedStatuses }))
   const toggleSection = (key: string) => setSections((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]))
+  const toggleStatus = (id: number) =>
+    setAllowedStatuses((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
 
   const toggleAccess = (id: number) =>
     setPerms((p) => {
@@ -323,6 +332,23 @@ function UserDetail({ user, onBack, onUpdated }: { user: User; onBack: () => voi
                   </div>
                 </>
               )}
+
+              <div className={styles.fieldLabel} style={{ margin: '16px 0 4px' }}>Статусы заказов</div>
+              <div className={styles.hint} style={{ marginBottom: 8 }}>
+                Пусто = без ограничения (видит все). Отметьте статусы, к которым у пользователя есть доступ —
+                он увидит такие заказы (в СРМ и в чате) и сможет переводить заказ только в эти статусы.
+              </div>
+              <div className={styles.sectionGrid}>
+                {orderStatuses.map((st) => {
+                  const on = allowedStatuses.includes(st.status_id)
+                  return (
+                    <button key={st.status_id} type="button" onClick={() => toggleStatus(st.status_id)}
+                      className={[styles.sectionChip, on ? styles.sectionChipOn : ''].join(' ')}>
+                      {st.status_status}
+                    </button>
+                  )
+                })}
+              </div>
 
               <div className={styles.cardFooter}>
                 <Button variant="primary" loading={saving === 'sections'} onClick={saveSections}>Сохранить доступ</Button>

@@ -20,6 +20,7 @@ from app.repositories.sessions import SessionRepository
 from app.repositories.users import UserRepository
 from app.repositories.user_establishment_roles import UserEstablishmentRoleRepository
 from app.repositories.profile_photos import ProfilePhotoRepository
+from app.repositories.reference_data import ReferenceDataRepository
 from app.schemas.auth import RegisterPayload
 from app.schemas.common import build_pagination, model_to_dict
 from app.schemas.users import GRANTABLE_SECTIONS, UserCreatePayload, UserPermissionsPayload, UserProfileUpdatePayload, UserUpdatePayload
@@ -187,6 +188,14 @@ class UserService:
             if unknown:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Недопустимые разделы: {', '.join(unknown)}")
             data["user_sections"] = list(dict.fromkeys(data["user_sections"]))  # уникальные, порядок сохранён
+        if "user_order_statuses" in data and data["user_order_statuses"] is not None:
+            ids = list(dict.fromkeys(int(s) for s in data["user_order_statuses"]))  # уникальные, порядок сохранён
+            if ids:
+                valid = {row.status_id for row in ReferenceDataRepository(self.db).list_statuses(status_type="orders")}
+                unknown_ids = [i for i in ids if i not in valid]
+                if unknown_ids:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Недопустимые статусы заказа: {', '.join(map(str, unknown_ids))}")
+            data["user_order_statuses"] = ids  # пустой список = снять ограничение
         if "user_login" in data:
             self.ensure_login_is_unique(data["user_login"], exclude_user_id=user_id)
         if "user_password" in data:
@@ -205,7 +214,7 @@ class UserService:
             event_payload={"changed_fields": sorted(data.keys())},
         )
         # Реалтайм: если изменились доступ-релевантные поля — уведомим клиента перечитать /me.
-        if any(field in data for field in ("user_sections", "user_active", "user_admin")):
+        if any(field in data for field in ("user_sections", "user_order_statuses", "user_active", "user_admin")):
             notify_user_updated(row.user_id)
         return serialize_user(row)
 

@@ -152,11 +152,18 @@ export function OrdersPage() {
   }
   const copyItems = (withQtyPrice: boolean) => {
     const items = collectSelectedItems()
-    const fmtPrice = (p: string) => Number(p).toLocaleString('de-DE', { maximumFractionDigits: 2 })
-    const text = items
-      .map((i) => (withQtyPrice ? `${i.quantity} шт. *  ${i.name} *  ${fmtPrice(i.price)}${i.sign}` : i.name))
-      .join('\n')
-    void navigator.clipboard?.writeText(text)
+    const fmtPrice = (p: string | number) => Number(p).toLocaleString('de-DE', { maximumFractionDigits: 2 })
+    const lines = items.map((i) =>
+      withQtyPrice ? `${i.quantity} шт. *  ${i.name} *  ${fmtPrice(i.price)}${i.sign}` : `${i.quantity} шт. *  ${i.name}`,
+    )
+    if (withQtyPrice && items.length) {
+      // Итого по валютам (в выборке могут быть позиции в разных валютах).
+      const totals = new Map<string, number>()
+      for (const i of items) totals.set(i.sign, (totals.get(i.sign) ?? 0) + (Number(i.price) || 0) * i.quantity)
+      const totalText = [...totals.entries()].map(([s, v]) => `${fmtPrice(v)}${s}`).join(' + ')
+      lines.push('', `Итого: ${totalText}`)
+    }
+    void navigator.clipboard?.writeText(lines.join('\n'))
     setActionMenuOpen(false)
   }
 

@@ -25,6 +25,8 @@ export type User = {
   user_establishment_roles?: EstablishmentPermission[]
   // Разрешённые разделы меню (ось A). null/undefined = все операционные разделы.
   user_sections?: string[] | null
+  // Разрешённые статусы заказа (ось C). null/undefined/[] = без ограничения (видит все статусы).
+  user_order_statuses?: number[] | null
 }
 
 export type AuthResponse = {
