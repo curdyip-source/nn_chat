@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.audit_types import ENTITY_TYPE_ORDER, EVENT_TYPE_ORDER_COMMENT_CREATE, EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_DELETE, EVENT_TYPE_ORDER_UPDATE
 from app.models.messages import Message
 from app.models.orders import Order, OrderItem
+from app.repositories.audit_events import AuditEventRepository
 from app.repositories.message_attachment_assets import MessageAttachmentAssetRepository
 from app.repositories.messages import MessageRepository
 from app.repositories.orders import OrderRepository
@@ -22,7 +23,7 @@ from app.services.card_sync import notify_cards_deleted, notify_order_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.messages import resolve_mention_recipient_ids
 from app.services.push_notifications import send_mention_push_event, send_order_change_push_event, send_order_comment_push_event, send_push_notification_event
-from app.services.serializers import serialize_order, serialize_order_comment
+from app.services.serializers import serialize_datetime, serialize_order, serialize_order_comment
 
 
 logger = logging.getLogger("app.orders")
@@ -204,6 +205,83 @@ def _build_order_update_audit_payload(before: dict, after: dict) -> dict:
         "changed_fields": _build_order_audit_changes(before, after),
         "items": _build_order_item_audit_changes(before.get("items", []), after.get("items", [])),
     }
+
+
+def _order_history_actor(event) -> tuple[str | None, str]:
+    # ФИО актора (как в чате: «Фамилия Имя»), fallback — логин, затем «Система».
+    actor = getattr(event, "actor", None)
+    if actor is None:
+        return None, "Система"
+    full = " ".join(part for part in (actor.user_second_name, actor.user_first_name) if part).strip()
+    return actor.user_login, (full or actor.user_login or "Пользователь")
+
+
+def _order_update_history_texts(payload: dict) -> list[tuple[str, str]]:
+    # Разворачиваем один order.update в набор человекочитаемых действий.
+    if payload.get("action") == "split":
+        return [("split", "разделил заказ")]
+
+    texts: list[tuple[str, str]] = []
+    changed = payload.get("changed_fields") or {}
+    items = payload.get("items") or {}
+
+    # 1) Статус самого заказа.
+    if "order_status" in changed:
+        new_status = changed["order_status"].get("to")
+        texts.append(("order_status", f"сменил статус заказа на «{new_status}»" if new_status else "сменил статус заказа"))
+
+    # 2) Статусы товаров — по одному действию на каждый уникальный новый статус.
+    item_new_statuses = [
+        upd["changes"]["order_item_status"].get("to")
+        for upd in items.get("updated", [])
+        if "order_item_status" in (upd.get("changes") or {})
+    ]
+    for new_status in dict.fromkeys(item_new_statuses):  # уникальные, порядок сохранён
+        texts.append(("item_status", f"сменил статус товаров на «{new_status}»" if new_status else "сменил статус товаров"))
+
+    # 3) Прочие правки (добавление/удаление позиций или изменение полей, не связанных со статусом).
+    other_header = any(field != "order_status" and not field.endswith("_id") for field in changed)
+    other_items = bool(items.get("added")) or bool(items.get("removed")) or any(
+        field != "order_item_status" and not field.endswith("_id")
+        for upd in items.get("updated", [])
+        for field in (upd.get("changes") or {})
+    )
+    if other_header or other_items:
+        texts.append(("edit", "отредактировал заказ"))
+
+    # Update без распознанных изменений всё равно показываем как правку.
+    if not texts:
+        texts.append(("edit", "отредактировал заказ"))
+    return texts
+
+
+def _order_history_entries_for_event(event) -> list[dict]:
+    actor_login, actor_name = _order_history_actor(event)
+    created_at = serialize_datetime(event.created_at)
+    payload = event.event_payload or {}
+
+    if event.event_type == EVENT_TYPE_ORDER_CREATE:
+        actions = [("create", "создал заказ")]
+    elif event.event_type == EVENT_TYPE_ORDER_UPDATE:
+        actions = _order_update_history_texts(payload)
+    elif event.event_type == EVENT_TYPE_ORDER_DELETE:
+        actions = [("delete", "удалил заказ")]
+    elif event.event_type == EVENT_TYPE_ORDER_COMMENT_CREATE:
+        actions = [("comment", "написал в чат заказа")]
+    else:
+        actions = []
+
+    return [
+        {
+            "audit_event_id": event.audit_event_id,
+            "kind": kind,
+            "text": text,
+            "actor_user_login": actor_login,
+            "actor_name": actor_name,
+            "created_at": created_at,
+        }
+        for kind, text in actions
+    ]
 
 
 class OrderService:
@@ -495,6 +573,23 @@ class OrderService:
         notify_order_changed(self.db, row.order_id)
         return serialize_order(row)
 
+    def get_order_history(self, order_id: int, current_user: dict) -> dict:
+        # Проверка доступа к заказу (область видимости + гейтинг по статусу).
+        self.get_accessible_order_or_404(order_id, current_user)
+        # Все audit-события заказа, новые сверху (репозиторий отдаёт по убыванию даты).
+        rows, _total = AuditEventRepository(self.db).list(
+            actor_user_id=None,
+            entity_type=ENTITY_TYPE_ORDER,
+            entity_id=order_id,
+            event_type=None,
+            date_from=None,
+            date_to=None,
+            page=1,
+            page_size=500,
+        )
+        items = [entry for event in rows for entry in _order_history_entries_for_event(event)]
+        return {"items": items}
+
     def delete_order(self, order_id: int, current_user: dict) -> None:
         row = self.get_accessible_order_or_404(order_id, current_user)
         # Право на удаление (профиль delete_scope).
@@ -769,6 +864,10 @@ def delete_order(db: Session, order_id: int, current_user: dict) -> None:
 
 def list_order_comments(db: Session, order_id: int, current_user: dict) -> dict:
     return OrderService(db).list_order_comments(order_id, current_user)
+
+
+def get_order_history(db: Session, order_id: int, current_user: dict) -> dict:
+    return OrderService(db).get_order_history(order_id, current_user)
 
 
 def add_order_comment(db: Session, order_id: int, payload: OrderCommentCreatePayload, current_user: dict) -> dict:

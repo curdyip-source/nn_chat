@@ -14,6 +14,7 @@ import { newUid } from './cart'
 import { ItemStatusExtraModal } from './ItemStatusExtraModal'
 import { showsMovement, showsSupplier, statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
 import { OrderChat } from './OrderChat'
+import { OrderHistory } from './OrderHistory'
 import { useOrderSelection, type BulkApplyFn, type BulkCollectFn, type BulkRemoveFn } from './orderSelection'
 import { orderToUpdate } from './orderUpdate'
 import styles from './OrdersTable.module.css'
@@ -103,6 +104,7 @@ function OrderRow({
   }, [expandSignal.expanded, expandSignal.nonce])
   const [addOpen, setAddOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   // Состояние чата заказа: непрочитанные (красноватый) / прочитанные (зеленоватый).
   // Прочтение отслеживаем локально (нет серверного трекинга): запоминаем последний
   // id комментария при открытии чата.
@@ -432,6 +434,9 @@ function OrderRow({
               </span>
             )}
           </button>
+          <button className={styles.editBtn} onClick={() => setHistoryOpen(true)} title="История заказа">
+            📋
+          </button>
           <button className={styles.editBtn} onClick={() => onEdit(order)} title="Редактировать заказ">
             ✏️
           </button>
@@ -515,6 +520,12 @@ function OrderRow({
       {chatOpen && (
         <Modal open title={`Чат заказа №${order.order_id}`} onClose={() => setChatOpen(false)} width={700}>
           <OrderChat orderId={order.order_id} />
+        </Modal>
+      )}
+
+      {historyOpen && (
+        <Modal open title={`История заказа №${order.order_id}`} onClose={() => setHistoryOpen(false)} width={700}>
+          <OrderHistory orderId={order.order_id} />
         </Modal>
       )}
 

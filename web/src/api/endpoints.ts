@@ -278,6 +278,18 @@ export function addOrderComment(orderId: number, text: string) {
   })
 }
 
+export type OrderHistoryEntry = {
+  audit_event_id: number
+  kind: string
+  text: string
+  actor_user_login: string | null
+  actor_name: string
+  created_at: string | null
+}
+export function getOrderHistory(orderId: number) {
+  return apiRequest<{ items: OrderHistoryEntry[] }>(`/orders/${orderId}/history`)
+}
+
 export function deleteMessage(messageId: number) {
   return apiRequest<void>(`/messages/${messageId}`, { method: 'DELETE' })
 }

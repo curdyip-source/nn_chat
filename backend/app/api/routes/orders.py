@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
-from app.services.orders import add_order_comment, create_order, delete_order, get_order, list_order_comments, list_orders, split_order, update_order, update_order_status
+from app.services.orders import add_order_comment, create_order, delete_order, get_order, get_order_history, list_order_comments, list_orders, split_order, update_order, update_order_status
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -56,6 +56,11 @@ def delete_order_route(order_id: int, current_user: dict = Depends(get_current_u
 def split_order_route(order_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     # Частичная отгрузка: «В наличии»/«Собрано» → этот заказ в «На сборку», остальное → новый заказ-дубль.
     return split_order(db, order_id, current_user)
+
+
+@router.get("/{order_id}/history")
+def get_order_history_route(order_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return get_order_history(db, order_id, current_user)
 
 
 @router.get("/{order_id}/comments")

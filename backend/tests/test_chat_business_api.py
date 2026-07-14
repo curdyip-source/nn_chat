@@ -708,6 +708,65 @@ def test_order_audit_payload_contains_field_and_item_changes(client, integration
     assert status_audit_item["event_payload"]["items"]["updated"] == []
 
 
+def test_order_history_returns_humanized_events_for_regular_user(client, integration_db_session, integration_admin, integration_user):
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+
+    login(client, "admin", "AdminPass123")
+    user_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, user_token)
+
+    reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
+    establishment_id = reference_payload["establishments"][0]["establishment_id"]
+    order_method_id = next(item for item in reference_payload["order_methods"] if item["order_method_name"] == "Авито")["order_method_id"]
+    processing_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "orders" and item["status_status"] == "В обработке")["status_id"]
+    order_product_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "order_products" and item["status_status"] == "Заказ поставщику")["status_id"]
+
+    create_response = client.post(
+        f"{API_PREFIX}/orders",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_sub_method": "СДЭК",
+            "order_customer": "Марина",
+            "items": [{"product_article": "HIST-001", "product_name": "History Product", "order_item_quantity": 2, "order_item_price": "10.00"}],
+        },
+    )
+    assert create_response.status_code == 201
+    order_id = create_response.json()["item"]["order_id"]
+
+    # Смена статуса заказа на «В обработке» + статуса товаров на «Заказано» одним обновлением.
+    update_response = client.put(
+        f"{API_PREFIX}/orders/{order_id}",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_sub_method": "СДЭК",
+            "order_customer": "Марина",
+            "order_status_id": processing_status_id,
+            "items": [{"product_article": "HIST-001", "product_name": "History Product", "order_item_quantity": 2, "order_item_price": "10.00", "order_item_status_id": order_product_status_id}],
+        },
+    )
+    assert update_response.status_code == 200
+
+    # Обычный пользователь (не админ) должен видеть историю своего заказа.
+    history_response = client.get(f"{API_PREFIX}/orders/{order_id}/history", headers={"Authorization": f"Bearer {user_token}"})
+    assert history_response.status_code == 200
+    entries = history_response.json()["items"]
+    texts = [entry["text"] for entry in entries]
+
+    assert "создал заказ" in texts
+    assert "сменил статус заказа на «В обработке»" in texts
+    assert "сменил статус товаров на «Заказ поставщику»" in texts
+    assert all(entry["actor_name"] for entry in entries)
+
+    # Новые события сверху: создание (самое старое) — последним в списке.
+    assert texts[-1] == "создал заказ"
+
+
 def test_admin_activation_sets_verified_user(client, integration_db_session, integration_admin):
     integration_admin.user_password = hash_password("AdminPass123")
     integration_db_session.commit()
