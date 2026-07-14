@@ -32,6 +32,18 @@ export function login(user_login: string, user_password: string) {
   })
 }
 
+export function register(payload: {
+  user_login: string
+  user_password: string
+  user_first_name: string
+  user_second_name: string
+}) {
+  return apiRequest<{ message: string; user: User }>('/auth/register', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
 export function fetchMe() {
   return apiRequest<{ user: User }>('/auth/me')
 }

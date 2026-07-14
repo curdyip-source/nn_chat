@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from '../ui/Button'
 import { Field, TextInput } from '../ui/Field'
 import { useAuth } from './AuthContext'
+import { RegisterModal } from './RegisterModal'
 import logoUrl from '../assets/general-title-logo.png'
 import styles from './LoginScreen.module.css'
 
@@ -11,6 +12,7 @@ export function LoginScreen() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [registerOpen, setRegisterOpen] = useState(false)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,10 +60,15 @@ export function LoginScreen() {
         <Button type="submit" variant="primary" loading={busy} disabled={!loginValue || !password}>
           Войти
         </Button>
+        <button type="button" className={styles.linkBtn} onClick={() => setRegisterOpen(true)}>
+          Нет аккаунта? Создать
+        </button>
         <p className={styles.note}>
-          Доступ только для пользователей с правами администратора.
+          После регистрации аккаунт активирует администратор.
         </p>
       </form>
+
+      <RegisterModal open={registerOpen} onClose={() => setRegisterOpen(false)} />
     </div>
   )
 }

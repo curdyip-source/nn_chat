@@ -9,6 +9,9 @@
   min-height: 0;
   overflow-y: auto;
   padding-bottom: 24px;
+  /* Оверлейный скроллбар (macOS) перекрывает содержимое у правого края —
+     отступаем, чтобы кнопки шапки и карточки не уходили под полоску. */
+  padding-right: 12px;
 }
 .header {
   margin-bottom: 24px;
