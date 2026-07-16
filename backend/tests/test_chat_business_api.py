@@ -874,6 +874,47 @@ def test_cdek_waybill_track_backfilled_into_audit(integration_db_session, integr
     assert rows2[0].event_payload["cdek_track_number"] == "1002233445"
 
 
+def test_cdek_helper_posts_waybill_comment_bypassing_access(client, integration_db_session, integration_admin):
+    from fastapi import HTTPException
+    from app.schemas.orders import OrderCommentCreatePayload
+    from app.services.cdek_chat import ensure_cdek_helper
+    from app.services.orders import OrderService
+
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+    ref = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {admin_token}"}).json()
+    est = ref["establishments"][0]["establishment_id"]
+    method = next(m for m in ref["order_methods"] if m["order_method_name"] == "Авито")["order_method_id"]
+    order = client.post(
+        f"{API_PREFIX}/orders",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "order_establishment_id": est, "order_method_id": method, "order_sub_method": "СДЭК",
+            "order_customer": "Клиент",
+            "items": [{"product_article": "CDEK-1", "product_name": "P", "order_item_quantity": 1, "order_item_price": "1.00"}],
+        },
+    ).json()["item"]
+    order_id = order["order_id"]
+
+    # Бот СДЭК создаётся как системный пользователь без ролей на складах.
+    helper = ensure_cdek_helper(integration_db_session)
+    assert helper["user_login"] == "cdek_helper"
+    payload = OrderCommentCreatePayload(order_comment_text="Накладные СДЭК готовы")
+
+    # Обычный путь (с проверкой доступа) для бота падает 404 — как было в проде.
+    raised_404 = False
+    try:
+        OrderService(integration_db_session).add_order_comment(order_id, payload, helper, enforce_access=True)
+    except HTTPException as exc:
+        raised_404 = exc.status_code == 404
+    assert raised_404
+
+    # Системный путь (enforce_access=False) постит от имени бота.
+    res = OrderService(integration_db_session).add_order_comment(order_id, payload, helper, enforce_access=False)
+    assert res["order_comment_owner_user_login"] == "cdek_helper"
+
+
 def test_admin_activation_sets_verified_user(client, integration_db_session, integration_admin):
     integration_admin.user_password = hash_password("AdminPass123")
     integration_db_session.commit()

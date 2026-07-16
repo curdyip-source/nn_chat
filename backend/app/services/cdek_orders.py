@@ -228,6 +228,9 @@ def create_waybill(db: Session, order_id: int, payload, current_user: dict) -> d
 
     # Печать (2 накладные) и постинг в чат заказа — в фоне (генерация PDF у CDEK асинхронна).
     from app.services import cdek_chat
+    # Системного бота СДЭК заводим синхронно — при первом же создании накладной, чтобы он
+    # существовал в базе независимо от фонового постинга (get-or-create, как fallback).
+    cdek_chat.ensure_cdek_helper(db)
     cdek_chat.post_waybills_async(order_id)
 
     return _serialize(order)

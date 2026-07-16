@@ -647,8 +647,14 @@ class OrderService:
         )
         return {"items": [serialize_order_comment(item) for item in items]}
 
-    def add_order_comment(self, order_id: int, payload: OrderCommentCreatePayload, current_user: dict) -> dict:
-        self.get_accessible_order_or_404(order_id, current_user)
+    def add_order_comment(self, order_id: int, payload: OrderCommentCreatePayload, current_user: dict, *, enforce_access: bool = True) -> dict:
+        # enforce_access=False — для системных постов (бот СДЭК кладёт накладные в чат
+        # заказа): у бота нет ролей на складах, поэтому проверку видимости пропускаем,
+        # но существование заказа всё равно требуем.
+        if enforce_access:
+            self.get_accessible_order_or_404(order_id, current_user)
+        else:
+            self.get_order_or_404(order_id)
         attachments = []
         for item in payload.attachments:
             asset = self.attachment_asset_repository.get_by_storage_key(item.attachment_storage_key)
@@ -950,8 +956,8 @@ def get_order_history(db: Session, order_id: int, current_user: dict) -> dict:
     return OrderService(db).get_order_history(order_id, current_user)
 
 
-def add_order_comment(db: Session, order_id: int, payload: OrderCommentCreatePayload, current_user: dict) -> dict:
-    return OrderService(db).add_order_comment(order_id, payload, current_user)
+def add_order_comment(db: Session, order_id: int, payload: OrderCommentCreatePayload, current_user: dict, *, enforce_access: bool = True) -> dict:
+    return OrderService(db).add_order_comment(order_id, payload, current_user, enforce_access=enforce_access)
 
 
 def update_order_comment(db: Session, order_id: int, comment_id: int, payload: OrderCommentUpdatePayload, current_user: dict) -> dict:

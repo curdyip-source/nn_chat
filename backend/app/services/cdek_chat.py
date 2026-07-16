@@ -113,7 +113,8 @@ def _run(order_id: int) -> None:
             attachments=[att_invoice, att_barcode],
             mentioned_user_ids=[],
         )
-        OrderService(db).add_order_comment(order_id, payload, helper)
+        # enforce_access=False: бот СДЭК без ролей на складах, но постит в свой же заказ.
+        OrderService(db).add_order_comment(order_id, payload, helper, enforce_access=False)
         logger.info("CDEK: накладные заказа %s отправлены в чат (трек %s)", order_id, track)
     except Exception as exc:  # фон — не роняем процесс
         logger.warning("CDEK: не удалось отправить накладные заказа %s: %s", order_id, exc)

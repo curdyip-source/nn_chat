@@ -32,7 +32,10 @@ const inputStyle: React.CSSProperties = {
 
 export function CdekWaybillModal({ order, onClose, onCreated }: Props) {
   const c = order.cdek // предзаполнение данными, сохранёнными при создании заказа (метод СДЭК)
-  const [recipientName, setRecipientName] = useState(c?.recipient_name || order.order_customer || '')
+  // ВАЖНО: не подставляем order_customer — это внутреннее наименование клиента (часто с
+  // пометками), оно НЕ должно утекать в накладную СДЭК получателю. Только сохранённый ранее
+  // получатель СДЭК; иначе поле пустое и оператор вводит реальное ФИО (submit это требует).
+  const [recipientName, setRecipientName] = useState(c?.recipient_name || '')
   const [recipientPhone, setRecipientPhone] = useState(c?.recipient_phone || '')
   // Город отправителя (origin). Дефолт — Москва (44); оператор меняет на Тулу и др. при необходимости.
   const [fromCityName, setFromCityName] = useState('Москва')
