@@ -29,6 +29,8 @@ const EVENT_LABELS: Record<string, string> = {
   'order.update': 'Изменил заказ',
   'order.comment.create': 'Прокомментировал заказ',
 
+  'cdek.waybill.create': 'Создал накладную СДЭК',
+
   'inventory.create': 'Создал инвентаризацию',
   'inventory.update': 'Изменил инвентаризацию',
 
@@ -60,6 +62,7 @@ const GROUP_ICONS: Record<string, string> = {
   push: '🔔',
   request: '⚠️',
   application: '⚙️',
+  cdek: '🚚',
 }
 
 // Существительное-цель по типу сущности (для строки «Заказ №5»).
@@ -72,6 +75,7 @@ const ENTITY_NOUNS: Record<string, string> = {
   product_registration: 'Приёмка',
   message: 'Сообщение',
   session: 'Сессия',
+  cdek: 'Заказ',
 }
 
 export type AuditView = {
@@ -147,11 +151,24 @@ export function describeOrderUpdate(payload: Record<string, unknown> | null): st
   return lines
 }
 
+// ----- Детализация создания накладной СДЭК (cdek.waybill.create) -----
+
+export function describeCdekWaybill(payload: Record<string, unknown> | null): string[] {
+  if (!payload) return []
+  const lines: string[] = []
+  const track = payload.cdek_track_number
+  lines.push(track ? `Накладная №${fmtVal(track)}` : 'Накладная (номер ещё не присвоен)')
+  if (payload.city_name) lines.push(`Город: ${fmtVal(payload.city_name)}`)
+  if (payload.recipient_name) lines.push(`Получатель: ${fmtVal(payload.recipient_name)}`)
+  return lines
+}
+
 // Быстрые фильтры по типу сущности.
 export const AUDIT_QUICK_FILTERS: { label: string; entityType: string | null }[] = [
   { label: 'Все', entityType: null },
   { label: 'Вход', entityType: 'session' },
   { label: 'Заказы', entityType: 'order' },
+  { label: 'СДЭК', entityType: 'cdek' },
   { label: 'Товары', entityType: 'product' },
   { label: 'Пользователи', entityType: 'user' },
   { label: 'Сообщения', entityType: 'message' },

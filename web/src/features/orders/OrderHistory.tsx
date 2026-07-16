@@ -25,6 +25,7 @@ const KIND_ICON: Record<string, string> = {
   split: '✂️',
   comment: '💬',
   delete: '🗑️',
+  cdek: '🚚',
 }
 
 export function OrderHistory({ orderId }: { orderId: number }) {

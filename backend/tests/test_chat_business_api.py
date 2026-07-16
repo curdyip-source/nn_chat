@@ -1,6 +1,9 @@
+from types import SimpleNamespace
+
 import app.services.messages as messages_service
 from openpyxl import Workbook
-from app.core.audit_types import EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_UPDATE
+from app.core.audit_types import EVENT_TYPE_CDEK_WAYBILL_CREATE, EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_UPDATE
+from app.services.orders import _order_history_entries_for_event, _order_update_history_texts
 from app.core.security import hash_password
 from app.models import User
 from app.models.user_establishment_roles import UserEstablishmentRole
@@ -794,11 +797,44 @@ def test_order_history_returns_humanized_events_for_regular_user(client, integra
 
     assert "создал заказ" in texts
     assert "сменил статус заказа на «В обработке»" in texts
-    assert "сменил статус товаров на «Заказ поставщику»" in texts
+    # Один товар — история называет его поимённо.
+    assert "сменил статус товара «History Product» на «Заказ поставщику»" in texts
     assert all(entry["actor_name"] for entry in entries)
 
     # Новые события сверху: создание (самое старое) — последним в списке.
     assert texts[-1] == "создал заказ"
+
+
+def test_order_history_item_status_lists_product_names():
+    # Два товара в один статус — группируем с перечислением наименований.
+    payload = {
+        "items": {
+            "updated": [
+                {"changes": {"order_item_status": {"to": "В наличии"}}, "after": {"order_item_name": "Товар A"}},
+                {"changes": {"order_item_status": {"to": "В наличии"}}, "after": {"order_item_name": "Товар B"}},
+            ]
+        }
+    }
+    texts = [text for _, text in _order_update_history_texts(payload)]
+    assert texts == ['сменил статус товаров на «В наличии»: «Товар A», «Товар B»']
+
+    # Один товар — называем поимённо.
+    single = {"items": {"updated": [{"changes": {"order_item_status": {"to": "Собрано"}}, "after": {"order_item_name": "Только один"}}]}}
+    assert [t for _, t in _order_update_history_texts(single)] == ['сменил статус товара «Только один» на «Собрано»']
+
+
+def test_order_history_entry_for_cdek_waybill():
+    event = SimpleNamespace(
+        event_type=EVENT_TYPE_CDEK_WAYBILL_CREATE,
+        event_payload={"cdek_track_number": "1234567890"},
+        created_at=None,
+        audit_event_id=7,
+        actor=None,
+    )
+    entries = _order_history_entries_for_event(event)
+    assert len(entries) == 1
+    assert entries[0]["kind"] == "cdek"
+    assert entries[0]["text"] == "создал накладную СДЭК №1234567890"
 
 
 def test_admin_activation_sets_verified_user(client, integration_db_session, integration_admin):

@@ -13,8 +13,10 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.core import config
+from app.core.audit_types import ENTITY_TYPE_CDEK, EVENT_TYPE_CDEK_WAYBILL_CREATE
 from app.models.orders import Order
 from app.services import cdek
+from app.services.audit import log_audit_event
 
 
 def _get_order_or_404(db: Session, order_id: int) -> Order:
@@ -170,6 +172,24 @@ def create_waybill(db: Session, order_id: int, payload, current_user: dict) -> d
     db.commit()
 
     _refresh_status(db, order)  # трек/статус могут прийти не сразу — не страшно
+
+    # Аудит: отдельная сущность «cdek» (в общем аудите — раздел СДЭК), но привязана к
+    # заказу через entity_id, чтобы событие попало и в «Историю заказа». Номер накладной
+    # (трек) кладём, если уже подтянулся; иначе останется uuid.
+    log_audit_event(
+        db,
+        actor_user_id=current_user["user_id"],
+        entity_type=ENTITY_TYPE_CDEK,
+        entity_id=order_id,
+        event_type=EVENT_TYPE_CDEK_WAYBILL_CREATE,
+        event_payload={
+            "order_id": order_id,
+            "cdek_track_number": order.order_cdek_track_number,
+            "cdek_uuid": uuid,
+            "city_name": order.order_cdek_city_name,
+            "recipient_name": order.order_cdek_recipient_name,
+        },
+    )
 
     # Печать (2 накладные) и постинг в чат заказа — в фоне (генерация PDF у CDEK асинхронна).
     from app.services import cdek_chat

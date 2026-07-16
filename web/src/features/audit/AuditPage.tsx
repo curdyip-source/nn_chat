@@ -3,7 +3,7 @@ import { listAuditEvents } from '../../api/endpoints'
 import type { AuditEvent } from '../../api/types'
 import { ButtonGroup } from '../../ui/ButtonGroup'
 import { formatDateTime } from '../../lib/format'
-import { AUDIT_QUICK_FILTERS, describeAuditEvent, describeOrderUpdate } from './describe'
+import { AUDIT_QUICK_FILTERS, describeAuditEvent, describeCdekWaybill, describeOrderUpdate } from './describe'
 import styles from './AuditPage.module.css'
 
 export function AuditPage() {
@@ -53,7 +53,12 @@ export function AuditPage() {
         <div className={styles.list}>
           {events.map((ev) => {
             const v = describeAuditEvent(ev)
-            const details = ev.event_type === 'order.update' ? describeOrderUpdate(ev.event_payload) : []
+            const details =
+              ev.event_type === 'order.update'
+                ? describeOrderUpdate(ev.event_payload)
+                : ev.event_type === 'cdek.waybill.create'
+                  ? describeCdekWaybill(ev.event_payload)
+                  : []
             return (
               <div key={ev.audit_event_id} className={styles.row}>
                 <span className={styles.icon}>{v.icon}</span>

@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
-from app.core.audit_types import ENTITY_TYPE_ORDER, EVENT_TYPE_ORDER_COMMENT_CREATE, EVENT_TYPE_ORDER_COMMENT_DELETE, EVENT_TYPE_ORDER_COMMENT_UPDATE, EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_DELETE, EVENT_TYPE_ORDER_UPDATE
+from app.core.audit_types import ENTITY_TYPE_CDEK, ENTITY_TYPE_ORDER, EVENT_TYPE_CDEK_WAYBILL_CREATE, EVENT_TYPE_ORDER_COMMENT_CREATE, EVENT_TYPE_ORDER_COMMENT_DELETE, EVENT_TYPE_ORDER_COMMENT_UPDATE, EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_DELETE, EVENT_TYPE_ORDER_UPDATE
 from app.models.messages import Message
 from app.models.orders import Order, OrderItem
 from app.repositories.audit_events import AuditEventRepository
@@ -230,14 +230,24 @@ def _order_update_history_texts(payload: dict) -> list[tuple[str, str]]:
         new_status = changed["order_status"].get("to")
         texts.append(("order_status", f"сменил статус заказа на «{new_status}»" if new_status else "сменил статус заказа"))
 
-    # 2) Статусы товаров — по одному действию на каждый уникальный новый статус.
-    item_new_statuses = [
-        upd["changes"]["order_item_status"].get("to")
-        for upd in items.get("updated", [])
-        if "order_item_status" in (upd.get("changes") or {})
-    ]
-    for new_status in dict.fromkeys(item_new_statuses):  # уникальные, порядок сохранён
-        texts.append(("item_status", f"сменил статус товаров на «{new_status}»" if new_status else "сменил статус товаров"))
+    # 2) Статусы товаров — группируем по новому статусу, перечисляя наименования,
+    #    чтобы было видно, какой именно товар сменил статус.
+    status_to_names: dict[str, list[str]] = {}
+    for upd in items.get("updated", []):
+        changes = upd.get("changes") or {}
+        if "order_item_status" not in changes:
+            continue
+        new_status = changes["order_item_status"].get("to")
+        name = (upd.get("after") or {}).get("order_item_name") or (upd.get("before") or {}).get("order_item_name") or "товар"
+        status_to_names.setdefault(new_status or "", []).append(name)
+
+    for new_status, names in status_to_names.items():
+        suffix = f" на «{new_status}»" if new_status else ""
+        if len(names) == 1:
+            texts.append(("item_status", f"сменил статус товара «{names[0]}»{suffix}"))
+        else:
+            listed = ", ".join(f"«{name}»" for name in names)
+            texts.append(("item_status", f"сменил статус товаров{suffix}: {listed}"))
 
     # 3) Прочие правки (добавление/удаление позиций или изменение полей, не связанных со статусом).
     other_header = any(field != "order_status" and not field.endswith("_id") for field in changed)
@@ -272,6 +282,9 @@ def _order_history_entries_for_event(event) -> list[dict]:
         actions = [("comment", "изменил сообщение в чате заказа")]
     elif event.event_type == EVENT_TYPE_ORDER_COMMENT_DELETE:
         actions = [("comment", "удалил сообщение из чата заказа")]
+    elif event.event_type == EVENT_TYPE_CDEK_WAYBILL_CREATE:
+        track = payload.get("cdek_track_number")
+        actions = [("cdek", f"создал накладную СДЭК №{track}" if track else "создал накладную СДЭК")]
     else:
         actions = []
 
@@ -580,16 +593,22 @@ class OrderService:
     def get_order_history(self, order_id: int, current_user: dict) -> dict:
         # Проверка доступа к заказу (область видимости + гейтинг по статусу).
         self.get_accessible_order_or_404(order_id, current_user)
-        # Все audit-события заказа, новые сверху (репозиторий отдаёт по убыванию даты).
-        rows, _total = AuditEventRepository(self.db).list(
-            actor_user_id=None,
-            entity_type=ENTITY_TYPE_ORDER,
-            entity_id=order_id,
-            event_type=None,
-            date_from=None,
-            date_to=None,
-            page=1,
-            page_size=500,
+        repo = AuditEventRepository(self.db)
+        # События самого заказа + события СДЭК (отдельная сущность аудита, но привязана к
+        # заказу через entity_id — накладные показываем в той же ленте истории).
+        order_rows, _ = repo.list(
+            actor_user_id=None, entity_type=ENTITY_TYPE_ORDER, entity_id=order_id,
+            event_type=None, date_from=None, date_to=None, page=1, page_size=500,
+        )
+        cdek_rows, _ = repo.list(
+            actor_user_id=None, entity_type=ENTITY_TYPE_CDEK, entity_id=order_id,
+            event_type=None, date_from=None, date_to=None, page=1, page_size=500,
+        )
+        # Сливаем обе ленты, новые сверху (created_at убыв.; при равенстве — по id убыв.).
+        rows = sorted(
+            [*order_rows, *cdek_rows],
+            key=lambda event: (event.created_at, event.audit_event_id),
+            reverse=True,
         )
         items = [entry for event in rows for entry in _order_history_entries_for_event(event)]
         return {"items": items}
