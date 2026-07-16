@@ -28,6 +28,8 @@ const EVENT_LABELS: Record<string, string> = {
   'order.create': 'Создал заказ',
   'order.update': 'Изменил заказ',
   'order.comment.create': 'Прокомментировал заказ',
+  'order.comment.update': 'Изменил комментарий',
+  'order.comment.delete': 'Удалил комментарий',
 
   'cdek.waybill.create': 'Создал накладную СДЭК',
 
