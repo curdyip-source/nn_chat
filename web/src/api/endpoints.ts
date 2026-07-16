@@ -289,6 +289,15 @@ export function addOrderComment(orderId: number, text: string) {
     body: { order_comment_text: text, attachments: [], mentioned_user_ids: [] },
   })
 }
+export function updateOrderComment(orderId: number, commentId: number, text: string) {
+  return apiRequest<{ item: OrderComment }>(`/orders/${orderId}/comments/${commentId}`, {
+    method: 'PUT',
+    body: { order_comment_text: text, mentioned_user_ids: [] },
+  })
+}
+export function deleteOrderComment(orderId: number, commentId: number) {
+  return apiRequest<void>(`/orders/${orderId}/comments/${commentId}`, { method: 'DELETE' })
+}
 
 export type OrderHistoryEntry = {
   audit_event_id: number

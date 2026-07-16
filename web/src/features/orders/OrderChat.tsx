@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { addOrderComment, getOrderComments, type OrderComment } from '../../api/endpoints'
+import { addOrderComment, deleteOrderComment, getOrderComments, updateOrderComment, type OrderComment } from '../../api/endpoints'
 import { useAuth } from '../../auth/AuthContext'
 import { useRealtime } from '../../data/RealtimeContext'
 import styles from './OrderChat.module.css'
@@ -45,6 +45,8 @@ export function OrderChat({ orderId }: { orderId: number }) {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editText, setEditText] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
 
   // Загрузка при монтировании (раскрытии карточки) и на каждое realtime-событие.
@@ -82,6 +84,40 @@ export function OrderChat({ orderId }: { orderId: number }) {
     }
   }
 
+  const startEdit = (c: OrderComment) => {
+    const reply = parseReply(c.order_comment_text)
+    setEditingId(c.order_comment_id)
+    setEditText(reply ? reply.body : c.order_comment_text ?? '')
+  }
+
+  const saveEdit = async (c: OrderComment) => {
+    const text = editText.trim()
+    if (!text) return
+    // Сохраняем reply-префикс исходного сообщения, редактируется только тело.
+    const reply = parseReply(c.order_comment_text)
+    const composed = reply ? `| ${reply.author}\n> ${reply.quote}\n${text}` : text
+    setError('')
+    try {
+      const { item } = await updateOrderComment(orderId, c.order_comment_id, composed)
+      setComments((prev) => prev.map((x) => (x.order_comment_id === item.order_comment_id ? item : x)))
+      setEditingId(null)
+      setEditText('')
+    } catch (e) {
+      setError((e as Error)?.message || 'Не удалось изменить')
+    }
+  }
+
+  const remove = async (c: OrderComment) => {
+    if (!window.confirm('Удалить сообщение?')) return
+    setError('')
+    try {
+      await deleteOrderComment(orderId, c.order_comment_id)
+      setComments((prev) => prev.filter((x) => x.order_comment_id !== c.order_comment_id))
+    } catch (e) {
+      setError((e as Error)?.message || 'Не удалось удалить')
+    }
+  }
+
   return (
     <div className={styles.chat}>
       <div className={styles.title}>Чат заказа</div>
@@ -93,36 +129,67 @@ export function OrderChat({ orderId }: { orderId: number }) {
             const mine = user?.user_id === c.order_comment_owner_user_id
             const reply = parseReply(c.order_comment_text)
             const bodyText = reply ? reply.body : c.order_comment_text
+            const hasAttachments = !!c.attachments?.length
+            const canEdit = mine && !hasAttachments && !!(c.order_comment_text ?? '').trim()
+            const canDelete = mine || !!user?.user_admin
+            const isEditing = editingId === c.order_comment_id
             return (
               <div key={c.order_comment_id} className={`${styles.msg} ${mine ? styles.mine : ''}`}>
                 <div className={styles.msgHead}>
                   <span className={styles.author}>{authorName(c)}</span>
                   <span className={styles.time}>{timeLabel(c.order_comment_created_at)}</span>
                 </div>
-                {reply ? (
-                  <div className={styles.reply}>
-                    <span className={styles.replyAuthor}>{reply.author}</span>
-                    {reply.quote ? <span className={styles.replyQuote}>{reply.quote}</span> : null}
+                {isEditing ? (
+                  <div className={styles.editBox}>
+                    <textarea
+                      className={styles.editArea}
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      rows={2}
+                    />
+                    <div className={styles.editActions}>
+                      <button onClick={() => { setEditingId(null); setEditText('') }}>Отмена</button>
+                      <button onClick={() => void saveEdit(c)} disabled={!editText.trim()}>Сохранить</button>
+                    </div>
                   </div>
-                ) : null}
-                {bodyText ? <div className={styles.text}>{bodyText}</div> : null}
-                {c.attachments?.length ? (
-                  <div className={styles.attachments}>
-                    {c.attachments.map((a) => {
-                      const url = `/media/order-comment-attachments/${a.attachment_id}`
-                      const isImage = (a.attachment_mime_type || '').startsWith('image/')
-                      return isImage ? (
-                        <a key={a.attachment_id} href={url} target="_blank" rel="noreferrer">
-                          <img className={styles.photo} src={url} alt={a.attachment_original_filename || ''} />
-                        </a>
-                      ) : (
-                        <a key={a.attachment_id} className={styles.file} href={url} target="_blank" rel="noreferrer">
-                          📎 {a.attachment_original_filename || 'файл'}
-                        </a>
-                      )
-                    })}
-                  </div>
-                ) : null}
+                ) : (
+                  <>
+                    {reply ? (
+                      <div className={styles.reply}>
+                        <span className={styles.replyAuthor}>{reply.author}</span>
+                        {reply.quote ? <span className={styles.replyQuote}>{reply.quote}</span> : null}
+                      </div>
+                    ) : null}
+                    {bodyText ? <div className={styles.text}>{bodyText}</div> : null}
+                    {hasAttachments ? (
+                      <div className={styles.attachments}>
+                        {c.attachments.map((a) => {
+                          const url = `/media/order-comment-attachments/${a.attachment_id}`
+                          const isImage = (a.attachment_mime_type || '').startsWith('image/')
+                          return isImage ? (
+                            <a key={a.attachment_id} href={url} target="_blank" rel="noreferrer">
+                              <img className={styles.photo} src={url} alt={a.attachment_original_filename || ''} />
+                            </a>
+                          ) : (
+                            <a key={a.attachment_id} className={styles.file} href={url} target="_blank" rel="noreferrer">
+                              📎 {a.attachment_original_filename || 'файл'}
+                            </a>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                    {(canEdit || canDelete) && (
+                      <div className={styles.actions}>
+                        {canEdit && (
+                          <button title="Изменить" onClick={() => startEdit(c)}>✏️</button>
+                        )}
+                        {canDelete && (
+                          <button title="Удалить" onClick={() => void remove(c)}>🗑️</button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )
           })

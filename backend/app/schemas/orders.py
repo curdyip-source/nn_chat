@@ -73,3 +73,8 @@ class OrderCommentCreatePayload(BaseModel):
         if not (self.order_comment_text and self.order_comment_text.strip()) and not self.attachments:
             raise ValueError("Текст комментария или вложение обязательны")
         return self
+
+
+class OrderCommentUpdatePayload(BaseModel):
+    order_comment_text: str = Field(min_length=1, max_length=4000)
+    mentioned_user_ids: list[int] = Field(default_factory=list, max_length=100)

@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
-from app.core.audit_types import ENTITY_TYPE_ORDER, EVENT_TYPE_ORDER_COMMENT_CREATE, EVENT_TYPE_ORDER_COMMENT_DELETE, EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_DELETE, EVENT_TYPE_ORDER_UPDATE
+from app.core.audit_types import ENTITY_TYPE_ORDER, EVENT_TYPE_ORDER_COMMENT_CREATE, EVENT_TYPE_ORDER_COMMENT_DELETE, EVENT_TYPE_ORDER_COMMENT_UPDATE, EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_DELETE, EVENT_TYPE_ORDER_UPDATE
 from app.models.messages import Message
 from app.models.orders import Order, OrderItem
 from app.repositories.audit_events import AuditEventRepository
@@ -15,7 +15,7 @@ from app.repositories.messages import MessageRepository
 from app.repositories.orders import OrderRepository
 from app.repositories.reference_data import ReferenceDataRepository
 from app.schemas.common import build_pagination
-from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
+from app.schemas.orders import OrderCommentCreatePayload, OrderCommentUpdatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
 from app.services.contacts import save_buyer_contact_from_order, save_supplier_contact
 from app.services.audit import log_audit_event
 from app.services.access_control import allowed_order_status_ids, can_create_on_establishment, can_delete_document, can_edit_document, can_view_document, can_view_order_status, list_visibility
@@ -268,6 +268,8 @@ def _order_history_entries_for_event(event) -> list[dict]:
         actions = [("delete", "удалил заказ")]
     elif event.event_type == EVENT_TYPE_ORDER_COMMENT_CREATE:
         actions = [("comment", "написал в чат заказа")]
+    elif event.event_type == EVENT_TYPE_ORDER_COMMENT_UPDATE:
+        actions = [("comment", "изменил сообщение в чате заказа")]
     elif event.event_type == EVENT_TYPE_ORDER_COMMENT_DELETE:
         actions = [("comment", "удалил сообщение из чата заказа")]
     else:
@@ -722,6 +724,36 @@ class OrderService:
             )
         return serialize_order_comment(row)
 
+    def update_order_comment(self, order_id: int, comment_id: int, payload: OrderCommentUpdatePayload, current_user: dict) -> dict:
+        # Заказ должен быть в области видимости, иначе не раскрываем его существование.
+        self.get_accessible_order_or_404(order_id, current_user)
+        comment = self.repository.get_comment_by_id(comment_id)
+        if comment is None or comment.order_comment_order_id != order_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Сообщение не найдено")
+        # Редактировать можно только своё текстовое сообщение без вложений — как в чате.
+        if comment.order_comment_owner_user_id != current_user["user_id"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Можно изменить только своё сообщение")
+        if comment.attachments:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Можно изменить только текстовое сообщение")
+        previous_text = comment.order_comment_text
+        updated = self.repository.update_comment(comment, {"order_comment_text": payload.order_comment_text.strip()})
+        log_audit_event(
+            self.db,
+            actor_user_id=current_user["user_id"],
+            entity_type=ENTITY_TYPE_ORDER,
+            entity_id=order_id,
+            event_type=EVENT_TYPE_ORDER_COMMENT_UPDATE,
+            event_payload={
+                "order_comment_id": updated.order_comment_id,
+                "previous_order_comment_text": previous_text,
+                "order_comment_text": updated.order_comment_text,
+            },
+        )
+        # Обновлённый текст меняет карточку заказа — публикуем SSE-событие updated
+        # (дельта-синк подхватит), как в add_order_comment/delete_order_comment.
+        notify_order_changed(self.db, order_id)
+        return serialize_order_comment(updated)
+
     def delete_order_comment(self, order_id: int, comment_id: int, current_user: dict) -> None:
         # Заказ должен быть в области видимости, иначе не раскрываем его существование.
         self.get_accessible_order_or_404(order_id, current_user)
@@ -901,6 +933,10 @@ def get_order_history(db: Session, order_id: int, current_user: dict) -> dict:
 
 def add_order_comment(db: Session, order_id: int, payload: OrderCommentCreatePayload, current_user: dict) -> dict:
     return OrderService(db).add_order_comment(order_id, payload, current_user)
+
+
+def update_order_comment(db: Session, order_id: int, comment_id: int, payload: OrderCommentUpdatePayload, current_user: dict) -> dict:
+    return OrderService(db).update_order_comment(order_id, comment_id, payload, current_user)
 
 
 def delete_order_comment(db: Session, order_id: int, comment_id: int, current_user: dict) -> None:

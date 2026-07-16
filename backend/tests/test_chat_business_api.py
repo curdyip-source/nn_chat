@@ -472,8 +472,25 @@ def test_order_inventory_and_product_registration_create_messages(client, integr
     assert order_detail_response.json()["item"]["items"][0]["order_item_status"] == "Не обработан"
     assert order_detail_response.json()["item"]["items"][0]["order_item_status_color"] == "gray"
 
-    # Удаление своего комментария чата заказа (текстового) — DELETE вычищает его из карточки.
+    # Редактирование своего текстового комментария — PUT меняет текст.
     text_comment_id = comment_payload["order_comment_id"]
+    edit_comment_response = client.put(
+        f"{API_PREFIX}/orders/{order_id}/comments/{text_comment_id}",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={"order_comment_text": "Позвонить за час до доставки"},
+    )
+    assert edit_comment_response.status_code == 200
+    assert edit_comment_response.json()["item"]["order_comment_text"] == "Позвонить за час до доставки"
+
+    # Комментарий-вложение редактировать нельзя (400).
+    edit_attachment_response = client.put(
+        f"{API_PREFIX}/orders/{order_id}/comments/{attachment_comment_payload['order_comment_id']}",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={"order_comment_text": "нельзя"},
+    )
+    assert edit_attachment_response.status_code == 400
+
+    # Удаление своего комментария чата заказа (текстового) — DELETE вычищает его из карточки.
     delete_missing_response = client.delete(
         f"{API_PREFIX}/orders/{order_id}/comments/999999",
         headers={"Authorization": f"Bearer {user_token}"},

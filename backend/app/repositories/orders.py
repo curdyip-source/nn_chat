@@ -199,6 +199,12 @@ class OrderRepository:
             .first()
         )
 
+    def update_comment(self, row: OrderComment, data: dict) -> OrderComment:
+        for key, value in data.items():
+            setattr(row, key, value)
+        self.db.commit()
+        return self.get_comment_by_id(row.order_comment_id)
+
     def delete_comment(self, row: OrderComment) -> None:
         # Жёсткое удаление: вложения комментария уходят каскадом (FK ondelete=CASCADE +
         # relationship cascade="all, delete-orphan").
