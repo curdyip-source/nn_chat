@@ -59,6 +59,28 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+.reply {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  border-left: 3px solid var(--accent, #3b82f6);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+}
+.replyAuthor {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.replyQuote {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .attachments {
   display: flex;
   flex-wrap: wrap;

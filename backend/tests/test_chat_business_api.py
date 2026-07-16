@@ -472,6 +472,23 @@ def test_order_inventory_and_product_registration_create_messages(client, integr
     assert order_detail_response.json()["item"]["items"][0]["order_item_status"] == "Не обработан"
     assert order_detail_response.json()["item"]["items"][0]["order_item_status_color"] == "gray"
 
+    # Удаление своего комментария чата заказа (текстового) — DELETE вычищает его из карточки.
+    text_comment_id = comment_payload["order_comment_id"]
+    delete_missing_response = client.delete(
+        f"{API_PREFIX}/orders/{order_id}/comments/999999",
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert delete_missing_response.status_code == 404
+    delete_comment_response = client.delete(
+        f"{API_PREFIX}/orders/{order_id}/comments/{text_comment_id}",
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert delete_comment_response.status_code == 204
+    after_delete_response = client.get(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {user_token}"})
+    remaining_comment_ids = [c["order_comment_id"] for c in after_delete_response.json()["item"]["comments"]]
+    assert text_comment_id not in remaining_comment_ids
+    assert len(remaining_comment_ids) == 1
+
     order_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "orders" and item["status_status"] == "В обработке")["status_id"]
     order_product_status_id = next(item for item in reference_payload["statuses"] if item["status_type"] == "order_products" and item["status_status"] == "Заказ поставщику")["status_id"]
     updated_order_response = client.put(

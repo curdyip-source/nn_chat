@@ -198,3 +198,9 @@ class OrderRepository:
             .filter(OrderComment.order_comment_id == order_comment_id)
             .first()
         )
+
+    def delete_comment(self, row: OrderComment) -> None:
+        # Жёсткое удаление: вложения комментария уходят каскадом (FK ondelete=CASCADE +
+        # relationship cascade="all, delete-orphan").
+        self.db.delete(row)
+        self.db.commit()

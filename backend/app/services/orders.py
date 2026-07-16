@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
-from app.core.audit_types import ENTITY_TYPE_ORDER, EVENT_TYPE_ORDER_COMMENT_CREATE, EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_DELETE, EVENT_TYPE_ORDER_UPDATE
+from app.core.audit_types import ENTITY_TYPE_ORDER, EVENT_TYPE_ORDER_COMMENT_CREATE, EVENT_TYPE_ORDER_COMMENT_DELETE, EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_DELETE, EVENT_TYPE_ORDER_UPDATE
 from app.models.messages import Message
 from app.models.orders import Order, OrderItem
 from app.repositories.audit_events import AuditEventRepository
@@ -268,6 +268,8 @@ def _order_history_entries_for_event(event) -> list[dict]:
         actions = [("delete", "удалил заказ")]
     elif event.event_type == EVENT_TYPE_ORDER_COMMENT_CREATE:
         actions = [("comment", "написал в чат заказа")]
+    elif event.event_type == EVENT_TYPE_ORDER_COMMENT_DELETE:
+        actions = [("comment", "удалил сообщение из чата заказа")]
     else:
         actions = []
 
@@ -720,6 +722,33 @@ class OrderService:
             )
         return serialize_order_comment(row)
 
+    def delete_order_comment(self, order_id: int, comment_id: int, current_user: dict) -> None:
+        # Заказ должен быть в области видимости, иначе не раскрываем его существование.
+        self.get_accessible_order_or_404(order_id, current_user)
+        comment = self.repository.get_comment_by_id(comment_id)
+        if comment is None or comment.order_comment_order_id != order_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Сообщение не найдено")
+        # Право на удаление — как у чат-сообщений: своё удаляет автор, чужое — только админ.
+        if comment.order_comment_owner_user_id != current_user["user_id"] and not current_user["user_admin"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Удалять чужие сообщения может только администратор")
+        log_audit_event(
+            self.db,
+            actor_user_id=current_user["user_id"],
+            entity_type=ENTITY_TYPE_ORDER,
+            entity_id=order_id,
+            event_type=EVENT_TYPE_ORDER_COMMENT_DELETE,
+            event_payload={
+                "order_comment_id": comment.order_comment_id,
+                "order_comment_text": comment.order_comment_text,
+                "attachment_count": len(comment.attachments),
+            },
+        )
+        self.repository.delete_comment(comment)
+        # Комментарий убран из карточки заказа — бампаем message_updated_at и публикуем
+        # SSE-событие updated с обновлённой карточкой (дельта-синк подхватит), как в
+        # add_order_comment. Иначе счётчик комментариев в ленте не обновится в реалтайме.
+        notify_order_changed(self.db, order_id)
+
     def split_order(self, order_id: int, current_user: dict) -> dict:
         """Разделить заказ для частичной отгрузки: товары, готовые к отгрузке сейчас
         («В наличии» и уже «Собрано»), остаются в этом заказе и он переводится в «На
@@ -872,3 +901,7 @@ def get_order_history(db: Session, order_id: int, current_user: dict) -> dict:
 
 def add_order_comment(db: Session, order_id: int, payload: OrderCommentCreatePayload, current_user: dict) -> dict:
     return OrderService(db).add_order_comment(order_id, payload, current_user)
+
+
+def delete_order_comment(db: Session, order_id: int, comment_id: int, current_user: dict) -> None:
+    OrderService(db).delete_order_comment(order_id, comment_id, current_user)

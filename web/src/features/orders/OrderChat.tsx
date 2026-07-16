@@ -16,6 +16,28 @@ function timeLabel(iso: string | null): string {
   return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
+type ReplyFragment = { author: string; quote: string; body: string }
+
+// Ответы в чате заказа кодируются текстовым префиксом (как в приложении):
+// «| Автор\n> цитата\nтело». Бэкенд про reply не знает — это клиентская конвенция.
+function parseReply(text: string | null): ReplyFragment | null {
+  if (!text) return null
+  const trimmed = text.trim()
+  if (!trimmed.startsWith('| ')) return null
+  const parts = trimmed.split('\n')
+  const author = parts[0].slice(2).trim()
+  if (parts.length < 2) return null
+  const second = parts[1].trim()
+  let quote: string
+  if (second.startsWith('> ') || second.startsWith('| ')) {
+    quote = second.slice(2).trim()
+  } else {
+    return null
+  }
+  const body = parts.slice(2).join('\n').trim()
+  return { author, quote, body }
+}
+
 export function OrderChat({ orderId }: { orderId: number }) {
   const { user } = useAuth()
   const { revision } = useRealtime()
@@ -69,13 +91,21 @@ export function OrderChat({ orderId }: { orderId: number }) {
         ) : (
           comments.map((c) => {
             const mine = user?.user_id === c.order_comment_owner_user_id
+            const reply = parseReply(c.order_comment_text)
+            const bodyText = reply ? reply.body : c.order_comment_text
             return (
               <div key={c.order_comment_id} className={`${styles.msg} ${mine ? styles.mine : ''}`}>
                 <div className={styles.msgHead}>
                   <span className={styles.author}>{authorName(c)}</span>
                   <span className={styles.time}>{timeLabel(c.order_comment_created_at)}</span>
                 </div>
-                {c.order_comment_text ? <div className={styles.text}>{c.order_comment_text}</div> : null}
+                {reply ? (
+                  <div className={styles.reply}>
+                    <span className={styles.replyAuthor}>{reply.author}</span>
+                    {reply.quote ? <span className={styles.replyQuote}>{reply.quote}</span> : null}
+                  </div>
+                ) : null}
+                {bodyText ? <div className={styles.text}>{bodyText}</div> : null}
                 {c.attachments?.length ? (
                   <div className={styles.attachments}>
                     {c.attachments.map((a) => {

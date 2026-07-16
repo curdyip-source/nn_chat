@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.schemas.orders import OrderCommentCreatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
-from app.services.orders import add_order_comment, create_order, delete_order, get_order, get_order_history, list_order_comments, list_orders, split_order, update_order, update_order_status
+from app.services.orders import add_order_comment, create_order, delete_order, delete_order_comment, get_order, get_order_history, list_order_comments, list_orders, split_order, update_order, update_order_status
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -71,3 +71,8 @@ def get_order_comments(order_id: int, current_user: dict = Depends(get_current_u
 @router.post("/{order_id}/comments", status_code=status.HTTP_201_CREATED)
 def add_order_comment_route(order_id: int, payload: OrderCommentCreatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     return {"item": add_order_comment(db, order_id, payload, current_user)}
+
+
+@router.delete("/{order_id}/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_order_comment_route(order_id: int, comment_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
+    delete_order_comment(db, order_id, comment_id, current_user)
