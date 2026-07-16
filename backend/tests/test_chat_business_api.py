@@ -837,6 +837,43 @@ def test_order_history_entry_for_cdek_waybill():
     assert entries[0]["text"] == "создал накладную СДЭК №1234567890"
 
 
+def test_cdek_waybill_track_backfilled_into_audit(integration_db_session, integration_user):
+    from app.core.audit_types import ENTITY_TYPE_CDEK
+    from app.services.audit import log_audit_event
+    from app.services.cdek_orders import record_waybill_track_in_audit
+    from app.repositories.audit_events import AuditEventRepository
+
+    order_id = 987654
+    # Событие создания накладной без номера (трек ещё не присвоен СДЭК).
+    log_audit_event(
+        integration_db_session,
+        actor_user_id=integration_user.user_id,
+        entity_type=ENTITY_TYPE_CDEK,
+        entity_id=order_id,
+        event_type=EVENT_TYPE_CDEK_WAYBILL_CREATE,
+        event_payload={"order_id": order_id, "cdek_track_number": None},
+    )
+
+    # Трек пришёл асинхронно → бэкфиллим в существующее событие.
+    record_waybill_track_in_audit(integration_db_session, order_id, "1002233445")
+
+    rows, _ = AuditEventRepository(integration_db_session).list(
+        actor_user_id=None, entity_type=ENTITY_TYPE_CDEK, entity_id=order_id,
+        event_type=EVENT_TYPE_CDEK_WAYBILL_CREATE, date_from=None, date_to=None, page=1, page_size=10,
+    )
+    assert rows[0].event_payload["cdek_track_number"] == "1002233445"
+    # Актор-создатель сохранён.
+    assert rows[0].actor_user_id == integration_user.user_id
+
+    # Повторный вызов с другим номером не перезатирает уже проставленный.
+    record_waybill_track_in_audit(integration_db_session, order_id, "9999999999")
+    rows2, _ = AuditEventRepository(integration_db_session).list(
+        actor_user_id=None, entity_type=ENTITY_TYPE_CDEK, entity_id=order_id,
+        event_type=EVENT_TYPE_CDEK_WAYBILL_CREATE, date_from=None, date_to=None, page=1, page_size=10,
+    )
+    assert rows2[0].event_payload["cdek_track_number"] == "1002233445"
+
+
 def test_admin_activation_sets_verified_user(client, integration_db_session, integration_admin):
     integration_admin.user_password = hash_password("AdminPass123")
     integration_db_session.commit()

@@ -93,6 +93,9 @@ def _run(order_id: int) -> None:
             if track:
                 order.order_cdek_track_number = str(track)
                 db.commit()
+                # Дописываем номер в событие аудита о создании накладной (трек пришёл асинхронно).
+                from app.services import cdek_orders
+                cdek_orders.record_waybill_track_in_audit(db, order_id, track)
                 break
             time.sleep(1.5)
 

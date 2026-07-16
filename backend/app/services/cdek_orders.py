@@ -12,9 +12,12 @@ from fastapi import HTTPException, status
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from sqlalchemy.orm.attributes import flag_modified
+
 from app.core import config
 from app.core.audit_types import ENTITY_TYPE_CDEK, EVENT_TYPE_CDEK_WAYBILL_CREATE
 from app.models.orders import Order
+from app.repositories.audit_events import AuditEventRepository
 from app.services import cdek
 from app.services.audit import log_audit_event
 
@@ -119,6 +122,36 @@ def _serialize(order: Order) -> dict:
     }
 
 
+def record_waybill_track_in_audit(db: Session, order_id: int, track) -> None:
+    """Дописать номер накладной в уже созданное событие аудита cdek.waybill.create.
+
+    Трек СДЭК присваивает асинхронно — уже после create_waybill, — поэтому номер
+    бэкфиллим в существующее событие (сохраняя автора-создателя), а не пишем новое
+    событие без актора. Идемпотентно: патчим самое свежее событие без номера.
+    """
+    if not track:
+        return
+    rows, _ = AuditEventRepository(db).list(
+        actor_user_id=None,
+        entity_type=ENTITY_TYPE_CDEK,
+        entity_id=order_id,
+        event_type=EVENT_TYPE_CDEK_WAYBILL_CREATE,
+        date_from=None,
+        date_to=None,
+        page=1,
+        page_size=50,
+    )
+    for event in rows:  # новые сверху
+        payload = dict(event.event_payload or {})
+        if payload.get("cdek_track_number"):
+            continue
+        payload["cdek_track_number"] = str(track)
+        event.event_payload = payload
+        flag_modified(event, "event_payload")  # JSON-мутацию SQLAlchemy иначе не заметит
+        db.commit()
+        return
+
+
 def _refresh_status(db: Session, order: Order) -> None:
     """Подтянуть трек (cdek_number) и последний статус из CDEK."""
     if not order.order_cdek_uuid:
@@ -136,6 +169,8 @@ def _refresh_status(db: Session, order: Order) -> None:
         order.order_cdek_status = latest.get("name") or order.order_cdek_status
         order.order_cdek_status_updated_at = datetime.utcnow()
     db.commit()
+    # Если трек только что подтянулся — дописываем его в событие аудита о создании.
+    record_waybill_track_in_audit(db, order.order_id, order.order_cdek_track_number)
 
 
 def create_waybill(db: Session, order_id: int, payload, current_user: dict) -> dict:
