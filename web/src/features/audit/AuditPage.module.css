@@ -43,6 +43,11 @@
   flex-direction: column;
   gap: 6px;
 }
+.loadMore {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
+}
 .row {
   display: flex;
   align-items: flex-start;

@@ -1,29 +1,50 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listAuditEvents } from '../../api/endpoints'
 import type { AuditEvent } from '../../api/types'
+import { Button } from '../../ui/Button'
 import { ButtonGroup } from '../../ui/ButtonGroup'
 import { formatDateTime } from '../../lib/format'
 import { AUDIT_QUICK_FILTERS, describeAuditEvent, describeCdekWaybill, describeOrderUpdate } from './describe'
 import styles from './AuditPage.module.css'
 
+const PAGE_SIZE = 50
+
 export function AuditPage() {
   const [events, setEvents] = useState<AuditEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [entityType, setEntityType] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
 
-  const reload = useCallback(() => {
-    setLoading(true)
-    listAuditEvents({ entityType: entityType ?? undefined })
-      .then((res) => {
-        setEvents(res.items)
-        setError(null)
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
-      .finally(() => setLoading(false))
-  }, [entityType])
+  const load = useCallback(
+    (page: number) => {
+      const first = page === 1
+      if (first) setLoading(true)
+      else setLoadingMore(true)
+      listAuditEvents({ entityType: entityType ?? undefined, page, pageSize: PAGE_SIZE })
+        .then((res) => {
+          // Первая страница (или смена фильтра) — заменяем, иначе дописываем снизу.
+          setEvents((prev) => (first ? res.items : [...prev, ...res.items]))
+          setTotal(res.pagination?.total ?? res.items.length)
+          setError(null)
+        })
+        .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
+        .finally(() => {
+          if (first) setLoading(false)
+          else setLoadingMore(false)
+        })
+    },
+    [entityType],
+  )
 
-  useEffect(reload, [reload])
+  // Смена фильтра → грузим первую страницу заново.
+  useEffect(() => {
+    load(1)
+  }, [load])
+
+  const hasMore = events.length < total
+  const loadMore = () => load(Math.floor(events.length / PAGE_SIZE) + 1)
 
   return (
     <div className={styles.page}>
@@ -84,6 +105,13 @@ export function AuditPage() {
               </div>
             )
           })}
+          {hasMore && (
+            <div className={styles.loadMore}>
+              <Button variant="ghost" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? 'Загрузка…' : 'Загрузить ещё'}
+              </Button>
+            </div>
+          )}
         </div>
       )}
       </div>
