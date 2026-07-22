@@ -64,10 +64,13 @@ class OrderRepository:
         if date_to:
             query = query.filter(Order.order_created_at < datetime.combine(date_to + timedelta(days=1), time.min))
         if search:
-            like_value = f"%{search.strip()}%"
-            query = query.filter(
-                or_(Order.order_customer.ilike(like_value), Order.order_info.ilike(like_value))
-            )
+            stripped = search.strip()
+            like_value = f"%{stripped}%"
+            conditions = [Order.order_customer.ilike(like_value), Order.order_info.ilike(like_value)]
+            # Числовой запрос — ищем ещё и по номеру заказа (order_id).
+            if stripped.isdigit():
+                conditions.append(Order.order_id == int(stripped))
+            query = query.filter(or_(*conditions))
         return query
 
     def list(

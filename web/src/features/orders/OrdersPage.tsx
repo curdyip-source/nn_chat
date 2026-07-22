@@ -294,7 +294,7 @@ export function OrdersPage() {
             />
           </div>
           <TextInput
-            placeholder="Поиск по клиенту или информации…"
+            placeholder="Поиск по клиенту, информации или № заказа…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
