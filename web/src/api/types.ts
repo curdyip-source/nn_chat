@@ -59,6 +59,12 @@ export type OrderMethod = {
   order_method_sub_methods: string[]
 }
 
+// Канал продаж (Розница/Опт/Дроп) — редактируемый справочник.
+export type SalesChannel = {
+  order_sales_channel_id: number
+  order_sales_channel_name: string
+}
+
 export type Currency = {
   currency_id: number
   currency_name: string
@@ -68,6 +74,7 @@ export type Currency = {
 export type ReferenceData = {
   establishments: Establishment[]
   order_methods: OrderMethod[]
+  sales_channels: SalesChannel[]
   statuses: Status[]
   currencies: Currency[]
 }
@@ -103,6 +110,7 @@ export type Contact = {
   contact_order_method_name?: string | null
   contact_order_sub_method?: string | null
   contact_contact_method?: string | null
+  contact_sales_channel?: string | null
 }
 
 // ----- Создание заказа -----
@@ -133,6 +141,7 @@ export type OrderCreate = {
   order_method_id: number
   order_sub_method?: string | null
   order_contact_method?: string | null
+  order_sales_channel?: string | null
   order_customer: string
   order_info: string
   save_contact: boolean
@@ -184,6 +193,7 @@ export type Order = {
   order_method_name?: string | null
   order_sub_method?: string | null
   order_contact_method?: string | null
+  order_sales_channel?: string | null
   order_customer: string
   order_info: string
   order_status_id?: number | null
@@ -217,6 +227,7 @@ export type OrderUpdate = {
   order_method_id: number
   order_sub_method?: string | null
   order_contact_method?: string | null
+  order_sales_channel?: string | null
   order_customer: string
   order_info: string
   order_status_id: number

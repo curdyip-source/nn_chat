@@ -105,6 +105,7 @@ const ORDER_FIELD_LABELS: Record<string, string> = {
   order_method_name: 'способ',
   order_sub_method: 'подспособ',
   order_contact_method: 'связь',
+  order_sales_channel: 'канал продаж',
   order_info: 'информация',
 }
 

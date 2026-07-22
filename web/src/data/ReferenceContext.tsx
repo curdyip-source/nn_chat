@@ -14,6 +14,7 @@ type RefState = ReferenceData & {
 const empty: ReferenceData = {
   establishments: [],
   order_methods: [],
+  sales_channels: [],
   statuses: [],
   currencies: [],
 }

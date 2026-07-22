@@ -28,6 +28,7 @@ export function orderToUpdate(
     order_method_id: order.order_method_id!,
     order_sub_method: order.order_sub_method ?? null,
     order_contact_method: order.order_contact_method ?? null,
+    order_sales_channel: order.order_sales_channel ?? null,
     order_customer: overrides.customer ?? order.order_customer,
     order_info: overrides.info ?? order.order_info,
     order_status_id: overrides.statusId ?? order.order_status_id!,

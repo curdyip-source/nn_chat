@@ -72,6 +72,7 @@ export function OrderCreate({
   const [methodId, setMethodId] = useState<number | null>(editOrder?.order_method_id ?? null)
   const [subMethod, setSubMethod] = useState<string | null>(editOrder?.order_sub_method ?? null)
   const [contactMethod, setContactMethod] = useState<string | null>(editOrder?.order_contact_method ?? null)
+  const [salesChannel, setSalesChannel] = useState<string | null>(editOrder?.order_sales_channel ?? null)
   const [saveContact, setSaveContact] = useState(false)
 
   // --- Данные СДЭК (когда метод/подметод = СДЭК): сохраняются в заказ, тянутся в накладную ---
@@ -164,6 +165,7 @@ export function OrderCreate({
     if (c.contact_order_method_id) setMethodId(c.contact_order_method_id)
     setSubMethod(c.contact_order_sub_method ?? null)
     setContactMethod(c.contact_contact_method ?? null)
+    setSalesChannel(c.contact_sales_channel ?? null)
   }
 
   const addProduct = (p: Product) =>
@@ -251,6 +253,7 @@ export function OrderCreate({
           order_method_id: methodId!,
           order_sub_method: subMethod,
           order_contact_method: contactMethod,
+          order_sales_channel: salesChannel,
           order_customer: customer.trim(),
           order_info: info.trim(),
           order_status_id: editOrder.order_status_id!,
@@ -262,6 +265,7 @@ export function OrderCreate({
           order_method_id: methodId!,
           order_sub_method: subMethod,
           order_contact_method: contactMethod,
+          order_sales_channel: salesChannel,
           order_customer: customer.trim(),
           order_info: info.trim(),
           save_contact: saveContact,
@@ -336,6 +340,21 @@ export function OrderCreate({
           <Field label="Информация">
             <TextArea value={info} onChange={(e) => setInfo(e.target.value)} />
           </Field>
+
+          {ref.sales_channels.length > 0 && (
+            <Field label="Канал">
+              <ButtonGroup
+                deselectable
+                columns={3}
+                value={salesChannel}
+                onChange={setSalesChannel}
+                options={ref.sales_channels.map((c) => ({
+                  value: c.order_sales_channel_name,
+                  label: c.order_sales_channel_name,
+                }))}
+              />
+            </Field>
+          )}
 
           <Field label="Склад">
             <ButtonGroup

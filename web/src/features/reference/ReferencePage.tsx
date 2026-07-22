@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { saveCurrency, saveEstablishment, saveOrderMethod, saveStatus } from '../../api/endpoints'
-import type { Currency, Establishment, OrderMethod, Status } from '../../api/types'
+import { saveCurrency, saveEstablishment, saveOrderMethod, saveSalesChannel, saveStatus } from '../../api/endpoints'
+import type { Currency, Establishment, OrderMethod, SalesChannel, Status } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
 import { ButtonGroup } from '../../ui/ButtonGroup'
@@ -10,12 +10,13 @@ import { Modal } from '../../ui/Modal'
 import { StatusChip } from '../../ui/StatusChip'
 import styles from './ReferencePage.module.css'
 
-type Tab = 'statuses' | 'establishments' | 'methods' | 'currencies'
+type Tab = 'statuses' | 'establishments' | 'methods' | 'channels' | 'currencies'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'statuses', label: 'Статусы' },
   { key: 'establishments', label: 'Склады' },
   { key: 'methods', label: 'Способы' },
+  { key: 'channels', label: 'Каналы' },
   { key: 'currencies', label: 'Валюты' },
 ]
 
@@ -33,6 +34,7 @@ export function ReferencePage() {
   const [statusEdit, setStatusEdit] = useState<Status | null | 'new'>(null)
   const [estEdit, setEstEdit] = useState<Establishment | null | 'new'>(null)
   const [methodEdit, setMethodEdit] = useState<OrderMethod | null | 'new'>(null)
+  const [channelEdit, setChannelEdit] = useState<SalesChannel | null | 'new'>(null)
   const [currEdit, setCurrEdit] = useState<Currency | null | 'new'>(null)
 
   return (
@@ -47,6 +49,7 @@ export function ReferencePage() {
             if (tab === 'statuses') setStatusEdit('new')
             else if (tab === 'establishments') setEstEdit('new')
             else if (tab === 'methods') setMethodEdit('new')
+            else if (tab === 'channels') setChannelEdit('new')
             else setCurrEdit('new')
           }}
         >
@@ -100,6 +103,16 @@ export function ReferencePage() {
           </div>
         )}
 
+        {tab === 'channels' && (
+          <div className={styles.list}>
+            {ref.sales_channels.map((c) => (
+              <button key={c.order_sales_channel_id} className={styles.row} onClick={() => setChannelEdit(c)}>
+                {c.order_sales_channel_name}
+              </button>
+            ))}
+          </div>
+        )}
+
         {tab === 'currencies' && (
           <div className={styles.list}>
             {ref.currencies.map((c) => (
@@ -137,6 +150,16 @@ export function ReferencePage() {
           onClose={() => setMethodEdit(null)}
           onSaved={() => {
             setMethodEdit(null)
+            ref.reload()
+          }}
+        />
+      )}
+      {channelEdit !== null && (
+        <SalesChannelModal
+          item={channelEdit === 'new' ? null : channelEdit}
+          onClose={() => setChannelEdit(null)}
+          onSaved={() => {
+            setChannelEdit(null)
             ref.reload()
           }}
         />
@@ -256,6 +279,30 @@ function MethodModal({ item, onClose, onSaved }: { item: OrderMethod | null; onC
         </Field>
         <Field label="Подспособы" hint="Через запятую: Авито, СДЭК, Яндекс">
           <TextInput value={subs} onChange={(e) => setSubs(e.target.value)} />
+        </Field>
+        {error && <div className={styles.error}>{error}</div>}
+      </div>
+    </Modal>
+  )
+}
+
+function SalesChannelModal({ item, onClose, onSaved }: { item: SalesChannel | null; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(item?.order_sales_channel_name ?? '')
+  const { busy, error, run } = useSaver(
+    () => saveSalesChannel(item?.order_sales_channel_id ?? null, { order_sales_channel_name: name.trim() }),
+    onSaved,
+  )
+  return (
+    <Modal
+      open
+      title={item ? 'Канал' : 'Новый канал'}
+      onClose={onClose}
+      width={420}
+      footer={<ModalFooter onClose={onClose} busy={busy} disabled={!name.trim()} onSave={run} />}
+    >
+      <div className={styles.form}>
+        <Field label="Название">
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Розница" />
         </Field>
         {error && <div className={styles.error}>{error}</div>}
       </div>

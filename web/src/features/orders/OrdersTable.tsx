@@ -348,8 +348,8 @@ function OrderRow({
   }
   const totalText = [...totals.entries()].map(([s, v]) => `${formatAmount(v)}${s}`).join(' · ')
 
-  // Порядок: способ связи · склад · метод · подметод (+ действие СДЭК инлайн ниже).
-  const metaParts = [order.order_contact_method, order.order_establishment_name, order.order_method_name, order.order_sub_method].filter(Boolean)
+  // Порядок: канал · способ связи · склад · метод · подметод (+ действие СДЭК инлайн ниже).
+  const metaParts = [order.order_sales_channel, order.order_contact_method, order.order_establishment_name, order.order_method_name, order.order_sub_method].filter(Boolean)
   const metaText = metaParts.join(' · ')
   // Кто создал заказ: Фамилия Имя (иначе логин).
   const creator = [order.order_owner_second_name, order.order_owner_first_name].filter(Boolean).join(' ') || order.order_owner_user_login || ''

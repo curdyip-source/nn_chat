@@ -17,6 +17,7 @@ import type {
   ProductImportJob,
   ProductRegistration,
   ReferenceData,
+  SalesChannel,
   SetupStatus,
   Status,
   User,
@@ -79,6 +80,13 @@ export function saveOrderMethod(
 ) {
   return apiRequest<{ item: OrderMethod }>(
     id ? `/order-methods/${id}` : '/order-methods',
+    { method: id ? 'PUT' : 'POST', body },
+  )
+}
+
+export function saveSalesChannel(id: number | null, body: { order_sales_channel_name: string }) {
+  return apiRequest<{ item: SalesChannel }>(
+    id ? `/sales-channels/${id}` : '/sales-channels',
     { method: id ? 'PUT' : 'POST', body },
   )
 }
