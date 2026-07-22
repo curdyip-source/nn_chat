@@ -39,7 +39,11 @@ def get_app_settings_route(_: dict = Depends(require_admin), db: Session = Depen
 
 @router.put("/app-settings")
 def update_app_settings_route(payload: AppSettingsPayload, _: dict = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
-    return {"min_supported_ios_build": set_min_supported_ios_build(db, payload.min_supported_ios_build)}
+    value = set_min_supported_ios_build(db, payload.min_supported_ios_build)
+    # Реалтайм: рассылаем новый порог всем подключённым приложениям (без перезапуска).
+    from app.services.card_sync import notify_app_config_updated
+    notify_app_config_updated(value)
+    return {"min_supported_ios_build": value}
 
 
 @router.get("/establishments")

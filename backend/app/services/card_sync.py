@@ -40,6 +40,12 @@ def notify_user_updated(user_id: int) -> None:
     broker.publish({"type": "user_updated", "user_id": user_id})
 
 
+def notify_app_config_updated(min_supported_ios_build: int) -> None:
+    # Порог форс-апдейта изменился в «Админке». Публикуем SSE всем подписчикам, чтобы
+    # приложение применило новый минимальный билд реалтайм (без перезапуска).
+    broker.publish({"type": "app_config_updated", "min_supported_ios_build": min_supported_ios_build})
+
+
 def notify_inventory_changed(db: Session, inventory_id: int) -> None:
     _emit_updated(db, MessageRepository(db).touch_for_inventory(inventory_id))
 
