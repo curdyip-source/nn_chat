@@ -14,6 +14,10 @@ class OrderMethodPayload(BaseModel):
     order_method_sub_methods: Optional[list[str]] = Field(default=None)
 
 
+class OrderSalesChannelPayload(BaseModel):
+    order_sales_channel_name: str = Field(min_length=1, max_length=255)
+
+
 class StatusPayload(BaseModel):
     status_type: str = Field(min_length=1, max_length=100)
     status_status: str = Field(min_length=1, max_length=255)

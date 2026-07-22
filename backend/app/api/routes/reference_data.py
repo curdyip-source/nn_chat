@@ -3,20 +3,23 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_admin
-from app.schemas.reference_data import CurrencyPayload, EstablishmentPayload, OrderMethodPayload, StatusPayload
+from app.schemas.reference_data import CurrencyPayload, EstablishmentPayload, OrderMethodPayload, OrderSalesChannelPayload, StatusPayload
 from app.services.reference_data import (
     create_currency,
     create_establishment,
     create_order_method,
+    create_order_sales_channel,
     create_status,
     get_reference_data,
     list_currencies,
     list_establishments,
     list_order_methods,
+    list_order_sales_channels,
     list_statuses,
     update_currency,
     update_establishment,
     update_order_method,
+    update_order_sales_channel,
     update_status,
 )
 
@@ -56,6 +59,21 @@ def create_order_method_route(payload: OrderMethodPayload, current_user: dict = 
 @router.put("/order-methods/{order_method_id}")
 def update_order_method_route(order_method_id: int, payload: OrderMethodPayload, _: dict = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
     return {"item": update_order_method(db, order_method_id, payload)}
+
+
+@router.get("/sales-channels")
+def get_sales_channels(_: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return list_order_sales_channels(db)
+
+
+@router.post("/sales-channels", status_code=status.HTTP_201_CREATED)
+def create_sales_channel_route(payload: OrderSalesChannelPayload, current_user: dict = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    return {"item": create_order_sales_channel(db, payload, current_user)}
+
+
+@router.put("/sales-channels/{order_sales_channel_id}")
+def update_sales_channel_route(order_sales_channel_id: int, payload: OrderSalesChannelPayload, _: dict = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    return {"item": update_order_sales_channel(db, order_sales_channel_id, payload)}
 
 
 @router.get("/statuses")

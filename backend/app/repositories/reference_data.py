@@ -5,7 +5,7 @@ import re
 from sqlalchemy import asc, desc, func, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.reference_data import Currency, Establishment, OrderMethod, Product, Status
+from app.models.reference_data import Currency, Establishment, OrderMethod, OrderSalesChannel, Product, Status
 
 
 def _split_product_search_tokens(search: str) -> list[str]:
@@ -21,6 +21,9 @@ class ReferenceDataRepository:
 
     def list_order_methods(self) -> list[OrderMethod]:
         return self.db.query(OrderMethod).options(joinedload(OrderMethod.owner)).order_by(OrderMethod.order_method_name.asc(), OrderMethod.order_method_id.asc()).all()
+
+    def list_order_sales_channels(self) -> list[OrderSalesChannel]:
+        return self.db.query(OrderSalesChannel).order_by(OrderSalesChannel.order_sales_channel_id.asc()).all()
 
     def list_statuses(self, *, status_type: str | None = None) -> list[Status]:
         query = self.db.query(Status).options(joinedload(Status.owner))
@@ -42,6 +45,19 @@ class ReferenceDataRepository:
 
     def get_order_method_by_name(self, order_method_name: str) -> OrderMethod | None:
         return self.db.query(OrderMethod).options(joinedload(OrderMethod.owner)).filter(OrderMethod.order_method_name == order_method_name).first()
+
+    def get_order_sales_channel(self, order_sales_channel_id: int) -> OrderSalesChannel | None:
+        return self.db.query(OrderSalesChannel).filter(OrderSalesChannel.order_sales_channel_id == order_sales_channel_id).first()
+
+    def get_order_sales_channel_by_name(self, order_sales_channel_name: str) -> OrderSalesChannel | None:
+        return self.db.query(OrderSalesChannel).filter(OrderSalesChannel.order_sales_channel_name == order_sales_channel_name).first()
+
+    def create_order_sales_channel(self, data: dict) -> OrderSalesChannel:
+        row = OrderSalesChannel(**data)
+        self.db.add(row)
+        self.db.commit()
+        self.db.refresh(row)
+        return self.get_order_sales_channel(row.order_sales_channel_id)
 
     def get_status(self, status_id: int) -> Status | None:
         return self.db.query(Status).options(joinedload(Status.owner)).filter(Status.status_id == status_id).first()

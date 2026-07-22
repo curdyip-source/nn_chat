@@ -43,6 +43,14 @@ def _normalize_order_contact_method(value: str | None) -> str | None:
     return normalized
 
 
+def _normalize_order_sales_channel(value: str | None) -> str | None:
+    # Канал продаж — свободное значение из редактируемого справочника (order_sales_channels).
+    # Список меняется, поэтому не валидируем жёстко, только нормализуем текст (как order_sub_method).
+    if not value:
+        return None
+    return " ".join(value.replace("\xa0", " ").split()) or None
+
+
 def _order_item_identity(item: dict) -> str:
     # Идентичность позиции — по артикулу (он стабилен), иначе по названию. НЕ по
     # product_id: при федерации каталога товар переподвязывается и product_id меняется
@@ -69,6 +77,7 @@ ORDER_AUDIT_FIELDS = (
     "order_method_name",
     "order_sub_method",
     "order_contact_method",
+    "order_sales_channel",
     "order_customer",
     "order_info",
     "order_status_id",
@@ -360,6 +369,7 @@ class OrderService:
         if normalized_order_sub_method is not None and normalized_order_sub_method not in available_sub_methods:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Передан неизвестный подспособ заказа")
         normalized_order_contact_method = _normalize_order_contact_method(payload.order_contact_method)
+        normalized_order_sales_channel = _normalize_order_sales_channel(payload.order_sales_channel)
         status_row = get_status_or_404(self.db, payload.order_status_id, expected_type="orders") if payload.order_status_id else get_default_status_or_400(self.db, status_type="orders")
         default_currency = get_default_currency_or_400(self.db)
         default_item_status = get_default_status_or_400(self.db, status_type="order_products")
@@ -405,6 +415,7 @@ class OrderService:
                 "order_method_id": payload.order_method_id,
                 "order_sub_method": normalized_order_sub_method,
                 "order_contact_method": normalized_order_contact_method,
+                "order_sales_channel": normalized_order_sales_channel,
                 "order_customer": payload.order_customer,
                 "order_info": payload.order_info,
                 "order_status_id": status_row.status_id,
@@ -430,6 +441,7 @@ class OrderService:
                 order_method_id=payload.order_method_id,
                 order_sub_method=normalized_order_sub_method,
                 order_contact_method=normalized_order_contact_method,
+                order_sales_channel=normalized_order_sales_channel,
                 current_user=current_user,
             )
         message = self.message_repository.create(
@@ -484,6 +496,7 @@ class OrderService:
         if normalized_order_sub_method is not None and normalized_order_sub_method not in available_sub_methods:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Передан неизвестный подспособ заказа")
         normalized_order_contact_method = _normalize_order_contact_method(payload.order_contact_method)
+        normalized_order_sales_channel = _normalize_order_sales_channel(payload.order_sales_channel)
 
         status_row = get_status_or_404(self.db, payload.order_status_id, expected_type="orders")
         default_currency = get_default_currency_or_400(self.db)
@@ -530,6 +543,7 @@ class OrderService:
                 "order_method_id": payload.order_method_id,
                 "order_sub_method": normalized_order_sub_method,
                 "order_contact_method": normalized_order_contact_method,
+                "order_sales_channel": normalized_order_sales_channel,
                 "order_customer": payload.order_customer,
                 "order_info": payload.order_info,
                 "order_status_id": status_row.status_id,
@@ -839,6 +853,7 @@ class OrderService:
             order_method_id=order.order_method_id,
             order_sub_method=order.order_sub_method,
             order_contact_method=order.order_contact_method,
+            order_sales_channel=order.order_sales_channel,
             order_customer=order.order_customer,
             order_info=order.order_info,
             order_status_id=order.order_status_id,

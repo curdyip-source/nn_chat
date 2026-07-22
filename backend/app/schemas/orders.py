@@ -39,6 +39,7 @@ class OrderCreatePayload(BaseModel):
     order_method_id: int = Field(ge=1)
     order_sub_method: Optional[str] = Field(default=None, min_length=1, max_length=255)
     order_contact_method: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    order_sales_channel: Optional[str] = Field(default=None, min_length=1, max_length=50)
     order_customer: str = Field(min_length=1, max_length=255)
     order_info: str = Field(default="", max_length=4000)
     save_contact: bool = False
@@ -57,6 +58,7 @@ class OrderUpdatePayload(BaseModel):
     order_method_id: int = Field(ge=1)
     order_sub_method: Optional[str] = Field(default=None, min_length=1, max_length=255)
     order_contact_method: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    order_sales_channel: Optional[str] = Field(default=None, min_length=1, max_length=50)
     order_customer: str = Field(min_length=1, max_length=255)
     order_info: str = Field(default="", max_length=4000)
     order_status_id: int = Field(ge=1)

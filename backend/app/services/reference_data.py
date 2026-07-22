@@ -13,10 +13,10 @@ from app.core.audit_types import ENTITY_TYPE_PRODUCT, EVENT_TYPE_PRODUCT_CREATE,
 from app.models.reference_data import Product
 from app.repositories.reference_data import ProductRepository, ReferenceDataRepository
 from app.schemas.common import build_pagination, model_to_dict
-from app.schemas.reference_data import CurrencyPayload, EstablishmentPayload, OrderMethodPayload, ProductCreatePayload, ProductUpdatePayload, StatusPayload
+from app.schemas.reference_data import CurrencyPayload, EstablishmentPayload, OrderMethodPayload, OrderSalesChannelPayload, ProductCreatePayload, ProductUpdatePayload, StatusPayload
 from app.services.audit import log_audit_event
 from app.services.price_federation import hydrate_products_async, hydrate_products_for_names
-from app.services.serializers import serialize_currency, serialize_establishment, serialize_order_method, serialize_product, serialize_status
+from app.services.serializers import serialize_currency, serialize_establishment, serialize_order_method, serialize_order_sales_channel, serialize_product, serialize_status
 
 
 DEFAULT_ESTABLISHMENTS = [
@@ -31,6 +31,11 @@ DEFAULT_ORDER_METHODS = [
     {"order_method_name": "Яндекс"},
     {"order_method_name": "5Post"},
     {"order_method_name": "Авито", "order_method_sub_methods": ["Авито", "СДЭК", "Яндекс", "5Post", "Почта"]},
+]
+DEFAULT_ORDER_SALES_CHANNELS = [
+    {"order_sales_channel_name": "Розница"},
+    {"order_sales_channel_name": "Опт"},
+    {"order_sales_channel_name": "Дроп"},
 ]
 DEFAULT_STATUSES = [
     {"status_type": "orders", "status_status": "Новый", "status_color": "orange"},
@@ -322,6 +327,14 @@ class ReferenceDataService:
                 if existing_method.order_method_sub_methods != expected_sub_methods:
                     self.repository.update_row(existing_method, {"order_method_sub_methods": expected_sub_methods})
 
+            for item in DEFAULT_ORDER_SALES_CHANNELS:
+                channel_name = item["order_sales_channel_name"]
+                if self.repository.get_order_sales_channel_by_name(channel_name) is None:
+                    self._create_seed_row_safely(
+                        create_row=lambda: self.repository.create_order_sales_channel(item),
+                        fetch_row=lambda: self.repository.get_order_sales_channel_by_name(channel_name),
+                    )
+
             existing_statuses = {
                 ((item.status_type or "").strip(), (item.status_status or "").strip()): item
                 for item in self.repository.list_statuses()
@@ -382,6 +395,7 @@ class ReferenceDataService:
         return {
             "establishments": [serialize_establishment(item) for item in self.repository.list_establishments()],
             "order_methods": [serialize_order_method(item) for item in self.repository.list_order_methods()],
+            "sales_channels": [serialize_order_sales_channel(item) for item in self.repository.list_order_sales_channels()],
             "statuses": [serialize_status(item) for item in self.repository.list_statuses()],
             "currencies": [serialize_currency(item) for item in self.repository.list_currencies()],
         }
@@ -393,6 +407,10 @@ class ReferenceDataService:
     def list_order_methods(self) -> dict:
         self.ensure_seed_data()
         return {"items": [serialize_order_method(item) for item in self.repository.list_order_methods()]}
+
+    def list_order_sales_channels(self) -> dict:
+        self.ensure_seed_data()
+        return {"items": [serialize_order_sales_channel(item) for item in self.repository.list_order_sales_channels()]}
 
     def list_statuses(self, *, status_type: str | None = None) -> dict:
         self.ensure_seed_data()
@@ -409,6 +427,10 @@ class ReferenceDataService:
     def create_order_method(self, payload: OrderMethodPayload, current_user: dict) -> dict:
         row = self.repository.create_order_method({**model_to_dict(payload), "order_method_owner_user_id": current_user["user_id"]})
         return serialize_order_method(row)
+
+    def create_order_sales_channel(self, payload: OrderSalesChannelPayload, current_user: dict) -> dict:
+        row = self.repository.create_order_sales_channel({**model_to_dict(payload), "order_sales_channel_owner_user_id": current_user["user_id"]})
+        return serialize_order_sales_channel(row)
 
     def create_status(self, payload: StatusPayload, current_user: dict) -> dict:
         row = self.repository.create_status({**model_to_dict(payload), "status_owner_user_id": current_user["user_id"]})
@@ -429,6 +451,12 @@ class ReferenceDataService:
         if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Способ заказа не найден")
         return serialize_order_method(self.repository.update_row(row, model_to_dict(payload)))
+
+    def update_order_sales_channel(self, order_sales_channel_id: int, payload: OrderSalesChannelPayload) -> dict:
+        row = self.repository.get_order_sales_channel(order_sales_channel_id)
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Канал продаж не найден")
+        return serialize_order_sales_channel(self.repository.update_row(row, model_to_dict(payload)))
 
     def update_status(self, status_id: int, payload: StatusPayload) -> dict:
         row = self.repository.get_status(status_id)
@@ -566,6 +594,10 @@ def list_order_methods(db: Session) -> dict:
     return ReferenceDataService(db).list_order_methods()
 
 
+def list_order_sales_channels(db: Session) -> dict:
+    return ReferenceDataService(db).list_order_sales_channels()
+
+
 def list_statuses(db: Session, *, status_type: str | None = None) -> dict:
     return ReferenceDataService(db).list_statuses(status_type=status_type)
 
@@ -582,6 +614,10 @@ def create_order_method(db: Session, payload: OrderMethodPayload, current_user: 
     return ReferenceDataService(db).create_order_method(payload, current_user)
 
 
+def create_order_sales_channel(db: Session, payload: OrderSalesChannelPayload, current_user: dict) -> dict:
+    return ReferenceDataService(db).create_order_sales_channel(payload, current_user)
+
+
 def create_status(db: Session, payload: StatusPayload, current_user: dict) -> dict:
     return ReferenceDataService(db).create_status(payload, current_user)
 
@@ -596,6 +632,10 @@ def update_establishment(db: Session, establishment_id: int, payload: Establishm
 
 def update_order_method(db: Session, order_method_id: int, payload: OrderMethodPayload) -> dict:
     return ReferenceDataService(db).update_order_method(order_method_id, payload)
+
+
+def update_order_sales_channel(db: Session, order_sales_channel_id: int, payload: OrderSalesChannelPayload) -> dict:
+    return ReferenceDataService(db).update_order_sales_channel(order_sales_channel_id, payload)
 
 
 def update_status(db: Session, status_id: int, payload: StatusPayload) -> dict:

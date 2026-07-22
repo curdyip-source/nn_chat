@@ -44,6 +44,16 @@ class OrderMethod(Base):
     contacts = relationship("Contact", back_populates="order_method")
 
 
+class OrderSalesChannel(Base):
+    __tablename__ = "order_sales_channels"
+    __table_args__ = (UniqueConstraint("order_sales_channel_name", name="uq_order_sales_channels_name"),)
+
+    order_sales_channel_id: Mapped[int] = mapped_column(SQL_ID_TYPE, primary_key=True, index=True)
+    order_sales_channel_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    order_sales_channel_owner_user_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True, index=True)
+    order_sales_channel_created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+
 class Status(Base):
     __tablename__ = "statuses"
     __table_args__ = (UniqueConstraint("status_type", "status_status", name="uq_statuses_type_name"),)

@@ -17,6 +17,9 @@ class Order(Base):
     order_method_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("order_methods.order_method_id", ondelete="RESTRICT"), nullable=False, index=True)
     order_sub_method: Mapped[str | None] = mapped_column(String(255), nullable=True)
     order_contact_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Канал продаж (Розница/Опт/Дроп) — значение из редактируемого справочника
+    # order_sales_channels, хранится строкой как order_sub_method.
+    order_sales_channel: Mapped[str | None] = mapped_column(String(50), nullable=True)
     order_customer: Mapped[str] = mapped_column(String(255), nullable=False)
     order_info: Mapped[str] = mapped_column(Text, nullable=False)
     order_status_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("statuses.status_id", ondelete="RESTRICT"), nullable=False, index=True)

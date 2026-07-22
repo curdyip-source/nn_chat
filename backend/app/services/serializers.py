@@ -127,6 +127,15 @@ def serialize_order_method(row) -> dict:
     }
 
 
+def serialize_order_sales_channel(row) -> dict:
+    return {
+        "order_sales_channel_id": row.order_sales_channel_id,
+        "order_sales_channel_name": row.order_sales_channel_name,
+        "order_sales_channel_owner_user_id": row.order_sales_channel_owner_user_id,
+        "order_sales_channel_created_at": serialize_datetime(row.order_sales_channel_created_at),
+    }
+
+
 def serialize_status(row) -> dict:
     owner = getattr(row, "owner", None)
     return {
@@ -180,6 +189,7 @@ def serialize_contact(row) -> dict:
         "contact_order_method_name": order_method.order_method_name if order_method else None,
         "contact_order_sub_method": row.contact_order_sub_method,
         "contact_contact_method": row.contact_contact_method,
+        "contact_sales_channel": row.contact_sales_channel,
         "contact_owner_user_id": row.contact_owner_user_id,
         "contact_owner_user_login": owner.user_login if owner else None,
         "contact_created_at": serialize_datetime(row.contact_created_at),
@@ -258,6 +268,7 @@ def serialize_order(row) -> dict:
         "order_method_name": order_method.order_method_name if order_method else None,
         "order_sub_method": row.order_sub_method,
         "order_contact_method": row.order_contact_method,
+        "order_sales_channel": row.order_sales_channel,
         "order_customer": row.order_customer,
         "order_info": row.order_info,
         "order_status_id": row.order_status_id,
