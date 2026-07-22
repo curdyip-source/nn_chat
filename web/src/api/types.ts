@@ -77,6 +77,8 @@ export type ReferenceData = {
   sales_channels: SalesChannel[]
   statuses: Status[]
   currencies: Currency[]
+  // Минимальный допустимый билд iOS (гейт форс-апдейта). 0 = выключен.
+  min_supported_ios_build: number
 }
 
 export type Product = {

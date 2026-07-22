@@ -18,6 +18,11 @@ class OrderSalesChannelPayload(BaseModel):
     order_sales_channel_name: str = Field(min_length=1, max_length=255)
 
 
+class AppSettingsPayload(BaseModel):
+    # Минимальный допустимый билд iOS. 0 = гейт выключен.
+    min_supported_ios_build: int = Field(ge=0, le=100000)
+
+
 class StatusPayload(BaseModel):
     status_type: str = Field(min_length=1, max_length=100)
     status_status: str = Field(min_length=1, max_length=255)

@@ -17,6 +17,7 @@ const empty: ReferenceData = {
   sales_channels: [],
   statuses: [],
   currencies: [],
+  min_supported_ios_build: 0,
 }
 
 const RefCtx = createContext<RefState | null>(null)

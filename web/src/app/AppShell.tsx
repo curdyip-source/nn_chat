@@ -11,6 +11,7 @@ import { OrdersPage } from '../features/orders/OrdersPage'
 import { ProductsPage } from '../features/products/ProductsPage'
 import { ReferencePage } from '../features/reference/ReferencePage'
 import { UsersPage } from '../features/users/UsersPage'
+import { AdminPage } from '../features/admin/AdminPage'
 import PriceSection from '../features/price/PriceSection.jsx'
 import logoUrl from '../assets/general-title-logo.png'
 import styles from './AppShell.module.css'
@@ -36,6 +37,7 @@ const SECTIONS: Section[] = [
   { key: 'audit', label: 'Аудит', icon: '📜', render: () => <AuditPage />, ready: true, adminOnly: true },
   { key: 'chat', label: 'Чат', icon: '💬', render: () => <ChatPage />, ready: true },
   { key: 'price', label: 'Прайс', icon: '💲', render: () => <PriceSection />, ready: true },
+  { key: 'admin', label: 'Админка', icon: '🛠️', render: () => <AdminPage />, ready: true, adminOnly: true },
 ]
 
 export function AppShell() {

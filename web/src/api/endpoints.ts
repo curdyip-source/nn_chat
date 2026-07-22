@@ -91,6 +91,10 @@ export function saveSalesChannel(id: number | null, body: { order_sales_channel_
   )
 }
 
+export function saveAppSettings(body: { min_supported_ios_build: number }) {
+  return apiRequest<{ min_supported_ios_build: number }>('/app-settings', { method: 'PUT', body })
+}
+
 export function saveStatus(
   id: number | null,
   body: { status_type: string; status_status: string; status_color?: string | null },

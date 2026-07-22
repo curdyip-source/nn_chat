@@ -1,3 +1,4 @@
+from app.models.app_settings import AppSetting
 from app.models.audit_events import AuditEvent
 from app.models.contacts import Contact
 from app.models.documents import Document
@@ -15,6 +16,7 @@ from app.models.user_establishment_roles import UserEstablishmentRole
 from app.models.users import User
 
 __all__ = [
+	"AppSetting",
 	"User",
 	"UserSession",
 	"Document",

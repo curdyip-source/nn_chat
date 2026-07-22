@@ -392,12 +392,14 @@ class ReferenceDataService:
 
     def get_reference_data(self) -> dict:
         self.ensure_seed_data()
+        from app.services.app_settings import get_min_supported_ios_build
         return {
             "establishments": [serialize_establishment(item) for item in self.repository.list_establishments()],
             "order_methods": [serialize_order_method(item) for item in self.repository.list_order_methods()],
             "sales_channels": [serialize_order_sales_channel(item) for item in self.repository.list_order_sales_channels()],
             "statuses": [serialize_status(item) for item in self.repository.list_statuses()],
             "currencies": [serialize_currency(item) for item in self.repository.list_currencies()],
+            "min_supported_ios_build": get_min_supported_ios_build(self.db),
         }
 
     def list_establishments(self) -> dict:

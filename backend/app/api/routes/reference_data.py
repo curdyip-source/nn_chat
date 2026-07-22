@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_admin
-from app.schemas.reference_data import CurrencyPayload, EstablishmentPayload, OrderMethodPayload, OrderSalesChannelPayload, StatusPayload
+from app.schemas.reference_data import AppSettingsPayload, CurrencyPayload, EstablishmentPayload, OrderMethodPayload, OrderSalesChannelPayload, StatusPayload
+from app.services.app_settings import get_min_supported_ios_build, set_min_supported_ios_build
 from app.services.reference_data import (
     create_currency,
     create_establishment,
@@ -29,6 +30,16 @@ router = APIRouter(tags=["reference-data"])
 @router.get("/reference-data")
 def get_reference_data_route(_: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     return get_reference_data(db)
+
+
+@router.get("/app-settings")
+def get_app_settings_route(_: dict = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    return {"min_supported_ios_build": get_min_supported_ios_build(db)}
+
+
+@router.put("/app-settings")
+def update_app_settings_route(payload: AppSettingsPayload, _: dict = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    return {"min_supported_ios_build": set_min_supported_ios_build(db, payload.min_supported_ios_build)}
 
 
 @router.get("/establishments")
