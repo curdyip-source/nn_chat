@@ -12,11 +12,12 @@ import { AddItemModal } from './AddItemModal'
 import { CdekWaybillModal } from './CdekWaybillModal'
 import { newUid } from './cart'
 import { ItemStatusExtraModal } from './ItemStatusExtraModal'
+import { OrderCancelConfirm } from './OrderCancelConfirm'
 import { showsMovement, showsSupplier, statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
 import { OrderChat } from './OrderChat'
 import { OrderHistory } from './OrderHistory'
 import { useOrderSelection, type BulkApplyFn, type BulkCollectFn, type BulkRemoveFn } from './orderSelection'
-import { orderToUpdate } from './orderUpdate'
+import { orderToCancelAll, orderToUpdate } from './orderUpdate'
 import styles from './OrdersTable.module.css'
 
 type ItemDraft = {
@@ -328,10 +329,37 @@ function OrderRow({
     void persist({ drafts: next })
   }
 
-  const changeStatus = (statusId: number) => {
+  const cancelledItemStatusId = itemStatusOptions.find((o) => o.label === 'Отменен')?.id ?? null
+  const [pendingCancel, setPendingCancel] = useState<{ statusId: number } | null>(null)
+
+  const doStatusChange = (statusId: number) => {
     void updateOrderStatus(order.order_id, statusId)
       .then((r) => onOrderPatched(r.item))
       .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось сменить статус'))
+  }
+
+  const changeStatus = (statusId: number) => {
+    const label = orderStatusOptions.find((o) => o.id === statusId)?.label
+    const hasNonCancelled = order.items.some((it) => it.order_item_status !== 'Отменен')
+    // При переводе в «Отменен» с товарами не в «Отменен» — спрашиваем про товары.
+    if (label === 'Отменен' && hasNonCancelled) {
+      setPendingCancel({ statusId })
+      return
+    }
+    doStatusChange(statusId)
+  }
+
+  const applyCancel = (cancelItems: boolean) => {
+    const statusId = pendingCancel?.statusId
+    setPendingCancel(null)
+    if (statusId == null) return
+    if (!cancelItems || cancelledItemStatusId == null) {
+      doStatusChange(statusId)
+      return
+    }
+    void updateOrder(order.order_id, orderToCancelAll(order, statusId, cancelledItemStatusId))
+      .then((r) => onOrderPatched(r.item))
+      .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось отменить заказ'))
   }
 
   const saveCustomer = () => {
@@ -530,6 +558,13 @@ function OrderRow({
       )}
 
       <AddItemModal open={addOpen} onClose={() => setAddOpen(false)} onAdd={addProduct} />
+
+      <OrderCancelConfirm
+        open={pendingCancel != null}
+        onDismiss={() => setPendingCancel(null)}
+        onKeepItems={() => applyCancel(false)}
+        onCancelAll={() => applyCancel(true)}
+      />
 
       {cdekOpen && (
         <CdekWaybillModal

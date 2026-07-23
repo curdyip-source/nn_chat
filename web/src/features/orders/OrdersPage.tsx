@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { deleteOrder, listOrders, updateOrderStatus, type OrderTotal } from '../../api/endpoints'
+import { deleteOrder, listOrders, updateOrder, updateOrderStatus, type OrderTotal } from '../../api/endpoints'
 import type { Order } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { useRealtime } from '../../data/RealtimeContext'
@@ -12,6 +12,8 @@ import { Switch } from '../../ui/Switch'
 import { useDebouncedValue } from '../../ui/useDebouncedValue'
 import { formatAmount } from '../../lib/format'
 import { ItemStatusExtraModal } from './ItemStatusExtraModal'
+import { OrderCancelConfirm } from './OrderCancelConfirm'
+import { orderToCancelAll } from './orderUpdate'
 import { statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
 import { OrderSelectionContext, type BulkApplyFn, type BulkCollectFn, type BulkItemInfo, type BulkRemoveFn, type OrderSelection } from './orderSelection'
 import { OrderCreate } from './OrderCreate'
@@ -168,10 +170,39 @@ export function OrdersPage() {
     setActionMenuOpen(false)
   }
 
+  const cancelledItemStatusId = itemStatusOptions.find((o) => o.label === 'Отменен')?.id ?? null
+  const [pendingBulkCancel, setPendingBulkCancel] = useState<{ statusId: number; ids: number[] } | null>(null)
+
   const onBulkOrderStatus = async (statusId: number) => {
     const ids = [...selectedOrders]
+    const label = orderStatusOptions.find((o) => o.id === statusId)?.label
+    const anyHasNonCancelled = ids.some((id) => {
+      const o = orders.find((x) => x.order_id === id)
+      return o ? o.items.some((it) => it.order_item_status !== 'Отменен') : false
+    })
+    if (label === 'Отменен' && anyHasNonCancelled) {
+      setPendingBulkCancel({ statusId, ids })
+      return
+    }
     setSelectedOrders(new Set())
     await Promise.all(ids.map((id) => updateOrderStatus(id, statusId).catch(() => {})))
+    reload()
+  }
+
+  const applyBulkCancel = async (cancelItems: boolean) => {
+    const pending = pendingBulkCancel
+    setPendingBulkCancel(null)
+    if (!pending) return
+    setSelectedOrders(new Set())
+    await Promise.all(
+      pending.ids.map((id) => {
+        const order = orders.find((x) => x.order_id === id)
+        if (cancelItems && cancelledItemStatusId != null && order) {
+          return updateOrder(id, orderToCancelAll(order, pending.statusId, cancelledItemStatusId)).catch(() => {})
+        }
+        return updateOrderStatus(id, pending.statusId).catch(() => {})
+      }),
+    )
     reload()
   }
 
@@ -499,6 +530,14 @@ export function OrdersPage() {
           Удалить можно только свои заказы; чужие вправе удалять лишь администратор.
         </p>
       </Modal>
+
+      <OrderCancelConfirm
+        open={pendingBulkCancel != null}
+        note={pendingBulkCancel ? `Заказов: ${pendingBulkCancel.ids.length}.` : undefined}
+        onDismiss={() => setPendingBulkCancel(null)}
+        onKeepItems={() => void applyBulkCancel(false)}
+        onCancelAll={() => void applyBulkCancel(true)}
+      />
     </div>
   )
 }
