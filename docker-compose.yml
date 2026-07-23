@@ -52,6 +52,11 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+    # default — своя БД; shared — достучаться до прайс-бэкенда nn_vla (алиас
+    # price-backend) для федерации CL и живого поиска по прайс-листам.
+    networks:
+      - default
+      - shared
 
   web:
     build: ./web

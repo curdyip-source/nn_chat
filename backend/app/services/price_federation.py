@@ -57,6 +57,38 @@ def _service_token() -> str:
     return token
 
 
+def proxy_search_all(query: str, emails: list[str] | None, limit: int = 50) -> dict:
+    """Прокси живого поиска по прайс-листам nn_vla (все источники: CL + поставщики).
+
+    ``emails`` — фильтр источников («CL» и/или email-ы поставщиков); None/пусто = все.
+    Поиск идёт напрямую в nn_vla (там все прайсы поставщиков), не по CL-зеркалу.
+    """
+    if not PRICE_BACKEND_URL:
+        return {"query": query or "", "normalized": "", "count": 0, "results": []}
+    params: dict = {"q": query or "", "limit": limit}
+    if emails:
+        params["emails"] = emails
+    response = _get_client().get(
+        f"{PRICE_BACKEND_URL}/api/search/all",
+        params=params,
+        headers={"Authorization": f"Bearer {_service_token()}"},
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def proxy_suppliers() -> list[dict]:
+    """Прокси списка активных поставщиков (только свежие прайсы) из nn_vla."""
+    if not PRICE_BACKEND_URL:
+        return []
+    response = _get_client().get(
+        f"{PRICE_BACKEND_URL}/api/match/suppliers",
+        headers={"Authorization": f"Bearer {_service_token()}"},
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 def _to_cost(value) -> Decimal:
     if value is None:
         return Decimal("0")

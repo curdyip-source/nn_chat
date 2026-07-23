@@ -16,6 +16,7 @@ from app.api.routes.message_attachments import router as message_attachments_rou
 from app.api.routes.media import router as media_router
 from app.api.routes.messages import router as messages_router
 from app.api.routes.orders import router as orders_router
+from app.api.routes.price import router as price_router
 from app.api.routes.product_registrations import router as product_registrations_router
 from app.api.routes.products import router as products_router
 from app.api.routes.reference_data import router as reference_data_router
@@ -96,6 +97,7 @@ def create_app() -> FastAPI:
     api_v1_router.include_router(message_attachments_router)
     api_v1_router.include_router(messages_router)
     api_v1_router.include_router(orders_router)
+    api_v1_router.include_router(price_router)
     api_v1_router.include_router(inventories_router)
     api_v1_router.include_router(product_registrations_router)
     api_v1_router.include_router(user_devices_router)
