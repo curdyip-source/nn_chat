@@ -25,9 +25,10 @@ def price_search_route(
     q: str = Query(default=""),
     emails: list[str] = Query(default=[], description="Источники: CL и/или email; пусто = все"),
     limit: int = Query(default=50, ge=1, le=200),
+    strict: bool = Query(default=False, description="Точный режим: все токены запроса в наименовании"),
     _: dict = Depends(get_current_user),
 ) -> dict:
     try:
-        return proxy_search_all(q, emails or None, limit)
+        return proxy_search_all(q, emails or None, limit, strict=strict)
     except Exception:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Прайс недоступен")

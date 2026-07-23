@@ -57,11 +57,16 @@ def _service_token() -> str:
     return token
 
 
-def proxy_search_all(query: str, emails: list[str] | None, limit: int = 50) -> dict:
+def proxy_search_all(query: str, emails: list[str] | None, limit: int = 50, strict: bool = False) -> dict:
     """Прокси живого поиска по прайс-листам nn_vla (все источники: CL + поставщики).
 
     ``emails`` — фильтр источников («CL» и/или email-ы поставщиков); None/пусто = все.
     Поиск идёт напрямую в nn_vla (там все прайсы поставщиков), не по CL-зеркалу.
+
+    ``strict`` — точный режим (как поиск товара при создании заказа): из широкой
+    выдачи nn_vla оставляем только строки, где КАЖДЫЙ токен запроса встречается
+    подстрокой в наименовании/артикуле. Оба режима ищут по всем прайс-листам —
+    разница только в механике отбора (широкий по близости vs точный по токенам).
     """
     if not PRICE_BACKEND_URL:
         return {"query": query or "", "normalized": "", "count": 0, "results": []}
@@ -74,7 +79,20 @@ def proxy_search_all(query: str, emails: list[str] | None, limit: int = 50) -> d
         headers={"Authorization": f"Bearer {_service_token()}"},
     )
     response.raise_for_status()
-    return response.json()
+    data = response.json()
+
+    if strict:
+        tokens = [t for t in (query or "").lower().split() if t]
+        results = data.get("results", [])
+        if tokens:
+            results = [
+                r for r in results
+                if all(t in ((r.get("name") or "") + " " + (r.get("code") or "")).lower() for t in tokens)
+            ]
+        data["results"] = results
+        data["count"] = len(results)
+
+    return data
 
 
 def proxy_suppliers() -> list[dict]:
