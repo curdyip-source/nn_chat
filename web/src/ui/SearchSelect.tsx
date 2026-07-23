@@ -24,6 +24,12 @@ type Props<T> = {
    * вызывается этот колбэк со списком строк (например, для массового добавления товаров).
    */
   onBulkPaste?: (lines: string[]) => void
+  /**
+   * Если задан — у каждой строки результата появляется кнопка «подставить в поиск»:
+   * текст поля заменяется на возвращённое значение (полное наименование), чтобы его
+   * доредактировать и создать вариант, не перепечатывая. Выбор товара при этом не срабатывает.
+   */
+  itemFillText?: (item: T) => string
 }
 
 export function SearchSelect<T>({
@@ -39,6 +45,7 @@ export function SearchSelect<T>({
   renderEmptyAction,
   autoFocus,
   onBulkPaste,
+  itemFillText,
 }: Props<T>) {
   const controlled = value !== undefined
   const [internalQuery, setInternalQuery] = useState('')
@@ -54,6 +61,7 @@ export function SearchSelect<T>({
   // заново запускать поиск — иначе окно с результатами всплывает само собой.
   const typingRef = useRef(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!typingRef.current) return
@@ -111,6 +119,7 @@ export function SearchSelect<T>({
   return (
     <div className={styles.root} ref={rootRef}>
       <input
+        ref={inputRef}
         className={styles.input}
         value={query}
         placeholder={placeholder}
@@ -139,16 +148,37 @@ export function SearchSelect<T>({
       {loading && <span className={styles.loader} />}
       {showDropdown && (
         <div className={styles.dropdown}>
-          {items.map((item) => (
-            <button
-              key={getKey(item)}
-              type="button"
-              className={styles.option}
-              onClick={() => handleSelect(item)}
-            >
-              {renderItem(item)}
-            </button>
-          ))}
+          {items.map((item) =>
+            itemFillText ? (
+              <div key={getKey(item)} className={styles.row}>
+                <button type="button" className={styles.option} onClick={() => handleSelect(item)}>
+                  {renderItem(item)}
+                </button>
+                <button
+                  type="button"
+                  className={styles.fillBtn}
+                  title="Подставить название в поиск — чтобы доредактировать и создать вариант"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    typingRef.current = true
+                    setQuery(itemFillText(item))
+                    inputRef.current?.focus()
+                  }}
+                >
+                  ✎
+                </button>
+              </div>
+            ) : (
+              <button
+                key={getKey(item)}
+                type="button"
+                className={styles.option}
+                onClick={() => handleSelect(item)}
+              >
+                {renderItem(item)}
+              </button>
+            ),
+          )}
           {showEmpty && (
             <div className={styles.empty}>
               {renderEmptyAction ? renderEmptyAction(query.trim()) : 'Ничего не найдено'}

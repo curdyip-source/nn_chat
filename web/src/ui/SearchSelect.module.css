@@ -68,6 +68,29 @@
   background: var(--surface-2);
 }
 
+.row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+.row .option {
+  flex: 1;
+  min-width: 0;
+}
+.fillBtn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.fillBtn:hover {
+  color: var(--text);
+}
+
 .empty {
   padding: 12px;
   color: var(--text-dim);

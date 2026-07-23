@@ -482,6 +482,7 @@ export function OrderCreate({
                   </span>
                 )}
                 onSelect={addProduct}
+                itemFillText={(p) => p.product_name}
                 onBulkPaste={addFromPastedList}
                 renderEmptyAction={(q) => (
                   <button className={styles.createLink} onClick={() => setCreateProductName(q)}>
