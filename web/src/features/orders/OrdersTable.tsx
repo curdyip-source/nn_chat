@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { cdekDeleteWaybill, cdekWaybillStatus, updateOrder, updateOrderStatus } from '../../api/endpoints'
+import { cdekDeleteWaybill, cdekWaybillStatus, splitOrder, updateOrder, updateOrderStatus } from '../../api/endpoints'
 import type { Order, OrderUpdateItem, Product } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
@@ -13,11 +13,12 @@ import { CdekWaybillModal } from './CdekWaybillModal'
 import { newUid } from './cart'
 import { ItemStatusExtraModal } from './ItemStatusExtraModal'
 import { OrderCancelConfirm } from './OrderCancelConfirm'
+import { OrderSplitConfirm } from './OrderSplitConfirm'
 import { showsMovement, showsSupplier, statusExtraMode, type ExtraMode, type ItemExtra } from './itemStatusExtra'
 import { OrderChat } from './OrderChat'
 import { OrderHistory } from './OrderHistory'
 import { useOrderSelection, type BulkApplyFn, type BulkCollectFn, type BulkRemoveFn } from './orderSelection'
-import { orderToCancelAll, orderToUpdate } from './orderUpdate'
+import { orderToAssembly, orderToCancelAll, orderToUpdate } from './orderUpdate'
 import styles from './OrdersTable.module.css'
 
 type ItemDraft = {
@@ -338,15 +339,43 @@ function OrderRow({
       .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось сменить статус'))
   }
 
+  const [pendingSplit, setPendingSplit] = useState<{ statusId: number } | null>(null)
+  const COLLECTABLE = ['В наличии', 'Собрано']
+  const ASSEMBLY_READY = ['В наличии', 'Собрано', 'Отменен', 'Не будет']
+
   const changeStatus = (statusId: number) => {
     const label = orderStatusOptions.find((o) => o.id === statusId)?.label
-    const hasNonCancelled = order.items.some((it) => it.order_item_status !== 'Отменен')
     // При переводе в «Отменен» с товарами не в «Отменен» — спрашиваем про товары.
-    if (label === 'Отменен' && hasNonCancelled) {
+    if (label === 'Отменен' && order.items.some((it) => it.order_item_status !== 'Отменен')) {
       setPendingCancel({ statusId })
       return
     }
+    // «На сборку»: смешанный заказ → сплит, всё готово → перевод с конверсией «Не будет».
+    if (label === 'На сборку') {
+      const names = order.items.map((it) => it.order_item_status ?? '')
+      const hasCollectable = names.some((n) => COLLECTABLE.includes(n))
+      const hasPending = names.some((n) => !ASSEMBLY_READY.includes(n))
+      if (!hasCollectable) {
+        setError('Нет товаров «В наличии»/«Собрано» для сборки')
+        return
+      }
+      if (hasPending) {
+        setPendingSplit({ statusId })
+        return
+      }
+      void updateOrder(order.order_id, orderToAssembly(order, statusId, cancelledItemStatusId))
+        .then((r) => onOrderPatched(r.item))
+        .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось перевести на сборку'))
+      return
+    }
     doStatusChange(statusId)
+  }
+
+  const applySplit = () => {
+    setPendingSplit(null)
+    void splitOrder(order.order_id)
+      .then((r) => onOrderPatched(r.order)) // новый заказ подтянется по realtime
+      .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось разделить заказ'))
   }
 
   const applyCancel = (cancelItems: boolean) => {
@@ -564,6 +593,12 @@ function OrderRow({
         onDismiss={() => setPendingCancel(null)}
         onKeepItems={() => applyCancel(false)}
         onCancelAll={() => applyCancel(true)}
+      />
+
+      <OrderSplitConfirm
+        open={pendingSplit != null}
+        onDismiss={() => setPendingSplit(null)}
+        onSplit={applySplit}
       />
 
       {cdekOpen && (

@@ -250,6 +250,12 @@ export function updateOrder(orderId: number, payload: OrderUpdate) {
   return apiRequest<{ item: Order }>(`/orders/${orderId}`, { method: 'PUT', body: payload })
 }
 
+/** Частичная отгрузка: «В наличии»/«Собрано» остаются и заказ → «На сборку»,
+ *  остальное уходит в новый заказ-дубль. Возвращает оба заказа. */
+export function splitOrder(orderId: number) {
+  return apiRequest<{ order: Order; new_order: Order }>(`/orders/${orderId}/split`, { method: 'POST' })
+}
+
 // ---------- Chat ----------
 
 export function listMessages(opts: { beforeMessageId?: number; pageSize?: number } = {}) {
