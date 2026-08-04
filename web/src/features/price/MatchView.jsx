@@ -197,12 +197,25 @@ export default function MatchView() {
         }
       });
 
-  // Грузим все позиции задания; вкладки/фильтр источников считаем на клиенте —
-  // «решено» зависит от выбранных источников, серверный статус тут не годится.
-  const loadItems = (id) =>
-    priceFetch(`/api/match/jobs/${id}/items?limit=200`)
-      .then((r) => r.json())
-      .then(setItems);
+  // Грузим ВСЕ позиции задания страницами: бэкенд отдаёт максимум 200 за раз, а
+  // в задании бывает больше — недогруженный хвост давал нерешённые строки,
+  // которые видит счётчик прогресса (он считает по всем), но не видят вкладки.
+  // Вкладки/фильтр источников считаем на клиенте — «решено» зависит от
+  // выбранных источников, серверный статус тут не годится.
+  const PAGE = 200;
+  const loadItems = async (id) => {
+    const all = [];
+    for (let offset = 0; ; offset += PAGE) {
+      const r = await priceFetch(
+        `/api/match/jobs/${id}/items?limit=${PAGE}&offset=${offset}`
+      );
+      const page = await r.json();
+      if (!Array.isArray(page)) break;
+      all.push(...page);
+      if (page.length < PAGE) break;
+    }
+    setItems(all);
+  };
 
   const changeFilter = (st) => setFilter(st);
 
@@ -260,7 +273,10 @@ export default function MatchView() {
       a.email === "CL" ? -1 : b.email === "CL" ? 1 : a.email.localeCompare(b.email)
     );
   };
-  // Лучшее предложение поставщика (мин. цена) — CL в picks не лежит, не учитывается.
+  // Лучшее предложение (мин. цена) среди источников позиции — CL участвует
+  // наравне с поставщиками (он лежит в picks под ключом "CL" и всегда актуален).
+  // Цена здесь из снимка picks — для карточки этого хватает; в выгрузку цены
+  // идут живыми из БД (см. backend matching.result_rows).
   const bestPick = (picks) => {
     let best = null;
     for (const p of Object.values(picks || {})) {
