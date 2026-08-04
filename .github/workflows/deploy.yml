@@ -96,6 +96,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build-and-push
+    permissions:
+      contents: read
+      packages: read  # для docker login на сервере эфемерным GITHUB_TOKEN
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -131,6 +134,9 @@ jobs:
           scp -i ~/.ssh/id_ed25519 -o BatchMode=yes -P '${{ secrets.VPS_PORT }}' -r ops '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_ROOT }}/'
 
       - name: Deploy on VPS
+        # Логин в GHCR — эфемерным GITHUB_TOKEN выката, а не постоянным PAT
+        # (GHCR_TOKEN протух → "denied: denied" на docker login). Тот же приём,
+        # что в nn_price: токен живёт один прогон, продлевать нечего.
         run: |
           ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -p '${{ secrets.VPS_PORT }}' '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}' "cd ${{ env.DEPLOY_ROOT }} && \
             chmod +x ops/*.sh && \
@@ -139,5 +145,5 @@ jobs:
             else \
               printf '\\nRELEASE_TAG=${{ needs.build-and-push.outputs.release_tag }}\\n' >> .env; \
             fi && \
-            echo '${{ secrets.GHCR_TOKEN }}' | docker login ghcr.io -u '${{ secrets.GHCR_USERNAME }}' --password-stdin && \
+            echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin && \
             bash ./ops/release_deploy.sh .env '${{ needs.build-and-push.outputs.release_tag }}'"
