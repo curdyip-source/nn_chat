@@ -1682,3 +1682,66 @@ def test_order_payment_forbidden_without_edit_rights(client, integration_db_sess
         json={"order_paid": True},
     )
     assert forbidden.status_code in (403, 404)
+
+
+def test_order_can_be_created_without_order_method(client, integration_db_session, integration_user, integration_admin):
+    # Заказ с сайта приходит без способа заказа — менеджер выбирает его сам.
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    login(client, "admin", "AdminPass123")
+    user_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, user_token)
+
+    reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
+    establishment_id = reference_payload["establishments"][0]["establishment_id"]
+    order_method_id = reference_payload["order_methods"][0]["order_method_id"]
+
+    created = client.post(
+        f"{API_PREFIX}/orders",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_customer": "Степан",
+            "items": [{"product_article": "NM-001", "product_name": "No Method", "order_item_quantity": 1, "order_item_price": "10.00"}],
+        },
+    )
+    assert created.status_code == 201, created.text
+    item = created.json()["item"]
+    order_id = item["order_id"]
+    assert item["order_method_id"] is None
+    assert item["order_method_name"] is None
+
+    # Заказ без способа виден в списке и открывается.
+    listed = client.get(f"{API_PREFIX}/orders", headers={"Authorization": f"Bearer {user_token}"}).json()["items"]
+    assert next(row for row in listed if row["order_id"] == order_id)["order_method_id"] is None
+    assert client.get(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {user_token}"}).status_code == 200
+
+    # Подспособ без способа — ошибка.
+    bad = client.post(
+        f"{API_PREFIX}/orders",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_sub_method": "СДЭК",
+            "order_customer": "Степан",
+            "items": [{"product_article": "NM-002", "product_name": "Sub Only", "order_item_quantity": 1, "order_item_price": "10.00"}],
+        },
+    )
+    assert bad.status_code == 400
+
+    # Менеджер выбирает способ — заказ обновляется.
+    status_id = next(row["status_id"] for row in reference_payload["statuses"] if row["status_type"] == "orders")
+    updated = client.put(
+        f"{API_PREFIX}/orders/{order_id}",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_customer": "Степан",
+            "order_status_id": status_id,
+            "items": [{"product_article": "NM-001", "product_name": "No Method", "order_item_quantity": 1, "order_item_price": "10.00"}],
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["item"]["order_method_id"] == order_method_id

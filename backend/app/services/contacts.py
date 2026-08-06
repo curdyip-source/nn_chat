@@ -56,7 +56,7 @@ def create_or_get_contact(db: Session, *, contact_type: str, contact_name: str, 
     return serialize_contact(repository.create(data))
 
 
-def save_buyer_contact_from_order(db: Session, *, order_customer: str, order_info: str | None, order_establishment_id: int, order_method_id: int, order_sub_method: str | None, order_contact_method: str | None = None, order_sales_channel: str | None = None, current_user: dict) -> dict | None:
+def save_buyer_contact_from_order(db: Session, *, order_customer: str, order_info: str | None, order_establishment_id: int, order_method_id: int | None, order_sub_method: str | None, order_contact_method: str | None = None, order_sales_channel: str | None = None, current_user: dict) -> dict | None:
     return create_or_get_contact(
         db,
         contact_type="buyer",

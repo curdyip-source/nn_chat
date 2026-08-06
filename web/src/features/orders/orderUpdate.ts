@@ -78,7 +78,7 @@ export function orderToUpdate(
 ): OrderUpdate {
   return {
     order_establishment_id: order.order_establishment_id!,
-    order_method_id: order.order_method_id!,
+    order_method_id: order.order_method_id ?? null,
     order_sub_method: order.order_sub_method ?? null,
     order_contact_method: order.order_contact_method ?? null,
     order_sales_channel: order.order_sales_channel ?? null,

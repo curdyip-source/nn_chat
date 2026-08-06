@@ -369,13 +369,19 @@ class OrderService:
         get_establishment_or_404(self.db, payload.order_establishment_id)
         if not can_create_on_establishment(self.db, current_user, payload.order_establishment_id):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для создания заказа на этом складе")
-        order_method_row = get_order_method_or_404(self.db, payload.order_method_id)
-        available_sub_methods = order_method_row.order_method_sub_methods or []
+        # Способ заказа необязателен (заказ с сайта приходит без него) — проверяем
+        # его и подспособ только если он выбран.
         normalized_order_sub_method = payload.order_sub_method.strip() if payload.order_sub_method else None
-        if not available_sub_methods and normalized_order_sub_method is not None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Для выбранного способа заказа подспособ не поддерживается")
-        if normalized_order_sub_method is not None and normalized_order_sub_method not in available_sub_methods:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Передан неизвестный подспособ заказа")
+        if payload.order_method_id is None:
+            if normalized_order_sub_method is not None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Подспособ без способа заказа не бывает")
+        else:
+            order_method_row = get_order_method_or_404(self.db, payload.order_method_id)
+            available_sub_methods = order_method_row.order_method_sub_methods or []
+            if not available_sub_methods and normalized_order_sub_method is not None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Для выбранного способа заказа подспособ не поддерживается")
+            if normalized_order_sub_method is not None and normalized_order_sub_method not in available_sub_methods:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Передан неизвестный подспособ заказа")
         normalized_order_contact_method = _normalize_order_contact_method(payload.order_contact_method)
         normalized_order_sales_channel = _normalize_order_sales_channel(payload.order_sales_channel)
         status_row = get_status_or_404(self.db, payload.order_status_id, expected_type="orders") if payload.order_status_id else get_default_status_or_400(self.db, status_type="orders")
@@ -496,13 +502,19 @@ class OrderService:
         self._ensure_order_editable(row, current_user)
         before_snapshot = serialize_order(row)
         get_establishment_or_404(self.db, payload.order_establishment_id)
-        order_method_row = get_order_method_or_404(self.db, payload.order_method_id)
-        available_sub_methods = order_method_row.order_method_sub_methods or []
+        # Способ заказа необязателен (заказ с сайта приходит без него) — проверяем
+        # его и подспособ только если он выбран.
         normalized_order_sub_method = payload.order_sub_method.strip() if payload.order_sub_method else None
-        if not available_sub_methods and normalized_order_sub_method is not None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Для выбранного способа заказа подспособ не поддерживается")
-        if normalized_order_sub_method is not None and normalized_order_sub_method not in available_sub_methods:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Передан неизвестный подспособ заказа")
+        if payload.order_method_id is None:
+            if normalized_order_sub_method is not None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Подспособ без способа заказа не бывает")
+        else:
+            order_method_row = get_order_method_or_404(self.db, payload.order_method_id)
+            available_sub_methods = order_method_row.order_method_sub_methods or []
+            if not available_sub_methods and normalized_order_sub_method is not None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Для выбранного способа заказа подспособ не поддерживается")
+            if normalized_order_sub_method is not None and normalized_order_sub_method not in available_sub_methods:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Передан неизвестный подспособ заказа")
         normalized_order_contact_method = _normalize_order_contact_method(payload.order_contact_method)
         normalized_order_sales_channel = _normalize_order_sales_channel(payload.order_sales_channel)
 

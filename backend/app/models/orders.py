@@ -14,7 +14,9 @@ class Order(Base):
 
     order_id: Mapped[int] = mapped_column(SQL_ID_TYPE, primary_key=True, index=True)
     order_establishment_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("establishments.establishment_id", ondelete="RESTRICT"), nullable=False, index=True)
-    order_method_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("order_methods.order_method_id", ondelete="RESTRICT"), nullable=False, index=True)
+    # Способ заказа может быть не выбран: заказы с сайта приходят без него —
+    # менеджер проставляет способ сам, заглушка вводила бы в заблуждение.
+    order_method_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("order_methods.order_method_id", ondelete="RESTRICT"), nullable=True, index=True)
     order_sub_method: Mapped[str | None] = mapped_column(String(255), nullable=True)
     order_contact_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # Канал продаж (Розница/Опт/Дроп) — значение из редактируемого справочника

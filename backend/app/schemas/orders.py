@@ -36,7 +36,8 @@ class OrderCdekPayload(BaseModel):
 
 class OrderCreatePayload(BaseModel):
     order_establishment_id: int = Field(ge=1)
-    order_method_id: int = Field(ge=1)
+    # Способ заказа необязателен: заказ с сайта приходит без него (менеджер выберет).
+    order_method_id: Optional[int] = Field(default=None, ge=1)
     order_sub_method: Optional[str] = Field(default=None, min_length=1, max_length=255)
     order_contact_method: Optional[str] = Field(default=None, min_length=1, max_length=50)
     order_sales_channel: Optional[str] = Field(default=None, min_length=1, max_length=50)
@@ -60,7 +61,7 @@ class OrderPaymentUpdatePayload(BaseModel):
 
 class OrderUpdatePayload(BaseModel):
     order_establishment_id: int = Field(ge=1)
-    order_method_id: int = Field(ge=1)
+    order_method_id: Optional[int] = Field(default=None, ge=1)
     order_sub_method: Optional[str] = Field(default=None, min_length=1, max_length=255)
     order_contact_method: Optional[str] = Field(default=None, min_length=1, max_length=50)
     order_sales_channel: Optional[str] = Field(default=None, min_length=1, max_length=50)

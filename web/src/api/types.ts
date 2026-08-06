@@ -140,7 +140,8 @@ export type OrderCreateCdek = {
 
 export type OrderCreate = {
   order_establishment_id: number
-  order_method_id: number
+  // Способ заказа может быть не выбран (заказы с сайта) — менеджер проставит сам.
+  order_method_id?: number | null
   order_sub_method?: string | null
   order_contact_method?: string | null
   order_sales_channel?: string | null
@@ -226,7 +227,7 @@ export type OrderUpdateItem = {
 
 export type OrderUpdate = {
   order_establishment_id: number
-  order_method_id: number
+  order_method_id?: number | null
   order_sub_method?: string | null
   order_contact_method?: string | null
   order_sales_channel?: string | null
