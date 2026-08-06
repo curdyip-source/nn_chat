@@ -52,6 +52,9 @@ DEFAULT_STATUSES = [
     {"status_type": "order_products", "status_status": "Перемещение", "status_color": "blue"},
     {"status_type": "order_products", "status_status": "Заказ поставщику", "status_color": "orange"},
     {"status_type": "order_products", "status_status": "Собрано", "status_color": "#8b5cf6"},
+    # Финальный шаг сборки в «Отгрузках»: кнопка «Упаковать» переводит позицию сюда,
+    # и заказ можно выполнять, только когда упакованы все позиции.
+    {"status_type": "order_products", "status_status": "Упаковано", "status_color": "#4f46e5"},
     {"status_type": "order_products", "status_status": "Не будет", "status_color": "red"},
     {"status_type": "order_products", "status_status": "В наличии", "status_color": "green"},
     {"status_type": "order_products", "status_status": "Отгружено", "status_color": "blue"},

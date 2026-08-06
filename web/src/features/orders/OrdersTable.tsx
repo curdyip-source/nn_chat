@@ -340,8 +340,10 @@ function OrderRow({
   }
 
   const [pendingSplit, setPendingSplit] = useState<{ statusId: number } | null>(null)
-  const COLLECTABLE = ['В наличии', 'Собрано']
-  const ASSEMBLY_READY = ['В наличии', 'Собрано', 'Отменен', 'Не будет']
+  // «Упаковано» — финальный шаг сборки в отгрузках приложения: такие товары тоже
+  // готовы к отгрузке и не должны уезжать в дубль при сплите.
+  const COLLECTABLE = ['В наличии', 'Собрано', 'Упаковано']
+  const ASSEMBLY_READY = ['В наличии', 'Собрано', 'Упаковано', 'Отменен', 'Не будет']
 
   const changeStatus = (statusId: number) => {
     const label = orderStatusOptions.find((o) => o.id === statusId)?.label
@@ -356,7 +358,7 @@ function OrderRow({
       const hasCollectable = names.some((n) => COLLECTABLE.includes(n))
       const hasPending = names.some((n) => !ASSEMBLY_READY.includes(n))
       if (!hasCollectable) {
-        setError('Нет товаров «В наличии»/«Собрано» для сборки')
+        setError('Нет товаров «В наличии»/«Собрано»/«Упаковано» для сборки')
         return
       }
       if (hasPending) {

@@ -1786,3 +1786,15 @@ def test_system_push_allowed_for_service_user_and_admin_only(client, integration
     # Пустой текст — 422 (пуш без содержимого не шлём).
     bad = client.post(f"{API_PREFIX}/notifications/system", headers={"Authorization": f"Bearer {admin_token}"}, json={"title": "", "body": ""})
     assert bad.status_code == 422
+
+
+def test_packed_item_status_is_seeded(client, integration_db_session, integration_user):
+    # «Упаковано» — финальный шаг сборки в «Отгрузках»: статус должен быть в справочнике.
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    token = login(client, "worker", "WorkerPass123")["token"]
+
+    statuses = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {token}"}).json()["statuses"]
+    packed = next((s for s in statuses if s["status_type"] == "order_products" and s["status_status"] == "Упаковано"), None)
+    assert packed is not None
+    assert packed["status_color"]

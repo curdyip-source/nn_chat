@@ -865,7 +865,7 @@ class OrderService:
 
     def split_order(self, order_id: int, current_user: dict) -> dict:
         """Разделить заказ для частичной отгрузки: товары, готовые к отгрузке сейчас
-        («В наличии» и уже «Собрано»), остаются в этом заказе и он переводится в «На
+        («В наличии», «Собрано», «Упаковано»), остаются в этом заказе и он переводится в «На
         сборку»; всё остальное (ожидаемые + отменённые) уходит в новый заказ-дубль со
         статусом исходного. Статусы остающихся позиций сохраняются («Собрано» не
         сбрасывается). Атомарно — один commit."""
@@ -875,18 +875,19 @@ class OrderService:
         reference = ReferenceDataRepository(self.db)
         in_stock_status = reference.get_status_by_type_and_name("order_products", "В наличии")
         collected_status = reference.get_status_by_type_and_name("order_products", "Собрано")
+        packed_status = reference.get_status_by_type_and_name("order_products", "Упаковано")
         assembly_status = reference.get_status_by_type_and_name("orders", "На сборку")
         if in_stock_status is None or assembly_status is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Не найдены статусы «В наличии»/«На сборку»")
 
-        # Готовые к отгрузке сейчас: «В наличии» + уже «Собрано» — они остаются в заказе.
-        collectable_status_ids = {s.status_id for s in (in_stock_status, collected_status) if s is not None}
+        # Готовые к отгрузке сейчас: «В наличии» + уже «Собрано»/«Упаковано» — остаются в заказе.
+        collectable_status_ids = {s.status_id for s in (in_stock_status, collected_status, packed_status) if s is not None}
         items = list(order.items)
         kept_items = [i for i in items if i.order_item_status_id in collectable_status_ids]
         rest_items = [i for i in items if i.order_item_status_id not in collectable_status_ids]
 
         if not kept_items:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Нет товаров «В наличии»/«Собрано» для сборки")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Нет товаров «В наличии»/«Собрано»/«Упаковано» для сборки")
         if not rest_items:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Нечего разделять: все товары готовы к сборке")
 
