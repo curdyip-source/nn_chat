@@ -26,6 +26,12 @@ class Order(Base):
     order_owner_user_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
     order_created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now(), index=True)
 
+    # --- Оплата: отметка «Оплачено» с кнопки в карточке заказа ---
+    # Хранится моментом оплаты (а не флагом): NULL = не оплачен, дата = когда
+    # отметили. Кто отметил — для строки «Оплата» в карточке и истории заказа.
+    order_paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    order_paid_by_user_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+
     # --- СДЭК (доставка): заполняется при создании накладной ---
     order_cdek_recipient_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     order_cdek_recipient_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -49,7 +55,8 @@ class Order(Base):
     establishment = relationship("Establishment", back_populates="orders")
     order_method = relationship("OrderMethod", back_populates="orders")
     status = relationship("Status", back_populates="orders")
-    owner = relationship("User", back_populates="orders")
+    owner = relationship("User", back_populates="orders", foreign_keys=[order_owner_user_id])
+    paid_by = relationship("User", foreign_keys=[order_paid_by_user_id])
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan", order_by="OrderItem.order_item_id")
     comments = relationship("OrderComment", back_populates="order", cascade="all, delete-orphan")
     messages = relationship("Message", back_populates="order")

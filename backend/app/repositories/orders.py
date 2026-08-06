@@ -19,6 +19,7 @@ class OrderRepository:
             joinedload(Order.order_method),
             joinedload(Order.status),
             joinedload(Order.owner),
+            joinedload(Order.paid_by),
             joinedload(Order.items).joinedload(OrderItem.status),
             joinedload(Order.items).joinedload(OrderItem.source_establishment),
             joinedload(Order.items).joinedload(OrderItem.destination_establishment),

@@ -40,7 +40,9 @@ class User(Base):
     messages = relationship("Message", back_populates="owner", cascade="all, delete-orphan")
     message_attachments = relationship("MessageAttachment", back_populates="owner")
     profile_photo_asset = relationship("ProfilePhoto", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    orders = relationship("Order", back_populates="owner")
+    # У заказа две ссылки на пользователя (создатель и кто отметил оплату) —
+    # поэтому связь указывает свой внешний ключ явно.
+    orders = relationship("Order", back_populates="owner", foreign_keys="Order.order_owner_user_id")
     order_comments = relationship("OrderComment", back_populates="owner")
     order_comment_attachments = relationship("OrderCommentAttachment", back_populates="owner")
     inventories = relationship("Inventory", back_populates="owner")

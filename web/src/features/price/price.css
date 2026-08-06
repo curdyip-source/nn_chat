@@ -634,6 +634,26 @@
 .price-root .pstage a {
   color: var(--accent);
 }
+
+/* Числа прогона этапа (платформа NufNaf.ru): подпись сверху, значение снизу. */
+.price-root .pstage-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 6px 0;
+}
+.price-root .pstage-stat {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+.price-root .pstage-stat-val {
+  font-size: 13px;
+  font-weight: 600;
+}
+.price-root .pstage-actions {
+  margin-top: 8px;
+}
 .price-root .small {
   font-size: 12px;
 }

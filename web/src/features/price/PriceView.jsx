@@ -8,9 +8,11 @@ const LABELS = {
   running: "Выполняется…",
 };
 
-function Stage({ number, title, stage, link, linkLabel, stale }) {
+function Stage({ number, title, stage, link, linkLabel, stale, children }) {
   const status = stage?.status || "pending";
   const done = status === "success";
+  // Числа прогона (этап 5): подписи приходят с платформы как есть.
+  const stats = Object.entries(stage?.stats || {});
   // Прайс за сегодня ещё не получен → успешные этапы относятся к прошлому
   // прогону: гасим зелёный в серый, чтобы не выглядело «всё ок за сегодня».
   const tag = done ? (stale ? "tag" : "tag ok") : status === "error" ? "tag bad" : "tag";
@@ -28,6 +30,23 @@ function Stage({ number, title, stage, link, linkLabel, stale }) {
       {stage?.products != null && status === "success" && (
         <div className="muted small">товаров в БД: {stage.products}</div>
       )}
+      {stage?.message && status !== "error" && (
+        <div className="muted small">
+          {stage.message}
+          {status === "running" && stage.progress != null && ` · ${stage.progress}%`}
+        </div>
+      )}
+      {stats.length > 0 && (status === "success" || status === "running") && (
+        <div className="pstage-stats">
+          {stats.map(([k, v]) => (
+            <div key={k} className="pstage-stat">
+              {/* «Пропущенно:» приходит с двоеточием — срезаем хвост. */}
+              <span className="muted small">{k.replace(/:$/, "")}</span>
+              <span className="pstage-stat-val">{String(v)}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {link && status === "success" && (
         <a href={link} target="_blank" rel="noreferrer">
           {linkLabel}
@@ -39,6 +58,7 @@ function Stage({ number, title, stage, link, linkLabel, stale }) {
         </div>
       )}
       {stage?.error && <div className="status error">{stage.error}</div>}
+      {children}
       </div>
     </div>
   );
@@ -137,6 +157,7 @@ export default function PriceView() {
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [busy5, setBusy5] = useState(false);
   const [view, setView] = useState("stages"); // stages | suppliers
 
   const load = useCallback(
@@ -159,6 +180,16 @@ export default function PriceView() {
 
   const processing = status?.processing;
   const authorized = status?.authorized;
+  // Этап 5 идёт на стороне платформы: пока он «running», кнопку запуска гасим
+  // (busy5 закрывает окно между кликом и первым ответом /status).
+  const syncing = status?.stage5?.status === "running" || busy5;
+
+  const runStage5 = () => {
+    setBusy5(true);
+    priceFetch("/api/price/nufnaf-sync", { method: "POST" })
+      .then(() => setTimeout(load, 800))
+      .finally(() => setTimeout(() => setBusy5(false), 1500));
+  };
 
   const checkNow = () => {
     setBusy(true);
@@ -265,6 +296,22 @@ export default function PriceView() {
               stage={status.stage4}
               stale={!status.priceReceivedToday}
             />
+            <Stage
+              number={5}
+              title="Обновление прайс-листа на платформе NufNaf.ru"
+              stage={status.stage5}
+              stale={!status.priceReceivedToday}
+            >
+              <div className="pstage-actions">
+                <button
+                  className="btn-ghost sm"
+                  disabled={syncing}
+                  onClick={runStage5}
+                >
+                  {syncing ? "Обновление…" : "Обновить платформу"}
+                </button>
+              </div>
+            </Stage>
           </div>
         </>
       )}

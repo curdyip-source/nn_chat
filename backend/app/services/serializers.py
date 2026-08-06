@@ -256,6 +256,7 @@ def serialize_order(row) -> dict:
     order_method = getattr(row, "order_method", None)
     status = getattr(row, "status", None)
     owner = getattr(row, "owner", None)
+    paid_by = getattr(row, "paid_by", None)
     comments = sorted(
         getattr(row, "comments", []),
         key=lambda item: (serialize_datetime(getattr(item, "order_comment_created_at", None)) or "", getattr(item, "order_comment_id", 0)),
@@ -279,6 +280,13 @@ def serialize_order(row) -> dict:
         "order_owner_first_name": owner.user_first_name if owner else None,
         "order_owner_second_name": owner.user_second_name if owner else None,
         "order_created_at": serialize_datetime(row.order_created_at),
+        # Оплата: флаг для кнопки в карточке + кто и когда отметил (для «Оплата» в параметрах).
+        "order_paid": row.order_paid_at is not None,
+        "order_paid_at": serialize_datetime(row.order_paid_at),
+        "order_paid_by_user_id": row.order_paid_by_user_id,
+        "order_paid_by_user_login": paid_by.user_login if paid_by else None,
+        "order_paid_by_first_name": paid_by.user_first_name if paid_by else None,
+        "order_paid_by_second_name": paid_by.user_second_name if paid_by else None,
         "cdek": {
             "has_waybill": bool(row.order_cdek_uuid),
             "uuid": row.order_cdek_uuid,

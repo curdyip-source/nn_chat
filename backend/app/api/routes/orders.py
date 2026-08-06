@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
-from app.schemas.orders import OrderCommentCreatePayload, OrderCommentUpdatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
-from app.services.orders import add_order_comment, create_order, delete_order, delete_order_comment, get_order, get_order_history, list_order_comments, list_orders, split_order, update_order, update_order_comment, update_order_status
+from app.schemas.orders import OrderCommentCreatePayload, OrderCommentUpdatePayload, OrderCreatePayload, OrderPaymentUpdatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
+from app.services.orders import add_order_comment, create_order, delete_order, delete_order_comment, get_order, get_order_history, list_order_comments, list_orders, split_order, update_order, update_order_comment, update_order_payment, update_order_status
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -45,6 +45,12 @@ def update_order_route(order_id: int, payload: OrderUpdatePayload, current_user:
 @router.put("/{order_id}/status")
 def update_order_status_route(order_id: int, payload: OrderStatusUpdatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     return {"item": update_order_status(db, order_id, payload, current_user)}
+
+
+@router.put("/{order_id}/payment")
+def update_order_payment_route(order_id: int, payload: OrderPaymentUpdatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    # Отметка «Оплачено» с кнопки в карточке заказа (и снятие отметки).
+    return {"item": update_order_payment(db, order_id, payload, current_user)}
 
 
 @router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)

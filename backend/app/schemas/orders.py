@@ -53,6 +53,11 @@ class OrderStatusUpdatePayload(BaseModel):
     order_status_id: int = Field(ge=1)
 
 
+class OrderPaymentUpdatePayload(BaseModel):
+    """Отметка об оплате заказа: true — «Оплачено», false — снять отметку."""
+    order_paid: bool
+
+
 class OrderUpdatePayload(BaseModel):
     order_establishment_id: int = Field(ge=1)
     order_method_id: int = Field(ge=1)

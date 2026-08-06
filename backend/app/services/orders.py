@@ -1,6 +1,6 @@
 import logging
 from collections import Counter
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import delete
@@ -15,7 +15,7 @@ from app.repositories.messages import MessageRepository
 from app.repositories.orders import OrderRepository
 from app.repositories.reference_data import ReferenceDataRepository
 from app.schemas.common import build_pagination
-from app.schemas.orders import OrderCommentCreatePayload, OrderCommentUpdatePayload, OrderCreatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
+from app.schemas.orders import OrderCommentCreatePayload, OrderCommentUpdatePayload, OrderCreatePayload, OrderPaymentUpdatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
 from app.services.contacts import save_buyer_contact_from_order, save_supplier_contact
 from app.services.audit import log_audit_event
 from app.services.access_control import allowed_order_status_ids, can_create_on_establishment, can_delete_document, can_edit_document, can_view_document, can_view_order_status, list_visibility
@@ -82,6 +82,7 @@ ORDER_AUDIT_FIELDS = (
     "order_info",
     "order_status_id",
     "order_status",
+    "order_paid",
 )
 
 ORDER_ITEM_AUDIT_FIELDS = (
@@ -239,6 +240,13 @@ def _order_update_history_texts(payload: dict) -> list[tuple[str, str]]:
         new_status = changed["order_status"].get("to")
         texts.append(("order_status", f"сменил статус заказа на «{new_status}»" if new_status else "сменил статус заказа"))
 
+    # 1a) Оплата заказа (кнопка «Оплатить» / «Оплачено» в карточке).
+    if "order_paid" in changed:
+        texts.append((
+            "order_paid",
+            "отметил заказ оплаченным" if changed["order_paid"].get("to") else "снял отметку об оплате",
+        ))
+
     # 2) Статусы товаров — группируем по новому статусу, перечисляя наименования,
     #    чтобы было видно, какой именно товар сменил статус.
     status_to_names: dict[str, list[str]] = {}
@@ -259,7 +267,7 @@ def _order_update_history_texts(payload: dict) -> list[tuple[str, str]]:
             texts.append(("item_status", f"сменил статус товаров{suffix}: {listed}"))
 
     # 3) Прочие правки (добавление/удаление позиций или изменение полей, не связанных со статусом).
-    other_header = any(field != "order_status" and not field.endswith("_id") for field in changed)
+    other_header = any(field not in ("order_status", "order_paid") and not field.endswith("_id") for field in changed)
     other_items = bool(items.get("added")) or bool(items.get("removed")) or any(
         field != "order_item_status" and not field.endswith("_id")
         for upd in items.get("updated", [])
@@ -593,6 +601,29 @@ class OrderService:
         if not can_view_order_status(current_user, status_row.status_id):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для перевода заказа в этот статус")
         row = self.repository.update(row, {"order_status_id": status_row.status_id})
+        log_audit_event(
+            self.db,
+            actor_user_id=current_user["user_id"],
+            entity_type=ENTITY_TYPE_ORDER,
+            entity_id=row.order_id,
+            event_type=EVENT_TYPE_ORDER_UPDATE,
+            event_payload=_build_order_update_audit_payload(before_snapshot, serialize_order(row)),
+        )
+        notify_order_changed(self.db, row.order_id)
+        return serialize_order(row)
+
+    def update_order_payment(self, order_id: int, payload: OrderPaymentUpdatePayload, current_user: dict) -> dict:
+        """Отметить заказ оплаченным (или снять отметку) — кнопка в карточке заказа."""
+        row = self.get_accessible_order_or_404(order_id, current_user)
+        self._ensure_order_editable(row, current_user)
+        before_snapshot = serialize_order(row)
+        row = self.repository.update(
+            row,
+            {
+                "order_paid_at": datetime.utcnow() if payload.order_paid else None,
+                "order_paid_by_user_id": current_user["user_id"] if payload.order_paid else None,
+            },
+        )
         log_audit_event(
             self.db,
             actor_user_id=current_user["user_id"],
@@ -949,6 +980,10 @@ def create_order(db: Session, payload: OrderCreatePayload, current_user: dict) -
 
 def update_order_status(db: Session, order_id: int, payload: OrderStatusUpdatePayload, current_user: dict) -> dict:
     return OrderService(db).update_order_status(order_id, payload, current_user)
+
+
+def update_order_payment(db: Session, order_id: int, payload: OrderPaymentUpdatePayload, current_user: dict) -> dict:
+    return OrderService(db).update_order_payment(order_id, payload, current_user)
 
 
 def update_order(db: Session, order_id: int, payload: OrderUpdatePayload, current_user: dict) -> dict:

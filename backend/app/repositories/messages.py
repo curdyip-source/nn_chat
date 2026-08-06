@@ -23,6 +23,9 @@ class MessageRepository:
             joinedload(Message.order).joinedload(Order.establishment),
             joinedload(Message.order).joinedload(Order.order_method),
             joinedload(Message.order).joinedload(Order.owner),
+            # Кто отметил оплату — подтягиваем сразу, иначе на каждую карточку заказа
+            # в ленте уходил бы отдельный запрос за пользователем.
+            joinedload(Message.order).joinedload(Order.paid_by),
             joinedload(Message.order).joinedload(Order.items),
             joinedload(Message.inventory).joinedload(Inventory.status),
             joinedload(Message.inventory).joinedload(Inventory.establishment),

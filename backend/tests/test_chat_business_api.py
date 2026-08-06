@@ -1586,3 +1586,99 @@ def test_admin_sets_user_menu_sections(client, integration_db_session, integrati
     bad = client.put(f"{API_PREFIX}/users/{integration_user.user_id}", headers={"Authorization": f"Bearer {admin_token}"},
                      json={"user_sections": ["orders", "users"]})
     assert bad.status_code == 400
+
+
+def test_order_payment_mark_and_unmark(client, integration_db_session, integration_admin, integration_user):
+    # Отметка «Оплачено» с кнопки в карточке: ставится, снимается и попадает в историю.
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+
+    login(client, "admin", "AdminPass123")
+    user_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, user_token)
+
+    reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
+    establishment_id = reference_payload["establishments"][0]["establishment_id"]
+    order_method_id = reference_payload["order_methods"][0]["order_method_id"]
+
+    create_response = client.post(
+        f"{API_PREFIX}/orders",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_customer": "Степан",
+            "items": [{"product_article": "PAY-001", "product_name": "Paid Product", "order_item_quantity": 1, "order_item_price": "6690.00"}],
+        },
+    )
+    assert create_response.status_code == 201
+    created = create_response.json()["item"]
+    order_id = created["order_id"]
+    # Новый заказ — не оплачен.
+    assert created["order_paid"] is False
+    assert created["order_paid_at"] is None
+
+    paid_response = client.put(
+        f"{API_PREFIX}/orders/{order_id}/payment",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={"order_paid": True},
+    )
+    assert paid_response.status_code == 200
+    paid = paid_response.json()["item"]
+    assert paid["order_paid"] is True
+    assert paid["order_paid_at"]
+    assert paid["order_paid_by_user_id"] == integration_user.user_id
+    assert paid["order_paid_by_user_login"] == "worker"
+
+    # Отметка видна и в списке, и в карточке заказа.
+    listed = client.get(f"{API_PREFIX}/orders", headers={"Authorization": f"Bearer {user_token}"}).json()["items"]
+    assert next(item for item in listed if item["order_id"] == order_id)["order_paid"] is True
+
+    unpaid_response = client.put(
+        f"{API_PREFIX}/orders/{order_id}/payment",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={"order_paid": False},
+    )
+    assert unpaid_response.status_code == 200
+    unpaid = unpaid_response.json()["item"]
+    assert unpaid["order_paid"] is False
+    assert unpaid["order_paid_at"] is None
+    assert unpaid["order_paid_by_user_id"] is None
+
+    history = client.get(f"{API_PREFIX}/orders/{order_id}/history", headers={"Authorization": f"Bearer {user_token}"}).json()["items"]
+    texts = [entry["text"] for entry in history]
+    assert "отметил заказ оплаченным" in texts
+    assert "снял отметку об оплате" in texts
+    # Оплата — не «отредактировал заказ»: отдельная строка истории.
+    assert texts.count("отредактировал заказ") == 0
+
+
+def test_order_payment_forbidden_without_edit_rights(client, integration_db_session, integration_user, integration_admin):
+    # Нет прав на редактирование заказа — нет и отметки об оплате.
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+    worker_token = login(client, "worker", "WorkerPass123")["token"]
+
+    reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {admin_token}"}).json()
+    establishment_id = reference_payload["establishments"][0]["establishment_id"]
+    order_method_id = reference_payload["order_methods"][0]["order_method_id"]
+    admin_order = client.post(
+        f"{API_PREFIX}/orders",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_customer": "Клиент админа",
+            "items": [{"product_article": "PAY-002", "product_name": "Admin Product", "order_item_quantity": 1, "order_item_price": "10.00"}],
+        },
+    ).json()["item"]
+
+    forbidden = client.put(
+        f"{API_PREFIX}/orders/{admin_order['order_id']}/payment",
+        headers={"Authorization": f"Bearer {worker_token}"},
+        json={"order_paid": True},
+    )
+    assert forbidden.status_code in (403, 404)
