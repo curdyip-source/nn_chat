@@ -50,6 +50,11 @@ APNS_USE_SANDBOX = os.getenv(
     "true" if APP_ENV != "production" else "false",
 ).strip().lower() in {"1", "true", "yes", "on"}
 APNS_ENABLED = all([APNS_AUTH_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC])
+# Кто может слать служебный пуш (уведомление от системы, а не от пользователя):
+# админы плюс перечисленные логины. Прайс шлёт «прайс обновлён» логином nufnaf.ru.
+SYSTEM_PUSH_LOGINS = {
+    login.strip() for login in os.getenv("SYSTEM_PUSH_LOGINS", "nufnaf.ru").split(",") if login.strip()
+}
 # --- CDEK (доставка) ---
 # По умолчанию — тестовая среда СДЭК (публичные тест-креды из cdek-sdk-v2), чтобы
 # локально работало без .env. Прод: задать CDEK_BASE_URL=https://api.cdek.ru/v2 и

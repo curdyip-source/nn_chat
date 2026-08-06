@@ -1745,3 +1745,44 @@ def test_order_can_be_created_without_order_method(client, integration_db_sessio
     )
     assert updated.status_code == 200
     assert updated.json()["item"]["order_method_id"] == order_method_id
+
+
+def test_system_push_allowed_for_service_user_and_admin_only(client, integration_db_session, integration_user, integration_admin, monkeypatch):
+    # Пуш «прайс обновлён» шлёт сервисный пользователь прайса; обычный — не может.
+    import app.api.routes.system as system_routes
+
+    sent: list[dict] = []
+    monkeypatch.setattr(
+        system_routes,
+        "send_system_push",
+        lambda db, *, sender_user_id, title, body, event_type: sent.append(
+            {"sender_user_id": sender_user_id, "title": title, "body": body, "event_type": event_type}
+        )
+        or 3,
+    )
+
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+    worker_token = login(client, "worker", "WorkerPass123")["token"]
+
+    body = {"title": "Прайс", "body": "День добрый! Прайс обновлён", "event_type": "price_updated"}
+
+    ok = client.post(f"{API_PREFIX}/notifications/system", headers={"Authorization": f"Bearer {admin_token}"}, json=body)
+    assert ok.status_code == 200
+    assert ok.json() == {"delivered": 3}
+    assert sent[-1]["event_type"] == "price_updated"
+
+    forbidden = client.post(f"{API_PREFIX}/notifications/system", headers={"Authorization": f"Bearer {worker_token}"}, json=body)
+    assert forbidden.status_code == 403
+
+    # Сервисный логин из SYSTEM_PUSH_LOGINS — можно (не админ).
+    monkeypatch.setattr(system_routes, "SYSTEM_PUSH_LOGINS", {"worker"})
+    allowed = client.post(f"{API_PREFIX}/notifications/system", headers={"Authorization": f"Bearer {worker_token}"}, json=body)
+    assert allowed.status_code == 200
+    assert len(sent) == 2
+
+    # Пустой текст — 422 (пуш без содержимого не шлём).
+    bad = client.post(f"{API_PREFIX}/notifications/system", headers={"Authorization": f"Bearer {admin_token}"}, json={"title": "", "body": ""})
+    assert bad.status_code == 422

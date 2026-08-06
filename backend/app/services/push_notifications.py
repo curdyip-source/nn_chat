@@ -49,6 +49,38 @@ def send_push_notification_event(
     return _dispatch_to_devices(db, devices=targets, title=title, body=body, event_type=message_type, entity_id=entity_id)
 
 
+def send_system_push(
+    db: Session,
+    *,
+    sender_user_id: int,
+    title: str,
+    body: str,
+    event_type: str = "system",
+) -> int:
+    """Служебное уведомление всем активным устройствам (кроме отправителя).
+
+    Для сообщений «от системы», а не от пользователя: например прайс, который
+    прошёл все этапы обновления. Тап по такому пушу никуда не ведёт — у события
+    нет сущности (entity_id = 0), приложение просто показывает текст.
+    """
+    if not APNS_ENABLED:
+        logger.info(
+            "push.skipped_disabled",
+            extra={"event_type": "push.skipped_disabled", "message_type": event_type},
+        )
+        return 0
+
+    targets = UserDeviceRepository(db).list_active_for_other_users(excluded_user_id=sender_user_id)
+    if not targets:
+        logger.info(
+            "push.skipped_no_targets",
+            extra={"event_type": "push.skipped_no_targets", "message_type": event_type},
+        )
+        return 0
+
+    return _dispatch_to_devices(db, devices=targets, title=title, body=body, event_type=event_type, entity_id=0)
+
+
 def send_mention_push_event(
     db: Session,
     *,
