@@ -100,6 +100,9 @@ class OrderComment(Base):
     order_comment_order_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("orders.order_id", ondelete="CASCADE"), nullable=False, index=True)
     order_comment_text: Mapped[str] = mapped_column(Text, nullable=False)
     order_comment_owner_user_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    # Закреплённое сообщение чата заказа: его текст выводится в карточке заказа в списках
+    # СРМ («Все заказы», «Отгрузки») — чтобы важное было видно без открытия заказа.
+    order_comment_is_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     order_comment_created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
     order = relationship("Order", back_populates="comments")

@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
-from app.core.audit_types import ENTITY_TYPE_CDEK, ENTITY_TYPE_ORDER, EVENT_TYPE_CDEK_WAYBILL_CREATE, EVENT_TYPE_ORDER_COMMENT_CREATE, EVENT_TYPE_ORDER_COMMENT_DELETE, EVENT_TYPE_ORDER_COMMENT_UPDATE, EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_DELETE, EVENT_TYPE_ORDER_UPDATE
+from app.core.audit_types import ENTITY_TYPE_CDEK, ENTITY_TYPE_ORDER, EVENT_TYPE_CDEK_WAYBILL_CREATE, EVENT_TYPE_ORDER_COMMENT_CREATE, EVENT_TYPE_ORDER_COMMENT_DELETE, EVENT_TYPE_ORDER_COMMENT_PIN, EVENT_TYPE_ORDER_COMMENT_UPDATE, EVENT_TYPE_ORDER_CREATE, EVENT_TYPE_ORDER_DELETE, EVENT_TYPE_ORDER_UPDATE
 from app.models.messages import Message
 from app.models.orders import Order, OrderItem
 from app.repositories.audit_events import AuditEventRepository
@@ -15,7 +15,7 @@ from app.repositories.messages import MessageRepository
 from app.repositories.orders import OrderRepository
 from app.repositories.reference_data import ReferenceDataRepository
 from app.schemas.common import build_pagination
-from app.schemas.orders import OrderCommentCreatePayload, OrderCommentUpdatePayload, OrderCreatePayload, OrderPaymentUpdatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
+from app.schemas.orders import OrderCommentCreatePayload, OrderCommentPinPayload, OrderCommentUpdatePayload, OrderCreatePayload, OrderPaymentUpdatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
 from app.services.contacts import save_buyer_contact_from_order, save_supplier_contact
 from app.services.audit import log_audit_event
 from app.services.access_control import allowed_order_status_ids, can_create_on_establishment, can_delete_document, can_edit_document, can_view_document, can_view_order_status, list_visibility
@@ -30,6 +30,10 @@ logger = logging.getLogger("app.orders")
 
 
 ALLOWED_ORDER_CONTACT_METHODS = ("WA", "TG", "AV", "IG", "SMS", "MX")
+
+# Сколько сообщений чата заказа можно держать закреплёнными: их текст показывается в
+# карточке заказа в списках СРМ, и больше трёх строк там уже мешают.
+MAX_PINNED_ORDER_COMMENTS = 3
 
 
 def _normalize_order_contact_method(value: str | None) -> str | None:
@@ -299,6 +303,9 @@ def _order_history_entries_for_event(event) -> list[dict]:
         actions = [("comment", "изменил сообщение в чате заказа")]
     elif event.event_type == EVENT_TYPE_ORDER_COMMENT_DELETE:
         actions = [("comment", "удалил сообщение из чата заказа")]
+    elif event.event_type == EVENT_TYPE_ORDER_COMMENT_PIN:
+        pinned = bool(payload.get("order_comment_is_pinned"))
+        actions = [("comment", "закрепил сообщение в чате заказа" if pinned else "открепил сообщение в чате заказа")]
     elif event.event_type == EVENT_TYPE_CDEK_WAYBILL_CREATE:
         track = payload.get("cdek_track_number")
         actions = [("cdek", f"создал накладную СДЭК №{track}" if track else "создал накладную СДЭК")]
@@ -836,6 +843,45 @@ class OrderService:
         notify_order_changed(self.db, order_id)
         return serialize_order_comment(updated)
 
+    def set_order_comment_pinned(self, order_id: int, comment_id: int, payload: OrderCommentPinPayload, current_user: dict) -> dict:
+        """Закрепить/открепить сообщение чата заказа. Текст закреплённых выводится в
+        карточке заказа в списках СРМ, поэтому закреплять может любой, кто видит заказ
+        (в отличие от правки/удаления — там права по автору)."""
+        order = self.get_accessible_order_or_404(order_id, current_user)
+        comment = self.repository.get_comment_by_id(comment_id)
+        if comment is None or comment.order_comment_order_id != order_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Сообщение не найдено")
+
+        if payload.order_comment_is_pinned == bool(comment.order_comment_is_pinned):
+            return serialize_order_comment(comment)
+
+        if payload.order_comment_is_pinned:
+            # В карточке заказа место ограничено — держим не больше трёх закреплённых.
+            pinned_count = sum(1 for item in order.comments if item.order_comment_is_pinned)
+            if pinned_count >= MAX_PINNED_ORDER_COMMENTS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Можно закрепить не больше {MAX_PINNED_ORDER_COMMENTS} сообщений — открепите лишнее",
+                )
+
+        updated = self.repository.update_comment(comment, {"order_comment_is_pinned": payload.order_comment_is_pinned})
+        log_audit_event(
+            self.db,
+            actor_user_id=current_user["user_id"],
+            entity_type=ENTITY_TYPE_ORDER,
+            entity_id=order_id,
+            event_type=EVENT_TYPE_ORDER_COMMENT_PIN,
+            event_payload={
+                "order_comment_id": updated.order_comment_id,
+                "order_comment_text": updated.order_comment_text,
+                "order_comment_is_pinned": bool(updated.order_comment_is_pinned),
+            },
+        )
+        # Закреплённое сообщение видно в карточке заказа — публикуем SSE-событие updated,
+        # как в add_order_comment/update_order_comment.
+        notify_order_changed(self.db, order_id)
+        return serialize_order_comment(updated)
+
     def delete_order_comment(self, order_id: int, comment_id: int, current_user: dict) -> None:
         # Заказ должен быть в области видимости, иначе не раскрываем его существование.
         self.get_accessible_order_or_404(order_id, current_user)
@@ -1025,6 +1071,10 @@ def add_order_comment(db: Session, order_id: int, payload: OrderCommentCreatePay
 
 def update_order_comment(db: Session, order_id: int, comment_id: int, payload: OrderCommentUpdatePayload, current_user: dict) -> dict:
     return OrderService(db).update_order_comment(order_id, comment_id, payload, current_user)
+
+
+def set_order_comment_pinned(db: Session, order_id: int, comment_id: int, payload: OrderCommentPinPayload, current_user: dict) -> dict:
+    return OrderService(db).set_order_comment_pinned(order_id, comment_id, payload, current_user)
 
 
 def delete_order_comment(db: Session, order_id: int, comment_id: int, current_user: dict) -> None:
