@@ -21,6 +21,7 @@ from app.api.routes.product_registrations import router as product_registrations
 from app.api.routes.products import router as products_router
 from app.api.routes.reference_data import router as reference_data_router
 from app.api.routes.system import router as system_router
+from app.api.routes.todos import lists_router as todo_lists_router, router as todos_router
 from app.api.routes.user_devices import router as user_devices_router
 from app.api.routes.users import router as users_router
 from app.core.config import CORS_ALLOW_CREDENTIALS, CORS_ALLOW_HEADERS, CORS_ALLOW_METHODS, CORS_ALLOW_ORIGINS, validate_runtime_config
@@ -101,6 +102,8 @@ def create_app() -> FastAPI:
     api_v1_router.include_router(inventories_router)
     api_v1_router.include_router(product_registrations_router)
     api_v1_router.include_router(user_devices_router)
+    api_v1_router.include_router(todos_router)
+    api_v1_router.include_router(todo_lists_router)
     api_v1_router.include_router(users_router)
 
     application.include_router(media_router)

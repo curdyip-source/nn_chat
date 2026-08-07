@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
-from app.schemas.orders import OrderCommentCreatePayload, OrderCommentUpdatePayload, OrderCreatePayload, OrderPaymentUpdatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
-from app.services.orders import add_order_comment, create_order, delete_order, delete_order_comment, get_order, get_order_history, list_order_comments, list_orders, split_order, update_order, update_order_comment, update_order_payment, update_order_status
+from app.schemas.orders import OrderCommentCreatePayload, OrderCommentPinPayload, OrderCommentUpdatePayload, OrderCreatePayload, OrderPaymentUpdatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
+from app.services.orders import add_order_comment, create_order, delete_order, delete_order_comment, get_order, get_order_history, list_order_comments, list_orders, set_order_comment_pinned, split_order, update_order, update_order_comment, update_order_payment, update_order_status
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -82,6 +82,11 @@ def add_order_comment_route(order_id: int, payload: OrderCommentCreatePayload, c
 @router.put("/{order_id}/comments/{comment_id}")
 def update_order_comment_route(order_id: int, comment_id: int, payload: OrderCommentUpdatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     return {"item": update_order_comment(db, order_id, comment_id, payload, current_user)}
+
+
+@router.put("/{order_id}/comments/{comment_id}/pin")
+def set_order_comment_pinned_route(order_id: int, comment_id: int, payload: OrderCommentPinPayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return {"item": set_order_comment_pinned(db, order_id, comment_id, payload, current_user)}
 
 
 @router.delete("/{order_id}/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)

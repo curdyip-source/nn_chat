@@ -247,6 +247,7 @@ def serialize_order_comment(row) -> dict:
         "order_comment_owner_second_name": owner.user_second_name if owner else None,
         "order_comment_owner_profile_photo": owner.user_profile_photo if owner else None,
         "order_comment_created_at": serialize_datetime(row.order_comment_created_at),
+        "order_comment_is_pinned": bool(getattr(row, "order_comment_is_pinned", False)),
         "attachments": [serialize_message_attachment(item) for item in getattr(row, "attachments", [])],
     }
 
@@ -417,4 +418,40 @@ def serialize_message_tombstone(row) -> dict:
         "message_id": row.message_id,
         "message_deleted": True,
         "message_updated_at": serialize_datetime(row.message_updated_at),
+    }
+
+def serialize_todo_list(row) -> dict:
+    return {
+        "todo_list_id": row.todo_list_id,
+        "todo_list_name": row.todo_list_name,
+        "todo_list_position": row.todo_list_position,
+        "todo_list_created_at": serialize_datetime(row.todo_list_created_at),
+    }
+
+
+def serialize_todo_subtask(row) -> dict:
+    return {
+        "todo_subtask_id": row.todo_subtask_id,
+        "todo_subtask_title": row.todo_subtask_title,
+        "todo_subtask_done": bool(row.todo_subtask_done),
+        "todo_subtask_position": row.todo_subtask_position,
+    }
+
+
+def serialize_todo(row) -> dict:
+    return {
+        "todo_id": row.todo_id,
+        "todo_list_id": row.todo_list_id,
+        "todo_title": row.todo_title,
+        "todo_note": row.todo_note,
+        "todo_do_at": serialize_datetime(row.todo_do_at),
+        "todo_deadline_at": serialize_datetime(row.todo_deadline_at),
+        "todo_someday": bool(row.todo_someday),
+        "todo_tags": list(row.todo_tags or []),
+        "todo_completed": row.todo_completed_at is not None,
+        "todo_completed_at": serialize_datetime(row.todo_completed_at),
+        "todo_archived": bool(row.todo_archived),
+        "todo_position": row.todo_position,
+        "todo_created_at": serialize_datetime(row.todo_created_at),
+        "subtasks": [serialize_todo_subtask(item) for item in sorted(getattr(row, "subtasks", []), key=lambda s: (s.todo_subtask_position, s.todo_subtask_id))],
     }

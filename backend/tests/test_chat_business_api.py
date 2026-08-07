@@ -1684,6 +1684,94 @@ def test_order_payment_forbidden_without_edit_rights(client, integration_db_sess
     assert forbidden.status_code in (403, 404)
 
 
+def test_order_comment_pin_limit_and_unpin(client, integration_db_session, integration_admin, integration_user):
+    # Закрепление сообщений чата заказа: не больше трёх, чужое закрепить можно,
+    # флаг приходит в карточке заказа, действие пишется в историю.
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+    user_token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, user_token)
+
+    reference_payload = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {user_token}"}).json()
+    establishment_id = reference_payload["establishments"][0]["establishment_id"]
+    order_method_id = reference_payload["order_methods"][0]["order_method_id"]
+
+    order_id = client.post(
+        f"{API_PREFIX}/orders",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_customer": "Пинна",
+            "items": [{"product_article": "PIN-001", "product_name": "Pinned Product", "order_item_quantity": 1, "order_item_price": "100.00"}],
+        },
+    ).json()["item"]["order_id"]
+
+    comment_ids = []
+    for index in range(4):
+        response = client.post(
+            f"{API_PREFIX}/orders/{order_id}/comments",
+            headers={"Authorization": f"Bearer {user_token}"},
+            json={"order_comment_text": f"Сообщение {index}"},
+        )
+        assert response.status_code == 201
+        item = response.json()["item"]
+        assert item["order_comment_is_pinned"] is False
+        comment_ids.append(item["order_comment_id"])
+
+    for comment_id in comment_ids[:3]:
+        pinned = client.put(
+            f"{API_PREFIX}/orders/{order_id}/comments/{comment_id}/pin",
+            headers={"Authorization": f"Bearer {user_token}"},
+            json={"order_comment_is_pinned": True},
+        )
+        assert pinned.status_code == 200
+        assert pinned.json()["item"]["order_comment_is_pinned"] is True
+
+    # Четвёртое закрепление упирается в лимит.
+    over_limit = client.put(
+        f"{API_PREFIX}/orders/{order_id}/comments/{comment_ids[3]}/pin",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={"order_comment_is_pinned": True},
+    )
+    assert over_limit.status_code == 400
+
+    # Флаг виден в карточке заказа — из неё список закреплённых собирает клиент.
+    detail = client.get(f"{API_PREFIX}/orders/{order_id}", headers={"Authorization": f"Bearer {user_token}"}).json()["item"]
+    assert [c["order_comment_text"] for c in detail["comments"] if c["order_comment_is_pinned"]] == ["Сообщение 0", "Сообщение 1", "Сообщение 2"]
+
+    # Открепить чужое сообщение может любой, кто видит заказ (здесь — админ).
+    unpinned = client.put(
+        f"{API_PREFIX}/orders/{order_id}/comments/{comment_ids[0]}/pin",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"order_comment_is_pinned": False},
+    )
+    assert unpinned.status_code == 200
+    assert unpinned.json()["item"]["order_comment_is_pinned"] is False
+
+    # Место освободилось — четвёртое закрепляется.
+    freed = client.put(
+        f"{API_PREFIX}/orders/{order_id}/comments/{comment_ids[3]}/pin",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={"order_comment_is_pinned": True},
+    )
+    assert freed.status_code == 200
+
+    missing = client.put(
+        f"{API_PREFIX}/orders/{order_id}/comments/999999/pin",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={"order_comment_is_pinned": True},
+    )
+    assert missing.status_code == 404
+
+    history_texts = [entry["text"] for entry in client.get(f"{API_PREFIX}/orders/{order_id}/history", headers={"Authorization": f"Bearer {user_token}"}).json()["items"]]
+    assert "закрепил сообщение в чате заказа" in history_texts
+    assert "открепил сообщение в чате заказа" in history_texts
+
+
 def test_order_can_be_created_without_order_method(client, integration_db_session, integration_user, integration_admin):
     # Заказ с сайта приходит без способа заказа — менеджер выбирает его сам.
     integration_admin.user_password = hash_password("AdminPass123")

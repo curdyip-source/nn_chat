@@ -28,6 +28,8 @@ const APP_MODES: { key: string; label: string; icon: string }[] = [
   { key: 'chat', label: 'Чат', icon: '💬' },
   { key: 'crm', label: 'СРМ', icon: '📋' },
   { key: 'price', label: 'Прайс', icon: '💲' },
+  // Тудулист есть только в приложении — в вебе экран не рисуется, ключ гейтит iOS.
+  { key: 'todo', label: 'Задачи', icon: '✅' },
 ]
 const CRM_SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: 'orders', label: 'Заказы', icon: '📦' },

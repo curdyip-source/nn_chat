@@ -86,3 +86,7 @@ class OrderCommentCreatePayload(BaseModel):
 class OrderCommentUpdatePayload(BaseModel):
     order_comment_text: str = Field(min_length=1, max_length=4000)
     mentioned_user_ids: list[int] = Field(default_factory=list, max_length=100)
+
+
+class OrderCommentPinPayload(BaseModel):
+    order_comment_is_pinned: bool
