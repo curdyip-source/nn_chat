@@ -111,6 +111,38 @@ def send_mention_push_event(
     return _dispatch_to_devices(db, devices=targets, title=title, body=body, event_type=event_type, entity_id=entity_id)
 
 
+def send_todo_assigned_push_event(
+    db: Session,
+    *,
+    recipient_user_ids: list[int],
+    sender_name: str,
+    todo_title: str,
+    todo_id: int,
+    order_id: int | None = None,
+) -> int:
+    """Пуш тем, кого назначили ответственными за задачу."""
+    if not APNS_ENABLED:
+        logger.info(
+            "push.todo_assigned.skipped_disabled",
+            extra={"event_type": "push.todo_assigned.skipped_disabled", "todo_id": todo_id},
+        )
+        return 0
+
+    targets = UserDeviceRepository(db).list_active_for_users(user_ids=recipient_user_ids)
+    if not targets:
+        logger.info(
+            "push.todo_assigned.skipped_no_targets",
+            extra={"event_type": "push.todo_assigned.skipped_no_targets", "todo_id": todo_id},
+        )
+        return 0
+
+    normalized_sender_name = sender_name.strip() or "Пользователь"
+    title = "Задача"
+    where = f" по заказу №{order_id}" if order_id else ""
+    body = f"{normalized_sender_name} назначил вас ответственным{where}: {todo_title.strip()[:80]}"
+    return _dispatch_to_devices(db, devices=targets, title=title, body=body, event_type="todo_assigned", entity_id=order_id or todo_id)
+
+
 def send_order_change_push_event(
     db: Session,
     *,

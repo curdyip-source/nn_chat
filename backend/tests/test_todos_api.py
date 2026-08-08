@@ -128,3 +128,112 @@ def test_todo_section_is_grantable(client, integration_db_session, integration_u
     )
     assert response.status_code == 200
     assert response.json()["item"]["user_sections"] == ["chat", "todo"]
+
+
+def _first_establishment(client, token: str) -> int:
+    ref = client.get(f"{API_PREFIX}/reference-data", headers=auth(token)).json()
+    return ref["establishments"][0]["establishment_id"]
+
+
+def _make_order(client, token: str, establishment_id: int, customer: str) -> int:
+    response = client.post(
+        f"{API_PREFIX}/orders",
+        headers=auth(token),
+        json={
+            "order_establishment_id": establishment_id,
+            "order_customer": customer,
+            "items": [{"product_article": "TODO-1", "product_name": "Товар", "order_item_quantity": 1, "order_item_price": "10.00"}],
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["item"]["order_id"]
+
+
+def test_order_todo_is_visible_to_everyone_who_sees_the_order(client, integration_db_session, integration_user, integration_admin):
+    # Заказная задача — общая: её видит любой, кому виден заказ, и она едет в карточке
+    # заказа (из неё же считается бабл в СРМ).
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    admin = login(client, "admin", "AdminPass123")
+    worker = login(client, "worker", "WorkerPass123")
+
+    establishment_id = _first_establishment(client, admin)
+    order_id = _make_order(client, admin, establishment_id, "Клиент админа")
+
+    created = client.post(
+        f"{API_PREFIX}/todos",
+        headers=auth(admin),
+        json={"todo_title": "Позвонить по заказу", "todo_order_id": order_id, "assignee_user_ids": [integration_user.user_id]},
+    )
+    assert created.status_code == 201, created.text
+    todo = created.json()["item"]
+    assert todo["todo_order_id"] == order_id
+    assert [a["user_login"] for a in todo["assignees"]] == ["worker"]
+
+    # Задача приезжает внутри карточки заказа.
+    order = client.get(f"{API_PREFIX}/orders/{order_id}", headers=auth(admin)).json()["item"]
+    assert [t["todo_title"] for t in order["todos"]] == ["Позвонить по заказу"]
+
+    # Ответственный видит чужую задачу в своём тудулисте и может её закрыть.
+    board = client.get(f"{API_PREFIX}/todos", headers=auth(worker)).json()
+    assert [i["todo_id"] for i in board["items"]] == [todo["todo_id"]]
+    done = client.put(f"{API_PREFIX}/todos/{todo['todo_id']}", headers=auth(worker), json={"todo_completed": True})
+    assert done.status_code == 200
+    assert done.json()["item"]["todo_completed"] is True
+
+    # Но удалить чужую задачу нельзя — только автор или админ.
+    assert client.delete(f"{API_PREFIX}/todos/{todo['todo_id']}", headers=auth(worker)).status_code == 403
+
+
+def test_order_todo_hidden_without_access_to_establishment(client, integration_db_session, integration_user, integration_admin):
+    # Нет доступа к складу заказа и не назначен ответственным → задачи не видно,
+    # и привязать свою задачу к чужому заказу нельзя.
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    admin = login(client, "admin", "AdminPass123")
+    worker = login(client, "worker", "WorkerPass123")
+
+    establishment_id = _first_establishment(client, admin)
+    order_id = _make_order(client, admin, establishment_id, "Клиент админа")
+    todo_id = client.post(
+        f"{API_PREFIX}/todos",
+        headers=auth(admin),
+        json={"todo_title": "Секретная задача", "todo_order_id": order_id},
+    ).json()["item"]["todo_id"]
+
+    # У worker нет ролей на складах вообще.
+    assert client.get(f"{API_PREFIX}/todos", headers=auth(worker)).json()["items"] == []
+    assert client.put(f"{API_PREFIX}/todos/{todo_id}", headers=auth(worker), json={"todo_completed": True}).status_code == 404
+    привязка = client.post(
+        f"{API_PREFIX}/todos",
+        headers=auth(worker),
+        json={"todo_title": "Своя", "todo_order_id": order_id},
+    )
+    assert привязка.status_code == 404
+
+
+def test_assignee_push_sent_once_on_assignment(client, integration_db_session, integration_user, integration_admin, monkeypatch):
+    # Пуш уходит только тем, кого назначили именно этим запросом.
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    admin = login(client, "admin", "AdminPass123")
+
+    calls = []
+    monkeypatch.setattr(
+        "app.services.todos.send_todo_assigned_push_event",
+        lambda db, **kwargs: calls.append(kwargs) or 0,
+    )
+
+    todo_id = client.post(f"{API_PREFIX}/todos", headers=auth(admin), json={"todo_title": "Задача"}).json()["item"]["todo_id"]
+    assert calls == []
+
+    client.put(f"{API_PREFIX}/todos/{todo_id}", headers=auth(admin), json={"assignee_user_ids": [integration_user.user_id]})
+    assert len(calls) == 1
+    assert calls[0]["recipient_user_ids"] == [integration_user.user_id]
+
+    # Повторное сохранение того же состава пуш не шлёт.
+    client.put(f"{API_PREFIX}/todos/{todo_id}", headers=auth(admin), json={"assignee_user_ids": [integration_user.user_id]})
+    assert len(calls) == 1

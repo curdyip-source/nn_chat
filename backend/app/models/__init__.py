@@ -10,7 +10,7 @@ from app.models.orders import Order, OrderComment, OrderCommentAttachment, Order
 from app.models.profile_photos import ProfilePhoto
 from app.models.product_registrations import ProductRegistration, ProductRegistrationItem
 from app.models.reference_data import Currency, Establishment, OrderMethod, Product, Status
-from app.models.todos import Todo, TodoList, TodoSubtask
+from app.models.todos import Todo, TodoAssignee, TodoList, TodoSubtask
 from app.models.user_sessions import UserSession
 from app.models.user_devices import UserDevice
 from app.models.user_establishment_roles import UserEstablishmentRole
@@ -46,4 +46,5 @@ __all__ = [
 	"TodoList",
 	"Todo",
 	"TodoSubtask",
+	"TodoAssignee",
 ]

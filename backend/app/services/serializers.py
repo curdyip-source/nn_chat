@@ -305,6 +305,10 @@ def serialize_order(row) -> dict:
         },
         "items": [serialize_order_item(item) for item in getattr(row, "items", [])],
         "comments": [serialize_order_comment(item) for item in comments],
+        # Задачи заказа едут в самой карточке: из них рисуется блок «Задачи» в
+        # просмотре заказа и бабл с количеством в списках СРМ. Их видно всем, кому
+        # виден заказ, — отдельного гейта не нужно.
+        "todos": [serialize_todo(item) for item in sorted(getattr(row, "todos", []), key=lambda t: t.todo_id)],
     }
 
 
@@ -438,10 +442,28 @@ def serialize_todo_subtask(row) -> dict:
     }
 
 
+def serialize_todo_assignee(row) -> dict:
+    user = getattr(row, "user", None)
+    return {
+        "user_id": row.todo_assignee_user_id,
+        "user_login": user.user_login if user else None,
+        "user_first_name": user.user_first_name if user else None,
+        "user_second_name": user.user_second_name if user else None,
+        "user_profile_photo": user.user_profile_photo if user else None,
+    }
+
+
 def serialize_todo(row) -> dict:
+    owner = getattr(row, "owner", None)
     return {
         "todo_id": row.todo_id,
         "todo_list_id": row.todo_list_id,
+        "todo_order_id": row.todo_order_id,
+        "todo_owner_user_id": row.todo_owner_user_id,
+        "todo_owner_user_login": owner.user_login if owner else None,
+        "todo_owner_first_name": owner.user_first_name if owner else None,
+        "todo_owner_second_name": owner.user_second_name if owner else None,
+        "assignees": [serialize_todo_assignee(item) for item in sorted(getattr(row, "assignees", []), key=lambda a: a.todo_assignee_user_id)],
         "todo_title": row.todo_title,
         "todo_note": row.todo_note,
         "todo_do_at": serialize_datetime(row.todo_do_at),

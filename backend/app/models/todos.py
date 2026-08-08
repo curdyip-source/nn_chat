@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -32,6 +32,10 @@ class Todo(Base):
     todo_owner_user_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
     # NULL = задача не в пользовательском списке (кандидат во «Входящие»).
     todo_list_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("todo_lists.todo_list_id", ondelete="SET NULL"), nullable=True, index=True)
+    # Привязка к заказу: такая задача общая — её видит любой, кому виден сам заказ.
+    # При удалении заказа задача остаётся, но теряет привязку (SET NULL), чтобы не
+    # уносить с собой работу.
+    todo_order_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("orders.order_id", ondelete="SET NULL"), nullable=True, index=True)
     todo_title: Mapped[str] = mapped_column(String(500), nullable=False)
     todo_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # «Когда сделать» и дедлайн — разные моменты (дата со временем): первый
@@ -49,9 +53,11 @@ class Todo(Base):
     todo_position: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     todo_created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
-    owner = relationship("User")
+    owner = relationship("User", foreign_keys=[todo_owner_user_id])
     list = relationship("TodoList", back_populates="todos")
+    order = relationship("Order", back_populates="todos")
     subtasks = relationship("TodoSubtask", back_populates="todo", cascade="all, delete-orphan", order_by="TodoSubtask.todo_subtask_position")
+    assignees = relationship("TodoAssignee", back_populates="todo", cascade="all, delete-orphan")
 
 
 class TodoSubtask(Base):
@@ -64,3 +70,19 @@ class TodoSubtask(Base):
     todo_subtask_position: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     todo = relationship("Todo", back_populates="subtasks")
+
+
+class TodoAssignee(Base):
+    """Ответственный за задачу. Их может быть несколько; назначение показывает задачу
+    в тудулисте человека и шлёт ему пуш."""
+
+    __tablename__ = "todo_assignees"
+    __table_args__ = (UniqueConstraint("todo_assignee_todo_id", "todo_assignee_user_id", name="uq_todo_assignee"),)
+
+    todo_assignee_id: Mapped[int] = mapped_column(SQL_ID_TYPE, primary_key=True, index=True)
+    todo_assignee_todo_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("todos.todo_id", ondelete="CASCADE"), nullable=False, index=True)
+    todo_assignee_user_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    todo_assignee_created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+    todo = relationship("Todo", back_populates="assignees")
+    user = relationship("User")

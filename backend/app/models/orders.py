@@ -61,6 +61,8 @@ class Order(Base):
     paid_by = relationship("User", foreign_keys=[order_paid_by_user_id])
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan", order_by="OrderItem.order_item_id")
     comments = relationship("OrderComment", back_populates="order", cascade="all, delete-orphan")
+    # Задачи заказа: живут в тудулисте, но показываются в карточке заказа и в СРМ.
+    todos = relationship("Todo", back_populates="order")
     messages = relationship("Message", back_populates="order")
 
 
