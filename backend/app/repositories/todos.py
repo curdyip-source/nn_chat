@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.todos import Todo, TodoList, TodoSubtask
+from app.models.orders import Order
+from app.models.todos import Todo, TodoAssignee, TodoList, TodoSubtask
 
 
 class TodoRepository:
@@ -59,46 +60,74 @@ class TodoRepository:
 
     # --- задачи ---
 
-    def list_todos(self, user_id: int) -> list[Todo]:
+    def list_visible(self, user_id: int, accessible_orders_filter) -> list[Todo]:
+        """Задачи, доступные пользователю: свои, где он ответственный, и задачи
+        заказов, которые он вправе видеть. `accessible_orders_filter` — готовое
+        условие по таблице orders (его собирает сервис из прав на склады и статусы)
+        либо None, если пользователь видит все заказы (администратор)."""
+        assigned = self.db.query(TodoAssignee.todo_assignee_todo_id).filter(TodoAssignee.todo_assignee_user_id == user_id)
+        order_ids = self.db.query(Order.order_id)
+        if accessible_orders_filter is not None:
+            order_ids = order_ids.filter(accessible_orders_filter)
+
         return (
-            self.db.query(Todo)
-            .options(joinedload(Todo.subtasks))
-            .filter(Todo.todo_owner_user_id == user_id)
+            self._todo_query()
+            .filter(
+                or_(
+                    Todo.todo_owner_user_id == user_id,
+                    Todo.todo_id.in_(assigned),
+                    Todo.todo_order_id.in_(order_ids),
+                )
+            )
             .order_by(Todo.todo_position, Todo.todo_id)
             .all()
         )
 
+    def get_todo_by_id(self, todo_id: int) -> Todo | None:
+        return self._todo_query().filter(Todo.todo_id == todo_id).first()
+
     def get_todo(self, user_id: int, todo_id: int) -> Todo | None:
-        return (
-            self.db.query(Todo)
-            .options(joinedload(Todo.subtasks))
-            .filter(Todo.todo_id == todo_id, Todo.todo_owner_user_id == user_id)
-            .first()
+        return self._todo_query().filter(Todo.todo_id == todo_id, Todo.todo_owner_user_id == user_id).first()
+
+    def list_todos_for_order(self, order_id: int) -> list[Todo]:
+        return self._todo_query().filter(Todo.todo_order_id == order_id).order_by(Todo.todo_id).all()
+
+    def _todo_query(self):
+        return self.db.query(Todo).options(
+            joinedload(Todo.subtasks),
+            joinedload(Todo.assignees).joinedload(TodoAssignee.user),
+            joinedload(Todo.owner),
         )
 
     def next_todo_position(self, user_id: int) -> int:
         value = self.db.query(func.max(Todo.todo_position)).filter(Todo.todo_owner_user_id == user_id).scalar()
         return (value or 0) + 1
 
-    def add_todo(self, data: dict, subtasks: list[dict]) -> Todo:
+    def add_todo(self, data: dict, subtasks: list[dict], assignee_user_ids: list[int]) -> Todo:
         row = Todo(**data)
         self.db.add(row)
         self.db.flush()
         self._replace_subtasks(row, subtasks)
+        self._replace_assignees(row, assignee_user_ids)
         self.db.commit()
-        return self.get_todo(row.todo_owner_user_id, row.todo_id)
+        return self.get_todo_by_id(row.todo_id)
 
-    def update_todo(self, row: Todo, data: dict, subtasks: list[dict] | None = None) -> Todo:
+    def update_todo(self, row: Todo, data: dict, subtasks: list[dict] | None = None, assignee_user_ids: list[int] | None = None) -> Todo:
         for key, value in data.items():
             setattr(row, key, value)
         if subtasks is not None:
             self._replace_subtasks(row, subtasks)
+        if assignee_user_ids is not None:
+            self._replace_assignees(row, assignee_user_ids)
         self.db.commit()
-        return self.get_todo(row.todo_owner_user_id, row.todo_id)
+        return self.get_todo_by_id(row.todo_id)
 
     def delete_todo(self, row: Todo) -> None:
         self.db.delete(row)
         self.db.commit()
+
+    def current_assignee_ids(self, row: Todo) -> set[int]:
+        return {item.todo_assignee_user_id for item in row.assignees}
 
     def reorder_todos(self, user_id: int, positions: dict[int, int]) -> None:
         rows = self.db.query(Todo).filter(Todo.todo_owner_user_id == user_id, Todo.todo_id.in_(positions.keys())).all()
@@ -121,4 +150,11 @@ class TodoRepository:
                     todo_subtask_position=index,
                 )
             )
+        self.db.flush()
+
+    def _replace_assignees(self, row: Todo, user_ids: list[int]) -> None:
+        row.assignees.clear()
+        self.db.flush()
+        for user_id in dict.fromkeys(user_ids):
+            row.assignees.append(TodoAssignee(todo_assignee_user_id=user_id))
         self.db.flush()

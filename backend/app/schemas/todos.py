@@ -20,6 +20,8 @@ class TodoSubtaskPayload(BaseModel):
 class TodoCreatePayload(BaseModel):
     todo_title: str = Field(min_length=1, max_length=500)
     todo_list_id: Optional[int] = None
+    todo_order_id: Optional[int] = None
+    assignee_user_ids: list[int] = Field(default_factory=list, max_length=20)
     todo_note: Optional[str] = Field(default=None, max_length=4000)
     todo_do_at: Optional[datetime] = None
     todo_deadline_at: Optional[datetime] = None
@@ -35,6 +37,8 @@ class TodoUpdatePayload(BaseModel):
 
     todo_title: Optional[str] = Field(default=None, min_length=1, max_length=500)
     todo_list_id: Optional[int] = None
+    todo_order_id: Optional[int] = None
+    assignee_user_ids: Optional[list[int]] = Field(default=None, max_length=20)
     todo_note: Optional[str] = Field(default=None, max_length=4000)
     todo_do_at: Optional[datetime] = None
     todo_deadline_at: Optional[datetime] = None
