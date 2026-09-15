@@ -153,10 +153,13 @@ export default function MatchView() {
     return [cp.name || cp.title, cp.email].filter(Boolean).join(" · ");
   };
 
-  const fromGsheet = () => {
+  // path — обычный прогон (связки, как раньше) или тестовый (+ сопоставление
+  // по содержанию, см. MatchJob.algo) — два отдельных запуска, чтобы сравнить
+  // результат, не подмешивая новое к привычному режиму.
+  const runFromGsheet = (path) => {
     setBusy(true);
     setError(null);
-    priceFetch(`/api/match/from-gsheet`, { method: "POST" })
+    priceFetch(`/api/match/${path}`, { method: "POST" })
       .then(async (r) => {
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.detail || `HTTP ${r.status}`);
@@ -172,6 +175,8 @@ export default function MatchView() {
       .catch((err) => setError(err.message))
       .finally(() => setBusy(false));
   };
+  const fromGsheet = () => runFromGsheet("from-gsheet");
+  const fromGsheetV2 = () => runFromGsheet("from-gsheet-v2");
 
   // --- review ---
   const openReview = (j) => {
@@ -292,7 +297,7 @@ export default function MatchView() {
     if (p) {
       if (p.reject) return "reject";
       if (p.product_id != null || p.offer_id != null)
-        return p.via === "auto" ? "auto" : "manual";
+        return p.via === "auto" || p.via === "content" ? "auto" : "manual";
     }
     const has = (it.candidates || []).some((c) => c.supplier_email === email);
     return has ? "pending" : "empty";
@@ -377,6 +382,16 @@ export default function MatchView() {
           >
             {busy ? "Загружаю…" : "Загрузить из Gsheet"}
           </button>
+          <button
+            className="btn-ghost match-intro-btn"
+            disabled={busy || !authorized}
+            onClick={fromGsheetV2}
+            title="Тот же лист, но отдельным заданием — со ВТОРЫМ сопоставлением
+(доп. авто-подбор по содержанию поверх связок). Не влияет на обычный
+прогон — для сравнения результата."
+          >
+            {busy ? "Загружаю…" : "Загрузить из Gsheet (тест: новое сопоставление)"}
+          </button>
         </div>
         {error && <div className="status error">Ошибка: {error}</div>}
         {jobs.length > 0 && (
@@ -413,6 +428,11 @@ export default function MatchView() {
                     title="Отметить для удаления"
                   />
                   <div className="name">
+                    {j.algo === "content_v2" && (
+                      <span className="tag" title="Тестовое задание: доп. сопоставление по содержанию">
+                        новое
+                      </span>
+                    )}
                     {j.counterparty_id ? <b>{custLabel(j.counterparty_id)} · </b> : null}
                     {j.filename}
                   </div>
