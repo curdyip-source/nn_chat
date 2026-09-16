@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import and_, delete, false, func, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, aliased, joinedload
 
 from app.models.orders import Order, OrderComment, OrderCommentAttachment, OrderItem
 from app.models.reference_data import Currency
@@ -71,6 +71,18 @@ class OrderRepository:
             # Числовой запрос — ищем ещё и по номеру заказа (order_id).
             if stripped.isdigit():
                 conditions.append(Order.order_id == int(stripped))
+            # Поиск по товару в позициях заказа (алиас — чтобы не конфликтовать
+            # с OrderItem, который может быть уже присоединён во внешнем запросе).
+            item_alias = aliased(OrderItem)
+            item_match = (
+                self.db.query(item_alias.order_item_id)
+                .filter(
+                    item_alias.order_item_order_id == Order.order_id,
+                    or_(item_alias.order_item_name.ilike(like_value), item_alias.order_item_article.ilike(like_value)),
+                )
+                .exists()
+            )
+            conditions.append(item_match)
             query = query.filter(or_(*conditions))
         return query
 
