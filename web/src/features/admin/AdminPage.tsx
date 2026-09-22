@@ -1,32 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
-import {
-  createSystemMessage,
-  getSystemMessageReceipts,
-  listSystemMessages,
-  listUsers,
-  saveAppSettings,
-} from '../../api/endpoints'
-import type { SystemMessage, SystemMessageReceipt, User } from '../../api/types'
+import { useState } from 'react'
+import { createSystemMessage, listUsers, saveAppSettings } from '../../api/endpoints'
+import type { User } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
-import { useRealtime } from '../../data/RealtimeContext'
 import { Button } from '../../ui/Button'
 import { Checkbox } from '../../ui/Checkbox'
 import { Field, TextArea, TextInput } from '../../ui/Field'
+import { Modal } from '../../ui/Modal'
 import { SearchSelect } from '../../ui/SearchSelect'
 import { SegmentedControl } from '../../ui/SegmentedControl'
+import { SystemMessagesHistory } from './SystemMessagesHistory'
 import styles from '../reference/ReferencePage.module.css'
 
 type TargetMode = 'all' | 'user' | 'users'
-
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 function userName(u: User) {
   return [u.user_second_name, u.user_first_name].filter(Boolean).join(' ') || u.user_login
@@ -70,6 +55,7 @@ export function AdminPage() {
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState('')
   const [sendSuccess, setSendSuccess] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const textValid = messageText.trim().length > 0
   const recipientsValid = targetMode === 'all' || recipients.length > 0
@@ -87,47 +73,6 @@ export function AdminPage() {
     setRecipients((prev) => prev.filter((u) => u.user_id !== userId))
   }
 
-  // ---------- Системные сообщения: история ----------
-  const [messages, setMessages] = useState<SystemMessage[]>([])
-  const [messagesLoading, setMessagesLoading] = useState(false)
-  const [expandedId, setExpandedId] = useState<number | null>(null)
-  const [receipts, setReceipts] = useState<Record<number, SystemMessageReceipt[]>>({})
-  const [receiptsLoadingId, setReceiptsLoadingId] = useState<number | null>(null)
-
-  const loadMessages = () => {
-    setMessagesLoading(true)
-    listSystemMessages()
-      .then((r) => setMessages(r.items))
-      .finally(() => setMessagesLoading(false))
-  }
-
-  const loadReceipts = (id: number) => {
-    setReceiptsLoadingId(id)
-    getSystemMessageReceipts(id)
-      .then((r) => setReceipts((prev) => ({ ...prev, [id]: r.items })))
-      .finally(() => setReceiptsLoadingId(null))
-  }
-
-  useEffect(() => {
-    loadMessages()
-  }, [])
-
-  // Realtime: сервер шлёт SSE-сигнал на отправку и на каждое подтверждение
-  // прочтения (плюс фолбэк-поллинг раз в 5с внутри useRealtime, если SSE
-  // не дошёл) — перечитываем список и открытую панель «кто прочитал» вживую,
-  // без ручного обновления страницы.
-  const { revision } = useRealtime()
-  const isFirstRevision = useRef(true)
-  useEffect(() => {
-    if (isFirstRevision.current) {
-      isFirstRevision.current = false
-      return
-    }
-    loadMessages()
-    if (expandedId !== null) loadReceipts(expandedId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [revision])
-
   const send = async () => {
     if (!canSend) return
     setSending(true)
@@ -144,21 +89,11 @@ export function AdminPage() {
       setImportant(false)
       setRecipients([])
       setSendSuccess(true)
-      loadMessages()
     } catch (e) {
       setSendError(e instanceof Error ? e.message : 'Не удалось отправить')
     } finally {
       setSending(false)
     }
-  }
-
-  const toggleReceipts = (id: number) => {
-    if (expandedId === id) {
-      setExpandedId(null)
-      return
-    }
-    setExpandedId(id)
-    if (!receipts[id]) loadReceipts(id)
   }
 
   return (
@@ -214,7 +149,30 @@ export function AdminPage() {
         </div>
 
         <div className={styles.group}>
-          <div className={styles.groupTitle}>Системные сообщения</div>
+          <div className={styles.groupTitle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Системные сообщения</span>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              title="История системных сообщений"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                color: 'var(--accent, #2563eb)',
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: 'none',
+                letterSpacing: 0,
+                padding: 0,
+              }}
+            >
+              🕘 История
+            </button>
+          </div>
           <div className={styles.form}>
             <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.45, maxWidth: 560, color: 'var(--text-dim)' }}>
               Получатель увидит сообщение блокирующим окном в приложении — сразу, если оно
@@ -324,73 +282,11 @@ export function AdminPage() {
             {sendSuccess && <div style={{ fontSize: 13, color: '#16a34a' }}>Отправлено ✓</div>}
           </div>
         </div>
-
-        <div className={styles.group}>
-          <div className={styles.groupTitle}>История системных сообщений</div>
-          <div className={styles.form}>
-            {messagesLoading && <p style={{ margin: 0, color: 'var(--text-dim)', fontSize: 13.5 }}>Загрузка…</p>}
-            {!messagesLoading && messages.length === 0 && (
-              <p style={{ margin: 0, color: 'var(--text-dim)', fontSize: 13.5 }}>Сообщений ещё не отправляли.</p>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 720 }}>
-              {messages.map((m) => (
-                <div
-                  key={m.id}
-                  style={{ border: '1px solid var(--border, #e5e7eb)', borderRadius: 12, padding: 12 }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>
-                        {formatDateTime(m.created_at)} · {m.created_by?.name ?? '—'}
-                        {m.important && (
-                          <span style={{ marginLeft: 8, color: '#b45309', fontWeight: 600 }}>Важное</span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 14, lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{m.text}</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => toggleReceipts(m.id)}
-                      style={{
-                        border: 'none',
-                        background: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--accent, #2563eb)',
-                        fontSize: 13,
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {m.read_count} из {m.recipients_count} прочитали {expandedId === m.id ? '▲' : '▼'}
-                    </button>
-                  </div>
-
-                  {expandedId === m.id && (
-                    <div style={{ marginTop: 10, borderTop: '1px solid var(--border, #e5e7eb)', paddingTop: 10 }}>
-                      {receiptsLoadingId === m.id && (
-                        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Загрузка…</div>
-                      )}
-                      {receipts[m.id] && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          {receipts[m.id].map((r) => (
-                            <div key={r.user_id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                              <span>{r.name ?? `#${r.user_id}`}</span>
-                              <span style={{ color: r.acked_at ? '#16a34a' : 'var(--text-dim)' }}>
-                                {r.acked_at ? formatDateTime(r.acked_at) : 'не прочитано'}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       </div>
+
+      <Modal open={historyOpen} title="История системных сообщений" onClose={() => setHistoryOpen(false)} width={720}>
+        <SystemMessagesHistory />
+      </Modal>
     </div>
   )
 }
