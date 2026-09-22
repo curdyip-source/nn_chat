@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   createSystemMessage,
   getSystemMessageReceipts,
@@ -8,6 +8,7 @@ import {
 } from '../../api/endpoints'
 import type { SystemMessage, SystemMessageReceipt, User } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
+import { useRealtime } from '../../data/RealtimeContext'
 import { Button } from '../../ui/Button'
 import { Checkbox } from '../../ui/Checkbox'
 import { Field, TextArea, TextInput } from '../../ui/Field'
@@ -100,9 +101,32 @@ export function AdminPage() {
       .finally(() => setMessagesLoading(false))
   }
 
+  const loadReceipts = (id: number) => {
+    setReceiptsLoadingId(id)
+    getSystemMessageReceipts(id)
+      .then((r) => setReceipts((prev) => ({ ...prev, [id]: r.items })))
+      .finally(() => setReceiptsLoadingId(null))
+  }
+
   useEffect(() => {
     loadMessages()
   }, [])
+
+  // Realtime: сервер шлёт SSE-сигнал на отправку и на каждое подтверждение
+  // прочтения (плюс фолбэк-поллинг раз в 5с внутри useRealtime, если SSE
+  // не дошёл) — перечитываем список и открытую панель «кто прочитал» вживую,
+  // без ручного обновления страницы.
+  const { revision } = useRealtime()
+  const isFirstRevision = useRef(true)
+  useEffect(() => {
+    if (isFirstRevision.current) {
+      isFirstRevision.current = false
+      return
+    }
+    loadMessages()
+    if (expandedId !== null) loadReceipts(expandedId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revision])
 
   const send = async () => {
     if (!canSend) return
@@ -134,12 +158,7 @@ export function AdminPage() {
       return
     }
     setExpandedId(id)
-    if (!receipts[id]) {
-      setReceiptsLoadingId(id)
-      getSystemMessageReceipts(id)
-        .then((r) => setReceipts((prev) => ({ ...prev, [id]: r.items })))
-        .finally(() => setReceiptsLoadingId(null))
-    }
+    if (!receipts[id]) loadReceipts(id)
   }
 
   return (

@@ -153,4 +153,10 @@ def acknowledge_system_message(db: Session, message_id: int, user_id: int) -> di
         recipient.system_message_recipient_acked_at = datetime.utcnow()
         db.commit()
 
+        # Веб-«Админка» держит открытой историю сообщений — счётчик «прочитали»
+        # обновляем вживую, а не только по фолбэк-поллингу realtime-канала.
+        from app.services.message_stream import broker
+
+        broker.publish({"type": "system_message_acked", "message_id": message_id})
+
     return {"acked": True}
