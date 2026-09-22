@@ -20,6 +20,8 @@ import type {
   SalesChannel,
   SetupStatus,
   Status,
+  SystemMessage,
+  SystemMessageReceipt,
   User,
 } from './types'
 
@@ -93,6 +95,25 @@ export function saveSalesChannel(id: number | null, body: { order_sales_channel_
 
 export function saveAppSettings(body: { min_supported_ios_build: number }) {
   return apiRequest<{ min_supported_ios_build: number }>('/app-settings', { method: 'PUT', body })
+}
+
+// ---------- Системные сообщения ----------
+
+export function listSystemMessages() {
+  return apiRequest<{ items: SystemMessage[] }>('/admin/system-messages')
+}
+
+export function createSystemMessage(body: {
+  text: string
+  important: boolean
+  target: 'all' | 'user' | 'users'
+  user_ids: number[]
+}) {
+  return apiRequest<{ item: SystemMessage }>('/admin/system-messages', { method: 'POST', body })
+}
+
+export function getSystemMessageReceipts(messageId: number) {
+  return apiRequest<{ items: SystemMessageReceipt[] }>(`/admin/system-messages/${messageId}/receipts`)
 }
 
 export function saveStatus(

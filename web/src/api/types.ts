@@ -12,6 +12,25 @@ export type EstablishmentPermission = {
   delete_scope: ActionScope
 }
 
+// Системное сообщение из «Админки» — блокирующий оверлей в приложении, пока
+// получатель не подтвердит прочтение. Получатели — снимок на момент отправки.
+export type SystemMessage = {
+  id: number
+  text: string
+  important: boolean
+  created_at: string
+  created_by: { user_id: number; name: string | null } | null
+  recipients_count: number
+  read_count: number
+}
+
+export type SystemMessageReceipt = {
+  user_id: number
+  name: string | null
+  // null, пока получатель не подтвердил прочтение.
+  acked_at: string | null
+}
+
 export type User = {
   user_id: number
   user_login: string

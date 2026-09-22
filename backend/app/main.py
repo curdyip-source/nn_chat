@@ -21,6 +21,7 @@ from app.api.routes.product_registrations import router as product_registrations
 from app.api.routes.products import router as products_router
 from app.api.routes.reference_data import router as reference_data_router
 from app.api.routes.system import router as system_router
+from app.api.routes.system_messages import router as system_messages_router
 from app.api.routes.todos import lists_router as todo_lists_router, router as todos_router
 from app.api.routes.user_devices import router as user_devices_router
 from app.api.routes.users import router as users_router
@@ -105,6 +106,7 @@ def create_app() -> FastAPI:
     api_v1_router.include_router(todos_router)
     api_v1_router.include_router(todo_lists_router)
     api_v1_router.include_router(users_router)
+    api_v1_router.include_router(system_messages_router)
 
     application.include_router(media_router)
     application.include_router(api_v1_router)
