@@ -7,14 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.finance import ExchangeRate, FinanceExpense, FinanceExpenseCategory
-from app.models.orders import Order, OrderItem
-from app.models.reference_data import Status
-
-# Товар считается «проданным» для финансового свода, когда позиция реально уехала —
-# это статус позиции (order_products), а не статус всего заказа: в одном заказе
-# позиции едут независимо (для этого и есть его разделение на «готово»/«остальное»).
-SOLD_ITEM_STATUS_TYPE = "order_products"
-SOLD_ITEM_STATUS_NAME = "Отгружено"
+from app.models.orders import OrderItem
 
 
 class ExchangeRateRepository:
@@ -137,19 +130,19 @@ class FinanceOrderItemRepository:
         self.db = db
 
     def list_items_for_range(self, date_from: date, date_to: date) -> list[OrderItem]:
-        # Диапазон — по дате СОЗДАНИЯ заказа (своей даты отгрузки позиция не хранит),
-        # как и фильтр по датам в разделе «Заказы» (OrderRepository._apply_order_filters).
-        # date_to включительно — берём весь день до полуночи следующего.
+        # Диапазон — по order_item_shipped_at (моменту перехода в «Отгружено»), а НЕ
+        # по дате создания заказа: заказ мог быть оформлен неделю назад, а товар уехал
+        # сегодня — фильтр должен находить его по сегодняшней дате. shipped_at не NULL
+        # ровно тогда, когда позиция реально отгружена (см. orders.py::_resolve_item_shipped_at),
+        # так что отдельный джойн на статус не нужен. date_to включительно.
         start = datetime.combine(date_from, time.min)
         end = datetime.combine(date_to + timedelta(days=1), time.min)
         return (
             self.db.query(OrderItem)
-            .join(Order, OrderItem.order_item_order_id == Order.order_id)
-            .join(Status, OrderItem.order_item_status_id == Status.status_id)
-            .options(joinedload(OrderItem.order), joinedload(OrderItem.currency))
-            .filter(Order.order_created_at >= start, Order.order_created_at < end)
-            .filter(Status.status_type == SOLD_ITEM_STATUS_TYPE, Status.status_status == SOLD_ITEM_STATUS_NAME)
-            .order_by(OrderItem.order_item_created_at.desc(), OrderItem.order_item_id.desc())
+            .options(joinedload(OrderItem.currency))
+            .filter(OrderItem.order_item_shipped_at.isnot(None))
+            .filter(OrderItem.order_item_shipped_at >= start, OrderItem.order_item_shipped_at < end)
+            .order_by(OrderItem.order_item_shipped_at.desc(), OrderItem.order_item_id.desc())
             .all()
         )
 

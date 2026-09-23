@@ -7,8 +7,30 @@
 .scroll {
   flex: 1;
   min-height: 0;
+  /* Каждая вкладка теперь сама решает, что у неё скроллится (см. .tabScroll и
+     .overviewRoot) — «Обзор» держит карточки/шапку и пагинацию прибитыми, скроллится
+     только список позиций. */
+  overflow: hidden;
+}
+.tabScroll {
+  height: 100%;
   overflow-y: auto;
   padding-bottom: 24px;
+}
+.overviewRoot {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.overviewFixed {
+  flex: 0 0 auto;
+}
+.itemsScrollArea {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 12px;
 }
 .header {
   margin-bottom: 20px;
@@ -89,9 +111,6 @@
 .cardValue {
   font-size: 20px;
   font-weight: 800;
-}
-.group {
-  margin-bottom: 22px;
 }
 .groupTitle {
   font-size: 12px;

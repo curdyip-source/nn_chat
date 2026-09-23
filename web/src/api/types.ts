@@ -140,6 +140,8 @@ export type OrderItemForReview = {
   order_item_article: string | null
   order_item_quantity: number
   order_item_created_at: string
+  // Момент отгрузки (не дата создания заказа!) — «Финансы» фильтруют период по нему.
+  order_item_shipped_at: string
   // Цена — в валюте позиции (order_item_currency_name), не всегда рубли!
   // По умолчанию продажи ведутся в USD. order_item_price_rub — уже переведено
   // по курсу на дату заказа (null, если курса на тот момент не было).

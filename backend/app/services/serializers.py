@@ -327,6 +327,8 @@ def serialize_order_item(row) -> dict:
         "order_item_checkpoint_started": row.order_item_checkpoint_started,
         "order_item_checkpoint_completed": row.order_item_checkpoint_completed,
         "order_item_created_at": serialize_datetime(row.order_item_created_at),
+        # Момент отгрузки (не дата создания заказа!) — по нему «Финансы» фильтруют период.
+        "order_item_shipped_at": serialize_datetime(getattr(row, "order_item_shipped_at", None)),
         # Финансы: снимок себестоимости на момент создания + расчёт на лету.
         "order_item_currency_name": money["currency_name"],
         "order_item_price_rub": serialize_decimal(money["price_rub"]),

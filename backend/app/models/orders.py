@@ -94,9 +94,15 @@ class OrderItem(Base):
     # считаются на лету (cost_usd * cost_rate), не хранятся.
     order_item_cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     order_item_cost_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
-    # Заполняются при ручной коррекции себестоимости в разделе «Финансы» (ревью перед закрытием месяца).
+    # Заполняются при ручной коррекции себестоимости в разделе «Финансы».
     order_item_cost_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     order_item_cost_updated_by_user_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+    # Момент, когда позиция стала «Отгружено» (не дата создания заказа!) — по этому
+    # полю «Финансы» фильтруют «проданное» за период. Ставится при переходе статуса
+    # в «Отгружено» и сохраняется как есть, если статус остаётся «Отгружено» при
+    # правках заказа (см. app/services/orders.py::_resolve_item_shipped_at);
+    # обнуляется, если статус уходит от «Отгружено».
+    order_item_shipped_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
     order = relationship("Order", back_populates="items")
     product = relationship("Product", back_populates="order_items")

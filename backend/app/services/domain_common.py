@@ -4,6 +4,11 @@ from sqlalchemy.orm import Session
 from app.repositories.reference_data import ProductRepository, ReferenceDataRepository
 from app.services.reference_data import ensure_reference_data
 
+# Статус позиции, который «Финансы» считают продажей (см. orders.py::_resolve_item_shipped_at
+# и repositories/finance.py) — общее место, чтобы обе стороны не разъехались по строке.
+SOLD_ITEM_STATUS_TYPE = "order_products"
+SOLD_ITEM_STATUS_NAME = "Отгружено"
+
 
 def get_establishment_or_404(db: Session, establishment_id: int):
     row = ReferenceDataRepository(db).get_establishment(establishment_id)

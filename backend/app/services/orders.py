@@ -20,7 +20,7 @@ from app.services.contacts import save_buyer_contact_from_order, save_supplier_c
 from app.services.audit import log_audit_event
 from app.services.access_control import allowed_order_status_ids, can_create_on_establishment, can_delete_document, can_edit_document, can_view_document, can_view_order_status, list_visibility
 from app.services.card_sync import notify_cards_deleted, notify_order_changed
-from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
+from app.services.domain_common import SOLD_ITEM_STATUS_NAME, get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.exchange_rates import get_rate_for_date
 from app.services.messages import resolve_mention_recipient_ids
 from app.services.push_notifications import send_mention_push_event, send_order_change_push_event, send_order_comment_push_event, send_push_notification_event
@@ -85,6 +85,19 @@ def _order_item_identity_row(item: OrderItem) -> str:
         return f"a:{article}"
     name = (item.order_item_name or "").strip().lower()
     return f"n:{name}"
+
+
+def _resolve_item_shipped_at(item_status, existing_item: OrderItem | None) -> datetime | None:
+    # «Финансы» фильтруют по этому полю, а не по дате создания заказа — иначе товар,
+    # отгруженный сегодня из заказа недельной давности, не находился бы за сегодня.
+    # Ставим момент перехода в «Отгружено»; если позиция и раньше была отгружена (и
+    # осталась такой при пересборке позиций на правке заказа) — сохраняем исходную
+    # дату, а не подменяем её на "сейчас". Если статус ушёл от «Отгружено» — сбрасываем.
+    if item_status.status_status != SOLD_ITEM_STATUS_NAME:
+        return None
+    if existing_item is not None and existing_item.order_item_shipped_at is not None:
+        return existing_item.order_item_shipped_at
+    return datetime.utcnow()
 
 
 def _count_order_item_changes(before_items: list[dict], after_items: list[dict]) -> tuple[int, int]:
@@ -432,6 +445,7 @@ class OrderService:
                 normalized_item_supplier = None
             source_establishment_id, destination_establishment_id = self._resolve_item_route(item_status.status_status if item_status else None, item.order_item_source_establishment_id, item.order_item_destination_establishment_id)
             cost_usd, cost_rate = _resolve_item_cost_snapshot(self.db, product_row.product_cost_usd)
+            shipped_at = _resolve_item_shipped_at(item_status, None)
             items.append(
                 {
                     "order_item_product_id": product_row.product_id,
@@ -450,6 +464,7 @@ class OrderService:
                     "order_item_owner_user_id": current_user["user_id"],
                     "order_item_cost_usd": cost_usd,
                     "order_item_cost_rate": cost_rate,
+                    "order_item_shipped_at": shipped_at,
                 }
             )
 
@@ -586,6 +601,7 @@ class OrderService:
                 cost_rate = existing_item.order_item_cost_rate
                 cost_updated_at = existing_item.order_item_cost_updated_at
                 cost_updated_by_user_id = existing_item.order_item_cost_updated_by_user_id
+            shipped_at = _resolve_item_shipped_at(item_status, existing_item)
             items.append(
                 {
                     "order_item_product_id": product_row.product_id,
@@ -606,6 +622,7 @@ class OrderService:
                     "order_item_cost_rate": cost_rate,
                     "order_item_cost_updated_at": cost_updated_at,
                     "order_item_cost_updated_by_user_id": cost_updated_by_user_id,
+                    "order_item_shipped_at": shipped_at,
                 }
             )
 
@@ -1023,6 +1040,7 @@ class OrderService:
                     order_item_cost_rate=item.order_item_cost_rate,
                     order_item_cost_updated_at=item.order_item_cost_updated_at,
                     order_item_cost_updated_by_user_id=item.order_item_cost_updated_by_user_id,
+                    order_item_shipped_at=item.order_item_shipped_at,
                 )
             )
 

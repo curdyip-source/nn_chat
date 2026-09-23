@@ -1,4 +1,7 @@
+from datetime import datetime
+
 from app.core.security import hash_password
+from app.models.orders import Order
 
 API_PREFIX = "/api/v1"
 
@@ -18,7 +21,7 @@ def _admin_headers(client, integration_db_session, integration_admin) -> dict:
 
 def _shipped_status_id(reference_payload: dict) -> int:
     # Свод считает «продано» только позиции в статусе «Отгружено» (order_products) —
-    # см. app/repositories/finance.py::SOLD_ITEM_STATUS_NAME.
+    # см. app/services/domain_common.py::SOLD_ITEM_STATUS_NAME.
     return next(
         item["status_id"]
         for item in reference_payload["statuses"]
@@ -560,3 +563,79 @@ def test_finance_access_gated_by_crm_and_finance_sections(client, integration_db
     )
     assert partial.status_code == 200
     assert client.get(summary_url, headers=worker_headers()).status_code == 403
+
+
+def test_summary_filters_by_shipped_date_not_order_created_date(client, integration_db_session, integration_admin):
+    # Регрессия: свод фильтровал по дате СОЗДАНИЯ заказа — товар, отгруженный сегодня
+    # из заказа недельной давности, не находился фильтром за сегодня. Позиция должна
+    # находиться по дате её отгрузки (order_item_shipped_at), а не по order_created_at.
+    headers = _admin_headers(client, integration_db_session, integration_admin)
+
+    reference_payload = client.get(f"{API_PREFIX}/reference-data", headers=headers).json()
+    establishment_id = reference_payload["establishments"][0]["establishment_id"]
+    order_method_id = reference_payload["order_methods"][0]["order_method_id"]
+    shipped_status_id = _shipped_status_id(reference_payload)
+
+    # Создаём заказ ещё не отгруженным (дефолтный статус позиции).
+    create_response = client.post(
+        f"{API_PREFIX}/orders",
+        headers=headers,
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_customer": "Старый заказ",
+            "order_info": "Тест",
+            "items": [
+                {
+                    "product_article": "FIN-TEST-SHIPDATE",
+                    "product_name": "Ship Date Product",
+                    "order_item_quantity": 1,
+                    "order_item_price": "10.00",
+                }
+            ],
+        },
+    )
+    assert create_response.status_code == 201
+    order = create_response.json()["item"]
+    order_id = order["order_id"]
+    assert order["items"][0]["order_item_shipped_at"] is None
+
+    # "Состарим" сам заказ в базе — как будто он оформлен неделю назад.
+    order_row = integration_db_session.query(Order).filter(Order.order_id == order_id).one()
+    order_row.order_created_at = datetime(2020, 1, 1)
+    integration_db_session.commit()
+
+    # Сегодня отгружаем эту позицию правкой заказа.
+    update_response = client.put(
+        f"{API_PREFIX}/orders/{order_id}",
+        headers=headers,
+        json={
+            "order_establishment_id": establishment_id,
+            "order_method_id": order_method_id,
+            "order_status_id": order["order_status_id"],
+            "order_customer": "Старый заказ",
+            "order_info": "Тест",
+            "items": [
+                {
+                    "product_article": "FIN-TEST-SHIPDATE",
+                    "product_name": "Ship Date Product",
+                    "order_item_quantity": 1,
+                    "order_item_price": "10.00",
+                    "order_item_status_id": shipped_status_id,
+                }
+            ],
+        },
+    )
+    assert update_response.status_code == 200
+    updated_item = update_response.json()["item"]["items"][0]
+    assert updated_item["order_item_shipped_at"] is not None
+
+    # Фильтр за дату СОЗДАНИЯ заказа (2020 год) больше не должен находить позицию.
+    old_date_summary = client.get(f"{API_PREFIX}/finance/summary?date_from=2020-01-01&date_to=2020-01-01", headers=headers)
+    assert old_date_summary.json()["items_count"] == 0
+
+    # А фильтр за сегодняшний день (дата фактической отгрузки) — должен.
+    today_summary = client.get(f"{API_PREFIX}/finance/summary?date_from=2026-09-23&date_to=2026-09-23", headers=headers)
+    body = today_summary.json()
+    assert body["items_count"] == 1
+    assert body["items"][0]["order_item_id"] == updated_item["order_item_id"]

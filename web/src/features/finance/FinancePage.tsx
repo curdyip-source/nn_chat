@@ -100,9 +100,21 @@ export function FinancePage() {
 
       <div className={styles.scroll}>
         {tab === 'overview' && <OverviewTab dateFrom={dateFrom} dateTo={dateTo} />}
-        {tab === 'expenses' && <ExpensesTab dateFrom={dateFrom} dateTo={dateTo} />}
-        {tab === 'categories' && <CategoriesTab />}
-        {tab === 'rate' && <RateTab dateFrom={dateFrom} dateTo={dateTo} />}
+        {tab === 'expenses' && (
+          <div className={styles.tabScroll}>
+            <ExpensesTab dateFrom={dateFrom} dateTo={dateTo} />
+          </div>
+        )}
+        {tab === 'categories' && (
+          <div className={styles.tabScroll}>
+            <CategoriesTab />
+          </div>
+        )}
+        {tab === 'rate' && (
+          <div className={styles.tabScroll}>
+            <RateTab dateFrom={dateFrom} dateTo={dateTo} />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -139,6 +151,7 @@ function OverviewTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string })
       .then((r) => {
         setData(r)
         setSelected(new Set())
+        setError('')
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось загрузить'))
   }
@@ -147,8 +160,18 @@ function OverviewTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string })
     setData(null)
     setSelected(new Set())
     setPage(1)
+    // Пока «дата от» и «дата до» не согласованы (пользователь ещё не успел
+    // поправить второе поле), бэкенд ответит 422 — не залипаем на этой ошибке
+    // навсегда, а просто ждём следующего валидного сочетания дат.
+    if (dateTo < dateFrom) {
+      setError('')
+      return
+    }
     fetchFinanceSummary(dateFrom, dateTo, 1, PAGE_SIZE)
-      .then(setData)
+      .then((r) => {
+        setData(r)
+        setError('')
+      })
       .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось загрузить'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo])
@@ -175,16 +198,16 @@ function OverviewTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string })
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(data.items.map((i) => i.order_item_id)))
 
   return (
-    <div>
-      <div className={styles.cards}>
-        <Card label="Выручка" value={money(data.revenue)} />
-        <Card label="Себестоимость" value={money(data.cost_rub)} />
-        <Card label="Валовая прибыль" value={money(data.gross_profit)} />
-        <Card label="Расходы" value={money(data.expenses_total)} />
-        <Card label="Чистая прибыль" value={money(data.net_profit)} emphasis />
-      </div>
+    <div className={styles.overviewRoot}>
+      <div className={styles.overviewFixed}>
+        <div className={styles.cards}>
+          <Card label="Выручка" value={money(data.revenue)} />
+          <Card label="Себестоимость" value={money(data.cost_rub)} />
+          <Card label="Валовая прибыль" value={money(data.gross_profit)} />
+          <Card label="Расходы" value={money(data.expenses_total)} />
+          <Card label="Чистая прибыль" value={money(data.net_profit)} emphasis />
+        </div>
 
-      <div className={styles.group}>
         <div className={styles.itemsHeader}>
           <div className={styles.groupTitle}>
             Отгруженные товары месяца ({data.items_count}, без себестоимости — {data.missing_cost_count})
@@ -201,6 +224,9 @@ function OverviewTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string })
             </div>
           )}
         </div>
+      </div>
+
+      <div className={styles.itemsScrollArea}>
         {data.items.length === 0 && <div className={styles.dim}>За этот месяц отгруженных товаров пока нет.</div>}
         <div className={styles.list}>
           {data.items.map((item) => (
@@ -213,7 +239,10 @@ function OverviewTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string })
             />
           ))}
         </div>
-        {data.pagination.total_pages > 1 && (
+      </div>
+
+      {data.pagination.total_pages > 1 && (
+        <div className={styles.overviewFixed}>
           <div className={styles.pager}>
             <Button variant="ghost" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
               ← Назад
@@ -225,8 +254,8 @@ function OverviewTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string })
               Вперёд →
             </Button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {bulkOpen && (
         <BulkRateModal
@@ -272,7 +301,7 @@ function ShippedItemRow({
       <button className={styles.rowMain} onClick={onOpen}>
         <span className={styles.itemLine1}>
           <span className={hasCost ? styles.dot : styles.dotMissing} title={hasCost ? 'Себестоимость есть' : 'Себестоимость не проставлена'} />
-          <span className={styles.dim}>{shortDate(item.order_item_created_at)}</span>
+          <span className={styles.dim}>{shortDate(item.order_item_shipped_at)}</span>
           <span className={styles.dim}>· Заказ №{item.order_item_order_id}</span>
           <span>· {item.order_item_name}</span>
           <span className={styles.dim}>· {item.order_item_quantity} шт.</span>
