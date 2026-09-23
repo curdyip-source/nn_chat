@@ -294,7 +294,6 @@ function ShippedItemRow({
   onOpen: () => void
 }) {
   const hasCost = item.order_item_cost_rate !== null
-  const isUsd = item.order_item_currency_name === 'USD'
   return (
     <div className={styles.itemRow}>
       <Checkbox checked={checked} onChange={onToggle} />
@@ -315,21 +314,18 @@ function ShippedItemRow({
           ) : (
             <>себестоимость не задана</>
           )}
-          {hasCost &&
-            (isUsd && item.order_item_margin_usd !== null ? (
-              <>
-                {' '}
-                · маржа {money(item.order_item_margin_usd)} USD × {money(item.order_item_cost_rate ?? '0')} = {money(item.order_item_margin ?? '0')} ₽
-              </>
-            ) : (
-              <> · маржа {money(item.order_item_margin ?? '0')} ₽</>
-            ))}
+          {hasCost && item.order_item_margin_usd !== null && (
+            <>
+              {' '}
+              · маржа {money(item.order_item_margin_usd)} USD × {money(item.order_item_cost_rate ?? '0')} = {money(item.order_item_margin ?? '0')} ₽
+            </>
+          )}
           {hasCost && item.order_item_quantity > 1 && (
             <>
               {' '}
               · итого за {item.order_item_quantity} шт.:{' '}
               <span className={styles.marginTotal}>
-                {isUsd && item.order_item_margin_usd_total !== null && <>{money(item.order_item_margin_usd_total)} USD = </>}
+                {item.order_item_margin_usd_total !== null && <>{money(item.order_item_margin_usd_total)} USD = </>}
                 {money(item.order_item_margin_total ?? '0')} ₽
               </span>
             </>

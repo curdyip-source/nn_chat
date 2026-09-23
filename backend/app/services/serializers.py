@@ -273,11 +273,10 @@ def compute_order_item_money(row) -> dict:
 
     cost_rub = cost_usd * cost_rate if cost_usd is not None and cost_rate is not None else None
     margin = (price_rub - cost_rub) if price_rub is not None and cost_rub is not None else None
-    # Маржа в долларах имеет смысл только когда цена и так в USD (нет смысла делить
-    # рублёвую продажу на курс, чтобы получить "виртуальные" доллары) — считаем её
-    # напрямую (row.order_item_price - cost_usd), а не делением margin/rate, чтобы
-    # не тащить лишнее округление; она равна margin/cost_rate математически.
-    margin_usd = (row.order_item_price - cost_usd) if is_usd_price and cost_usd is not None else None
+    # Маржа в долларах показывается в строке позиции всегда (по договорённости), не
+    # только для долларовых продаж — для рублёвых считаем её делением margin/rate
+    # (для долларовых это математически то же самое, что price - cost_usd).
+    margin_usd = (margin / cost_rate) if margin is not None and cost_rate is not None else None
     # Итого по позиции (за все order_item_quantity штук, не за одну) — margin/margin_usd
     # выше посчитаны ЗА ЕДИНИЦУ, как и order_item_price, здесь просто умножаем на кол-во.
     quantity = row.order_item_quantity
