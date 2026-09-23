@@ -7,6 +7,10 @@ import type {
   Currency,
   Establishment,
   EstablishmentPermission,
+  ExchangeRate,
+  FinanceExpense,
+  FinanceExpenseCategory,
+  FinancePeriodOverview,
   Inventory,
   Order,
   OrderCreate,
@@ -544,4 +548,71 @@ export type CdekPrefill = {
 
 export function cdekPrefill(customer: string) {
   return apiRequest<{ item: CdekPrefill }>(`/cdek/prefill?customer=${encodeURIComponent(customer)}`)
+}
+
+// ---------- Финансы ----------
+
+export function fetchExchangeRates(dateFrom?: string, dateTo?: string) {
+  const q = new URLSearchParams()
+  if (dateFrom) q.set('date_from', dateFrom)
+  if (dateTo) q.set('date_to', dateTo)
+  const qs = q.toString()
+  return apiRequest<{ items: ExchangeRate[] }>(`/finance/exchange-rates${qs ? `?${qs}` : ''}`)
+}
+
+export function overrideExchangeRate(rateDate: string, exchange_rate_value: string) {
+  return apiRequest<{ item: ExchangeRate }>(`/finance/exchange-rates/${rateDate}`, { method: 'PUT', body: { exchange_rate_value } })
+}
+
+export function fetchExpenseCategories() {
+  return apiRequest<{ items: FinanceExpenseCategory[] }>('/finance/expense-categories')
+}
+
+export function saveExpenseCategory(id: number | null, body: { finance_expense_category_name: string }) {
+  return apiRequest<{ item: FinanceExpenseCategory }>(
+    id ? `/finance/expense-categories/${id}` : '/finance/expense-categories',
+    { method: id ? 'PUT' : 'POST', body },
+  )
+}
+
+export function fetchExpenses(dateFrom: string, dateTo: string) {
+  return apiRequest<{ items: FinanceExpense[] }>(`/finance/expenses?date_from=${dateFrom}&date_to=${dateTo}`)
+}
+
+export type FinanceExpenseInput = {
+  finance_expense_category_id: number
+  finance_expense_period: string
+  finance_expense_amount: string
+  finance_expense_note?: string | null
+}
+
+export function saveExpense(id: number | null, body: FinanceExpenseInput) {
+  return apiRequest<{ item: FinanceExpense }>(
+    id ? `/finance/expenses/${id}` : '/finance/expenses',
+    { method: id ? 'PUT' : 'POST', body },
+  )
+}
+
+export function deleteExpense(id: number) {
+  return apiRequest<void>(`/finance/expenses/${id}`, { method: 'DELETE' })
+}
+
+export function fetchFinanceSummary(dateFrom: string, dateTo: string, page = 1, pageSize = 100) {
+  return apiRequest<FinancePeriodOverview>(`/finance/summary?date_from=${dateFrom}&date_to=${dateTo}&page=${page}&page_size=${pageSize}`)
+}
+
+export function correctOrderItemCost(orderItemId: number, body: { order_item_cost_usd: string | null; order_item_cost_rate: string | null }) {
+  return apiRequest<{ item: unknown }>(`/finance/order-items/${orderItemId}/cost`, { method: 'PUT', body })
+}
+
+export type BulkCostRateResult = {
+  updated_ids: number[]
+  not_found_ids: number[]
+}
+
+export function bulkSetOrderItemCostRate(orderItemIds: number[], order_item_cost_rate: string) {
+  return apiRequest<BulkCostRateResult>('/finance/order-items/bulk-cost-rate', {
+    method: 'PUT',
+    body: { order_item_ids: orderItemIds, order_item_cost_rate },
+  })
 }

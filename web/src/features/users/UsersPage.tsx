@@ -37,6 +37,7 @@ const CRM_SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: 'inventory', label: 'Инвентаризации', icon: '📊' },
   { key: 'registrations', label: 'Приёмки', icon: '📥' },
   { key: 'contacts', label: 'Контрагенты', icon: '👥' },
+  { key: 'finance', label: 'Финансы', icon: '💰' },
 ]
 // Вкладки СРМ в мобильном приложении (свой набор ключей, гейтят только iOS).
 const APP_CRM_SECTIONS: { key: string; label: string; icon: string }[] = [

@@ -11,6 +11,7 @@ from app.api.routes.audit import router as audit_router
 from app.api.routes.cdek import router as cdek_router
 from app.api.routes.contacts import router as contacts_router
 from app.api.routes.documents import router as documents_router
+from app.api.routes.finance import router as finance_router
 from app.api.routes.inventories import router as inventories_router
 from app.api.routes.message_attachments import router as message_attachments_router
 from app.api.routes.media import router as media_router
@@ -59,7 +60,46 @@ async def lifespan(_: FastAPI):
 
         threading.Thread(target=_register_cdek_webhook, daemon=True).start()
 
+    # Курс USD/RUB для себестоимости: тянем сразу при старте и дальше по расписанию.
+    # Идемпотентно по дате — повторный вызов в тот же день просто ничего не меняет.
+    # Выключено в тестах (EXCHANGE_RATE_POLL_ENABLED=false в conftest.py) — иначе
+    # каждый TestClient() при старте бил бы по живому сайту ЦБ.
+    scheduler = None
+    if _cfg.EXCHANGE_RATE_POLL_ENABLED:
+        from datetime import datetime as _datetime
+        from zoneinfo import ZoneInfo
+
+        from apscheduler.schedulers.background import BackgroundScheduler
+
+        from app.core.database import SessionLocal
+        from app.services.exchange_rates import fetch_and_store_today_rate
+
+        def _poll_exchange_rate() -> None:
+            db = SessionLocal()
+            try:
+                fetch_and_store_today_rate(db)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("exchange_rate.poll_failed error=%s", exc)
+            finally:
+                db.close()
+
+        scheduler = BackgroundScheduler(timezone=_cfg.EXCHANGE_RATE_TIMEZONE)
+        scheduler.add_job(
+            _poll_exchange_rate,
+            "interval",
+            minutes=_cfg.EXCHANGE_RATE_POLL_INTERVAL_MINUTES,
+            id="poll_exchange_rate",
+            max_instances=1,
+            coalesce=True,
+            # Без этого APScheduler ждёт первый полный интервал (часы) до первого запуска.
+            next_run_time=_datetime.now(ZoneInfo(_cfg.EXCHANGE_RATE_TIMEZONE)),
+        )
+        scheduler.start()
+
     yield
+
+    if scheduler is not None:
+        scheduler.shutdown(wait=False)
 
 
 def create_app() -> FastAPI:
@@ -95,6 +135,7 @@ def create_app() -> FastAPI:
     api_v1_router.include_router(contacts_router)
     api_v1_router.include_router(documents_router)
     api_v1_router.include_router(reference_data_router)
+    api_v1_router.include_router(finance_router)
     api_v1_router.include_router(products_router)
     api_v1_router.include_router(message_attachments_router)
     api_v1_router.include_router(messages_router)

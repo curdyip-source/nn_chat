@@ -53,3 +53,20 @@ def require_admin(user: dict = Depends(get_current_user)) -> dict:
     if not user["user_admin"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Нужны права администратора")
     return user
+
+
+def require_section(*keys: str):
+    """Доступ по разделам СРМ (user_sections) — как гейтинг вкладок во фронте
+    (AppShell.tsx: CRM_KEYS), только теперь проверяется и на сервере, а не только
+    скрытием кнопки в сайдбаре. Админ — всегда; user_sections=None — доступ ко всем
+    разделам (дефолт); иначе нужны ВСЕ переданные ключи (напр. "crm" и "finance")."""
+
+    def _dependency(user: dict = Depends(get_current_user)) -> dict:
+        if user["user_admin"]:
+            return user
+        sections = user.get("user_sections")
+        if sections is None or all(key in sections for key in keys):
+            return user
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Нет доступа к этому разделу")
+
+    return _dependency

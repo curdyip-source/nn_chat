@@ -21,6 +21,7 @@ from app.services.audit import log_audit_event
 from app.services.access_control import allowed_order_status_ids, can_create_on_establishment, can_delete_document, can_edit_document, can_view_document, can_view_order_status, list_visibility
 from app.services.card_sync import notify_cards_deleted, notify_order_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_order_method_or_404, get_status_or_404, resolve_product_snapshot
+from app.services.exchange_rates import get_rate_for_date
 from app.services.messages import resolve_mention_recipient_ids
 from app.services.push_notifications import send_mention_push_event, send_order_change_push_event, send_order_comment_push_event, send_push_notification_event
 from app.services.serializers import serialize_datetime, serialize_order, serialize_order_comment
@@ -55,6 +56,16 @@ def _normalize_order_sales_channel(value: str | None) -> str | None:
     return " ".join(value.replace("\xa0", " ").split()) or None
 
 
+def _resolve_item_cost_snapshot(db: Session, product_cost_usd) -> tuple:
+    # Снимок себестоимости на момент создания/пересборки позиции: courс — последний
+    # известный на сегодня (в выходные ЦБ не публикует новый — берём прошлый). Если
+    # курса ещё нет вообще (например, первый день без единой записи в exchange_rates) —
+    # оставляем NULL, это нормально (см. раздел «Финансы»).
+    rate_row = get_rate_for_date(db, date.today())
+    cost_rate = rate_row.exchange_rate_value if rate_row else None
+    return product_cost_usd, cost_rate
+
+
 def _order_item_identity(item: dict) -> str:
     # Идентичность позиции — по артикулу (он стабилен), иначе по названию. НЕ по
     # product_id: при федерации каталога товар переподвязывается и product_id меняется
@@ -63,6 +74,16 @@ def _order_item_identity(item: dict) -> str:
     if article:
         return f"a:{article}"
     name = (item.get("order_item_name") or "").strip().lower()
+    return f"n:{name}"
+
+
+def _order_item_identity_row(item: OrderItem) -> str:
+    # То же самое, что _order_item_identity, но для ORM-строки (используется, чтобы
+    # найти старую позицию при пересборке заказа — см. update_order).
+    article = (item.order_item_article or "").strip().lower()
+    if article:
+        return f"a:{article}"
+    name = (item.order_item_name or "").strip().lower()
     return f"n:{name}"
 
 
@@ -410,6 +431,7 @@ class OrderService:
             if item_status.status_status not in ("Заказ поставщику", "Заказано"):
                 normalized_item_supplier = None
             source_establishment_id, destination_establishment_id = self._resolve_item_route(item_status.status_status if item_status else None, item.order_item_source_establishment_id, item.order_item_destination_establishment_id)
+            cost_usd, cost_rate = _resolve_item_cost_snapshot(self.db, product_row.product_cost_usd)
             items.append(
                 {
                     "order_item_product_id": product_row.product_id,
@@ -426,6 +448,8 @@ class OrderService:
                     "order_item_checkpoint_started": item.order_item_checkpoint_started,
                     "order_item_checkpoint_completed": item.order_item_checkpoint_completed,
                     "order_item_owner_user_id": current_user["user_id"],
+                    "order_item_cost_usd": cost_usd,
+                    "order_item_cost_rate": cost_rate,
                 }
             )
 
@@ -528,6 +552,15 @@ class OrderService:
         status_row = get_status_or_404(self.db, payload.order_status_id, expected_type="orders")
         default_currency = get_default_currency_or_400(self.db)
         default_item_status = get_default_status_or_400(self.db, status_type="order_products")
+        # update_with_items ниже УДАЛЯЕТ все старые позиции и создаёт новые — иначе
+        # любая правка заказа (даже смена количества) молча стирала бы ручную коррекцию
+        # себестоимости/курса из «Финансов». Находим старую позицию по identity
+        # (артикул/название) и, если её себестоимость правили вручную, переносим снимок
+        # как есть вместо пересчёта по сегодняшнему курсу.
+        existing_items_by_identity: dict[str, OrderItem] = {}
+        for old_item in row.items:
+            existing_items_by_identity.setdefault(_order_item_identity_row(old_item), old_item)
+
         items = []
         for item in payload.items:
             product_row, article, name, price = resolve_product_snapshot(
@@ -544,6 +577,15 @@ class OrderService:
             if item_status.status_status not in ("Заказ поставщику", "Заказано"):
                 normalized_item_supplier = None
             source_establishment_id, destination_establishment_id = self._resolve_item_route(item_status.status_status if item_status else None, item.order_item_source_establishment_id, item.order_item_destination_establishment_id)
+            cost_usd, cost_rate = _resolve_item_cost_snapshot(self.db, product_row.product_cost_usd)
+            cost_updated_at = None
+            cost_updated_by_user_id = None
+            existing_item = existing_items_by_identity.get(_order_item_identity({"order_item_article": article, "order_item_name": name}))
+            if existing_item is not None and existing_item.order_item_cost_updated_at is not None:
+                cost_usd = existing_item.order_item_cost_usd
+                cost_rate = existing_item.order_item_cost_rate
+                cost_updated_at = existing_item.order_item_cost_updated_at
+                cost_updated_by_user_id = existing_item.order_item_cost_updated_by_user_id
             items.append(
                 {
                     "order_item_product_id": product_row.product_id,
@@ -560,6 +602,10 @@ class OrderService:
                     "order_item_checkpoint_started": item.order_item_checkpoint_started,
                     "order_item_checkpoint_completed": item.order_item_checkpoint_completed,
                     "order_item_owner_user_id": current_user["user_id"],
+                    "order_item_cost_usd": cost_usd,
+                    "order_item_cost_rate": cost_rate,
+                    "order_item_cost_updated_at": cost_updated_at,
+                    "order_item_cost_updated_by_user_id": cost_updated_by_user_id,
                 }
             )
 
@@ -970,6 +1016,13 @@ class OrderService:
                     order_item_checkpoint_started=item.order_item_checkpoint_started,
                     order_item_checkpoint_completed=item.order_item_checkpoint_completed,
                     order_item_owner_user_id=current_user["user_id"],
+                    # Разделение заказа переносит ту же позицию в новый заказ — это не
+                    # новая продажа, поэтому снимок себестоимости копируется как есть,
+                    # а не пересчитывается по сегодняшнему курсу.
+                    order_item_cost_usd=item.order_item_cost_usd,
+                    order_item_cost_rate=item.order_item_cost_rate,
+                    order_item_cost_updated_at=item.order_item_cost_updated_at,
+                    order_item_cost_updated_by_user_id=item.order_item_cost_updated_by_user_id,
                 )
             )
 

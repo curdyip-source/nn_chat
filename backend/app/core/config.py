@@ -77,6 +77,18 @@ CDEK_SENDER_ADDRESS = os.getenv("CDEK_SENDER_ADDRESS", "Москва, ул. Те
 # это считается до создания заказа, из договора взять неоткуда. 44 = Москва.
 CDEK_SENDER_CITY_CODE = int(os.getenv("CDEK_SENDER_CITY_CODE", "44"))
 
+# --- Курс USD/RUB (для себестоимости в разделе «Финансы») ---
+# Официальный курс ЦБ РФ: бесплатный, стабильный, без авторизации и рейт-лимитов
+# (в отличие от скрапинга сайта банка). После реформы 2022 года считается по
+# реальным внебиржевым сделкам банков, т.е. это уже рыночный курс.
+CBR_RATE_URL = os.getenv("CBR_RATE_URL", "https://www.cbr.ru/scripts/XML_daily.asp").strip()
+CBR_USD_VALUTE_ID = os.getenv("CBR_USD_VALUTE_ID", "R01235").strip()
+EXCHANGE_RATE_POLL_INTERVAL_MINUTES = int(os.getenv("EXCHANGE_RATE_POLL_INTERVAL_MINUTES", "180"))
+EXCHANGE_RATE_TIMEZONE = os.getenv("EXCHANGE_RATE_TIMEZONE", "Europe/Moscow").strip()
+# По умолчанию включено (дев/прод тянут курс сразу при старте). Тесты выключают
+# через env (см. tests/conftest.py) — иначе каждый TestClient() бил бы по живому ЦБ.
+EXCHANGE_RATE_POLL_ENABLED = os.getenv("EXCHANGE_RATE_POLL_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+
 INSECURE_ALLOW_HTTP_ORIGINS = os.getenv("INSECURE_ALLOW_HTTP_ORIGINS", "false").strip().lower() in {"1", "true", "yes", "on"}
 FIRST_ADMIN_PASS = os.getenv(
     "FIRST_ADMIN_PASS",

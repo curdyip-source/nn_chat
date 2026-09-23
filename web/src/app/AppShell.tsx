@@ -7,6 +7,7 @@ import { ChatPage } from '../features/chat/ChatPage'
 import { ContactsPage } from '../features/contacts/ContactsPage'
 import { DocumentsPage } from '../features/documents/DocumentsPage'
 import { INVENTORY_KIND, REGISTRATION_KIND } from '../features/documents/docKind'
+import { FinancePage } from '../features/finance/FinancePage'
 import { OrdersPage } from '../features/orders/OrdersPage'
 import { ProductsPage } from '../features/products/ProductsPage'
 import { ReferencePage } from '../features/reference/ReferencePage'
@@ -31,6 +32,9 @@ const SECTIONS: Section[] = [
   { key: 'inventory', label: 'Инвентаризации', icon: '📊', render: () => <DocumentsPage kind={INVENTORY_KIND} />, ready: true },
   { key: 'registrations', label: 'Приёмки', icon: '📥', render: () => <DocumentsPage kind={REGISTRATION_KIND} />, ready: true },
   { key: 'contacts', label: 'Контрагенты', icon: '👥', render: () => <ContactsPage />, ready: true },
+  // Себестоимость/выручка/прибыль — раздел СРМ как остальные (не admin-only):
+  // виден админу всегда, не-админу — если выдан в «Разделы СРМ (веб)» (crm + finance).
+  { key: 'finance', label: 'Финансы', icon: '💰', render: () => <FinancePage />, ready: true },
   // Административные разделы — только для админа (управление правами/системой).
   { key: 'reference', label: 'Справочники', icon: '⚙️', render: () => <ReferencePage />, ready: true, adminOnly: true },
   { key: 'users', label: 'Пользователи', icon: '👤', render: () => <UsersPage />, ready: true, adminOnly: true },
@@ -56,7 +60,7 @@ function AppShellInner() {
   // (null = всё). Режимы: chat/price напрямую; пункты СРМ требуют режим 'crm' + свой ключ.
   const secs = user?.user_sections
   const has = (key: string) => secs == null || secs.includes(key)
-  const CRM_KEYS = ['orders', 'products', 'inventory', 'registrations', 'contacts']
+  const CRM_KEYS = ['orders', 'products', 'inventory', 'registrations', 'contacts', 'finance']
   const visibleSections = SECTIONS.filter((s) => {
     if (user?.user_admin) return true
     if (s.adminOnly) return false

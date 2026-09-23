@@ -1,5 +1,11 @@
+import os
 from collections.abc import Generator
 from pathlib import Path
+
+# Выключаем фоновую джобу курса ЦБ до импорта app.main — иначе каждый TestClient()
+# при старте лифспана бил бы по живому cbr.ru (сеть, флейки, спам логов из фонового
+# потока после закрытия клиента).
+os.environ.setdefault("EXCHANGE_RATE_POLL_ENABLED", "false")
 
 import pytest
 from fastapi.testclient import TestClient

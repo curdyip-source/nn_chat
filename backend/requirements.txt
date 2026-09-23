@@ -6,6 +6,7 @@ alembic==1.18.4
 python-dotenv==1.2.2
 pytest==9.0.2
 httpx[http2]==0.28.1
+apscheduler==3.10.4
 sentry-sdk==2.40.0
 python-multipart==0.0.20
 PyJWT[crypto]==2.10.1

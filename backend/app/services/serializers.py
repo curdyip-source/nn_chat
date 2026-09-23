@@ -136,6 +136,47 @@ def serialize_order_sales_channel(row) -> dict:
     }
 
 
+def serialize_exchange_rate(row) -> dict:
+    updated_by = getattr(row, "updated_by", None)
+    return {
+        "exchange_rate_id": row.exchange_rate_id,
+        "exchange_rate_date": row.exchange_rate_date.isoformat() if row.exchange_rate_date else None,
+        "exchange_rate_value": serialize_decimal(row.exchange_rate_value),
+        "exchange_rate_source": row.exchange_rate_source,
+        "exchange_rate_fetched_at": serialize_datetime(row.exchange_rate_fetched_at),
+        "exchange_rate_updated_by_user_id": row.exchange_rate_updated_by_user_id,
+        "exchange_rate_updated_by_user_login": updated_by.user_login if updated_by else None,
+        "exchange_rate_created_at": serialize_datetime(row.exchange_rate_created_at),
+    }
+
+
+def serialize_finance_expense_category(row) -> dict:
+    owner = getattr(row, "owner", None)
+    return {
+        "finance_expense_category_id": row.finance_expense_category_id,
+        "finance_expense_category_name": row.finance_expense_category_name,
+        "finance_expense_category_owner_user_id": row.finance_expense_category_owner_user_id,
+        "finance_expense_category_owner_user_login": owner.user_login if owner else None,
+        "finance_expense_category_created_at": serialize_datetime(row.finance_expense_category_created_at),
+    }
+
+
+def serialize_finance_expense(row) -> dict:
+    category = getattr(row, "category", None)
+    owner = getattr(row, "owner", None)
+    return {
+        "finance_expense_id": row.finance_expense_id,
+        "finance_expense_category_id": row.finance_expense_category_id,
+        "finance_expense_category_name": category.finance_expense_category_name if category else None,
+        "finance_expense_period": row.finance_expense_period.isoformat() if row.finance_expense_period else None,
+        "finance_expense_amount": serialize_decimal(row.finance_expense_amount),
+        "finance_expense_note": row.finance_expense_note,
+        "finance_expense_owner_user_id": row.finance_expense_owner_user_id,
+        "finance_expense_owner_user_login": owner.user_login if owner else None,
+        "finance_expense_created_at": serialize_datetime(row.finance_expense_created_at),
+    }
+
+
 def serialize_status(row) -> dict:
     owner = getattr(row, "owner", None)
     return {
@@ -208,12 +249,66 @@ def serialize_message_attachment(row) -> dict:
     }
 
 
+def compute_order_item_money(row) -> dict:
+    """Единая денежная логика позиции заказа — используется и в сериализации, и в
+    своде «Финансы», чтобы цифры не могли разойтись.
+
+    order_item_price хранится В ВАЛЮТЕ ПОЗИЦИИ (order_item_currency_id), а не всегда
+    в рублях — по умолчанию это USD (см. get_default_currency_or_400), т.к. цены
+    в основном ведутся в долларах. Раньше цену молча считали рублями — из-за этого
+    валовая прибыль по долларовым позициям уходила в глубокий минус. Конвертируем по
+    тому же курсу, что снят для себестоимости (order_item_cost_rate — курс на дату
+    заказа), так что цена и себестоимость всегда сравниваются в одних единицах.
+    """
+    currency = getattr(row, "currency", None)
+    currency_name = ((currency.currency_name if currency else None) or "RUB").strip().upper()
+    cost_usd = row.order_item_cost_usd
+    cost_rate = row.order_item_cost_rate
+    is_usd_price = currency_name == "USD"
+
+    if is_usd_price:
+        price_rub = row.order_item_price * cost_rate if cost_rate is not None else None
+    else:
+        price_rub = row.order_item_price
+
+    cost_rub = cost_usd * cost_rate if cost_usd is not None and cost_rate is not None else None
+    margin = (price_rub - cost_rub) if price_rub is not None and cost_rub is not None else None
+    # Маржа в долларах имеет смысл только когда цена и так в USD (нет смысла делить
+    # рублёвую продажу на курс, чтобы получить "виртуальные" доллары) — считаем её
+    # напрямую (row.order_item_price - cost_usd), а не делением margin/rate, чтобы
+    # не тащить лишнее округление; она равна margin/cost_rate математически.
+    margin_usd = (row.order_item_price - cost_usd) if is_usd_price and cost_usd is not None else None
+    # Итого по позиции (за все order_item_quantity штук, не за одну) — margin/margin_usd
+    # выше посчитаны ЗА ЕДИНИЦУ, как и order_item_price, здесь просто умножаем на кол-во.
+    quantity = row.order_item_quantity
+    margin_total = margin * quantity if margin is not None else None
+    margin_usd_total = margin_usd * quantity if margin_usd is not None else None
+
+    return {
+        "currency_name": currency_name,
+        "cost_usd": cost_usd,
+        "cost_rate": cost_rate,
+        "price_rub": price_rub,
+        "cost_rub": cost_rub,
+        "margin": margin,
+        "margin_usd": margin_usd,
+        "margin_total": margin_total,
+        "margin_usd_total": margin_usd_total,
+    }
+
+
 def serialize_order_item(row) -> dict:
     status = getattr(row, "status", None)
     source_establishment = getattr(row, "source_establishment", None)
     destination_establishment = getattr(row, "destination_establishment", None)
+    money = compute_order_item_money(row)
+    cost_usd = money["cost_usd"]
+    cost_rate = money["cost_rate"]
+    cost_rub = money["cost_rub"]
+    margin = money["margin"]
     return {
         "order_item_id": row.order_item_id,
+        "order_item_order_id": row.order_item_order_id,
         "order_item_product_id": row.order_item_product_id,
         "order_item_name": row.order_item_name,
         "order_item_article": row.order_item_article,
@@ -232,6 +327,18 @@ def serialize_order_item(row) -> dict:
         "order_item_checkpoint_started": row.order_item_checkpoint_started,
         "order_item_checkpoint_completed": row.order_item_checkpoint_completed,
         "order_item_created_at": serialize_datetime(row.order_item_created_at),
+        # Финансы: снимок себестоимости на момент создания + расчёт на лету.
+        "order_item_currency_name": money["currency_name"],
+        "order_item_price_rub": serialize_decimal(money["price_rub"]),
+        "order_item_cost_usd": serialize_decimal(cost_usd),
+        "order_item_cost_rate": serialize_decimal(cost_rate),
+        "order_item_cost_rub": serialize_decimal(cost_rub),
+        "order_item_margin": serialize_decimal(margin),
+        "order_item_margin_usd": serialize_decimal(money["margin_usd"]),
+        # Итого по позиции (× order_item_quantity) — то, что реально заработали на этой строке.
+        "order_item_margin_total": serialize_decimal(money["margin_total"]),
+        "order_item_margin_usd_total": serialize_decimal(money["margin_usd_total"]),
+        "order_item_cost_updated_at": serialize_datetime(getattr(row, "order_item_cost_updated_at", None)),
     }
 
 

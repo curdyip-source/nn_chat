@@ -1,0 +1,285 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px 32px 0;
+}
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 24px;
+}
+.header {
+  margin-bottom: 20px;
+}
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.tabsRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  /* 40px до фильтра дат, сразу после кнопок вкладок. */
+  gap: 40px;
+  margin-bottom: 18px;
+}
+.tabsGroup {
+  /* ButtonGroup — CSS grid (auto-fit, minmax(120px,1fr)): auto-fit умеет посчитать
+     число колонок только при ОПРЕДЕЛЁННОЙ ширине контейнера. max-width тут не
+     работает (это не определённая ширина) — внутри flex-строки без явного width
+     грид не может определить, сколько колонок влезет, и схлопывается в одну. */
+  flex: 0 0 auto;
+  width: 520px;
+}
+.dateFilter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.dateInput {
+  height: 40px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 0 10px;
+  font-size: 14px;
+}
+.dateInput:focus {
+  border-color: var(--focus);
+}
+.dateDash {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.subHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+}
+.cardEmphasis {
+  border-color: var(--accent, var(--stroke));
+}
+.cardLabel {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.cardValue {
+  font-size: 20px;
+  font-weight: 800;
+}
+.group {
+  margin-bottom: 22px;
+}
+.groupTitle {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.itemsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.itemsHeader .groupTitle {
+  margin-bottom: 0;
+}
+.itemsHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.selectAll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.itemRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dot,
+.dotMissing {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.dot {
+  background: #3cc878;
+}
+.dotMissing {
+  background: #c8503c;
+}
+.row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.row:hover {
+  background: var(--surface-2);
+}
+.expenseRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rowMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.rowMain:hover {
+  background: var(--surface-2);
+}
+.itemLine1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+}
+.itemLine2 {
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+}
+.priceBold {
+  font-weight: 800;
+  color: var(--text);
+}
+.marginTotal {
+  font-weight: 700;
+  color: var(--text);
+}
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+.expenseRowMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.expenseRowMain:hover {
+  background: var(--surface-2);
+}
+.expenseNote {
+  color: var(--text-dim);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.expenseAmountInline {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding-left: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.deleteBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 6px;
+}
+.deleteBtn:hover {
+  color: var(--danger);
+}
+.dim {
+  color: var(--text-dim);
+  font-size: 13.5px;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.select {
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--text);
+}
+.error {
+  color: var(--danger);
+  font-size: 13.5px;
+}

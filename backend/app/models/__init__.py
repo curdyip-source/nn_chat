@@ -2,6 +2,7 @@ from app.models.app_settings import AppSetting
 from app.models.audit_events import AuditEvent
 from app.models.contacts import Contact
 from app.models.documents import Document
+from app.models.finance import ExchangeRate, FinanceExpense, FinanceExpenseCategory
 from app.models.idempotency_keys import IdempotencyKey
 from app.models.inventories import Inventory, InventoryItem
 from app.models.message_attachment_assets import MessageAttachmentAsset
@@ -50,4 +51,7 @@ __all__ = [
 	"TodoAssignee",
 	"SystemMessage",
 	"SystemMessageRecipient",
+	"ExchangeRate",
+	"FinanceExpenseCategory",
+	"FinanceExpense",
 ]

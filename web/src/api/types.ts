@@ -107,6 +107,81 @@ export type Product = {
   product_cost_usd: string
 }
 
+// --- Финансы: курс USD/RUB, себестоимость, расходы, закрытие месяца ---
+
+export type ExchangeRate = {
+  exchange_rate_id: number
+  exchange_rate_date: string
+  exchange_rate_value: string
+  exchange_rate_source: 'cbr' | 'manual'
+  exchange_rate_updated_by_user_login: string | null
+}
+
+export type FinanceExpenseCategory = {
+  finance_expense_category_id: number
+  finance_expense_category_name: string
+}
+
+export type FinanceExpense = {
+  finance_expense_id: number
+  finance_expense_category_id: number
+  finance_expense_category_name: string | null
+  finance_expense_period: string
+  finance_expense_amount: string
+  finance_expense_note: string | null
+  finance_expense_owner_user_login: string | null
+  finance_expense_created_at: string
+}
+
+export type OrderItemForReview = {
+  order_item_id: number
+  order_item_order_id: number
+  order_item_name: string
+  order_item_article: string | null
+  order_item_quantity: number
+  order_item_created_at: string
+  // Цена — в валюте позиции (order_item_currency_name), не всегда рубли!
+  // По умолчанию продажи ведутся в USD. order_item_price_rub — уже переведено
+  // по курсу на дату заказа (null, если курса на тот момент не было).
+  order_item_price: string
+  order_item_currency_name: string
+  order_item_price_rub: string | null
+  order_item_cost_usd: string | null
+  order_item_cost_rate: string | null
+  order_item_cost_rub: string | null
+  order_item_margin: string | null
+  // Маржа в USD (price - cost_usd) — только когда цена сама в USD; для рублёвых
+  // продаж нет естественного "долларового" разложения, поэтому null.
+  order_item_margin_usd: string | null
+  // Итого по позиции (margin × order_item_quantity) — сколько реально заработали на строке.
+  order_item_margin_total: string | null
+  order_item_margin_usd_total: string | null
+}
+
+export type Pagination = {
+  page: number
+  page_size: number
+  total: number
+  total_pages: number
+}
+
+export type FinancePeriodOverview = {
+  date_from: string
+  date_to: string
+  revenue: string
+  cost_rub: string
+  gross_profit: string
+  expenses_total: string
+  net_profit: string
+  // Общее число отгруженных позиций месяца (не размер текущей страницы).
+  items_count: number
+  missing_cost_count: number
+  // Текущая страница списка позиций (новые сверху) — см. pagination.
+  items: OrderItemForReview[]
+  pagination: Pagination
+  expenses: FinanceExpense[]
+}
+
 export type ProductImportJob = {
   job_id: string
   status: 'queued' | 'running' | 'completed' | 'failed'
