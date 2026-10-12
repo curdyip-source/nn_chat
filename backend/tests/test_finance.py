@@ -1,9 +1,16 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.core.security import hash_password
 from app.models.orders import Order
 
 API_PREFIX = "/api/v1"
+
+# Позиция получает order_item_shipped_at = «сейчас» (UTC) в момент отгрузки, поэтому
+# свод запрашиваем за текущие сутки/месяц, а не за зашитые даты — иначе тесты
+# начинают падать, как только календарь уходит с месяца, в котором их писали.
+TODAY = datetime.utcnow().date()
+MONTH_FROM = TODAY.replace(day=1)
+MONTH_TO = (MONTH_FROM + timedelta(days=32)).replace(day=1) - timedelta(days=1)
 
 
 def login(client, login: str, password: str) -> dict:
@@ -77,7 +84,7 @@ def test_order_item_cost_snapshot_from_rate_and_period_overview(client, integrat
     headers = _admin_headers(client, integration_db_session, integration_admin)
 
     override_rate = client.put(
-        f"{API_PREFIX}/finance/exchange-rates/2026-09-23",
+        f"{API_PREFIX}/finance/exchange-rates/{TODAY}",
         headers=headers,
         json={"exchange_rate_value": "90.0000"},
     )
@@ -118,7 +125,7 @@ def test_order_item_cost_snapshot_from_rate_and_period_overview(client, integrat
     assert float(order_item["order_item_cost_rub"]) == 500.0 * 90.0
     assert order_item["order_item_margin"] is not None
 
-    overview = client.get(f"{API_PREFIX}/finance/summary?date_from=2026-09-01&date_to=2026-09-30", headers=headers)
+    overview = client.get(f"{API_PREFIX}/finance/summary?date_from={MONTH_FROM}&date_to={MONTH_TO}", headers=headers)
     assert overview.status_code == 200
     body = overview.json()
     assert float(body["revenue"]) >= 1000.0
@@ -160,7 +167,7 @@ def test_order_item_without_rate_is_flagged_for_review(client, integration_db_se
     assert order_item["order_item_cost_rate"] is None
     order_item_id = order_item["order_item_id"]
 
-    overview = client.get(f"{API_PREFIX}/finance/summary?date_from=2026-09-01&date_to=2026-09-30", headers=headers)
+    overview = client.get(f"{API_PREFIX}/finance/summary?date_from={MONTH_FROM}&date_to={MONTH_TO}", headers=headers)
     assert overview.status_code == 200
     body = overview.json()
     assert body["missing_cost_count"] == 1
@@ -174,7 +181,7 @@ def test_order_item_without_rate_is_flagged_for_review(client, integration_db_se
     assert correction.status_code == 200
     assert float(correction.json()["item"]["order_item_cost_rate"]) == 95.0
 
-    overview_after = client.get(f"{API_PREFIX}/finance/summary?date_from=2026-09-01&date_to=2026-09-30", headers=headers)
+    overview_after = client.get(f"{API_PREFIX}/finance/summary?date_from={MONTH_FROM}&date_to={MONTH_TO}", headers=headers)
     assert overview_after.json()["missing_cost_count"] == 0
 
 
@@ -219,7 +226,7 @@ def test_period_overview_excludes_items_not_shipped(client, integration_db_sessi
     )
     assert create_order_response.status_code == 201
 
-    overview = client.get(f"{API_PREFIX}/finance/summary?date_from=2026-09-01&date_to=2026-09-30", headers=headers)
+    overview = client.get(f"{API_PREFIX}/finance/summary?date_from={MONTH_FROM}&date_to={MONTH_TO}", headers=headers)
     assert overview.status_code == 200
     body = overview.json()
     assert body["items_count"] == 0
@@ -235,7 +242,7 @@ def test_revenue_converts_usd_price_to_rub_not_treated_as_rub(client, integratio
     headers = _admin_headers(client, integration_db_session, integration_admin)
 
     override_rate = client.put(
-        f"{API_PREFIX}/finance/exchange-rates/2026-09-23",
+        f"{API_PREFIX}/finance/exchange-rates/{TODAY}",
         headers=headers,
         json={"exchange_rate_value": "90.0000"},
     )
@@ -283,7 +290,7 @@ def test_revenue_converts_usd_price_to_rub_not_treated_as_rub(client, integratio
     assert float(order_item["order_item_cost_rub"]) == 900.0
     assert float(order_item["order_item_margin"]) == 12600.0
 
-    overview = client.get(f"{API_PREFIX}/finance/summary?date_from=2026-09-01&date_to=2026-09-30", headers=headers)
+    overview = client.get(f"{API_PREFIX}/finance/summary?date_from={MONTH_FROM}&date_to={MONTH_TO}", headers=headers)
     body = overview.json()
     assert float(body["revenue"]) == 13500.0
     assert float(body["cost_rub"]) == 900.0
@@ -336,7 +343,7 @@ def test_bulk_set_cost_rate_updates_selected_items_only(client, integration_db_s
     assert sorted(body["updated_ids"]) == sorted([item_a, item_b])
     assert body["not_found_ids"] == []
 
-    overview = client.get(f"{API_PREFIX}/finance/summary?date_from=2026-09-01&date_to=2026-09-30", headers=headers)
+    overview = client.get(f"{API_PREFIX}/finance/summary?date_from={MONTH_FROM}&date_to={MONTH_TO}", headers=headers)
     items_by_id = {item["order_item_id"]: item for item in overview.json()["items"]}
     assert float(items_by_id[item_a]["order_item_cost_rate"]) == 88.5
     assert float(items_by_id[item_b]["order_item_cost_rate"]) == 88.5
@@ -378,13 +385,13 @@ def test_period_overview_paginates_and_sorts_newest_first(client, integration_db
         order_item_ids.append(response.json()["item"]["items"][0]["order_item_id"])
 
     # page_size=2: первая страница — 2 последних созданных (новые сверху).
-    page1 = client.get(f"{API_PREFIX}/finance/summary?date_from=2026-09-01&date_to=2026-09-30&page=1&page_size=2", headers=headers).json()
+    page1 = client.get(f"{API_PREFIX}/finance/summary?date_from={MONTH_FROM}&date_to={MONTH_TO}&page=1&page_size=2", headers=headers).json()
     assert [item["order_item_id"] for item in page1["items"]] == list(reversed(order_item_ids))[:2]
     assert page1["pagination"] == {"page": 1, "page_size": 2, "total": 3, "total_pages": 2}
     # items_count — это общее число позиций месяца, а не размер текущей страницы.
     assert page1["items_count"] == 3
 
-    page2 = client.get(f"{API_PREFIX}/finance/summary?date_from=2026-09-01&date_to=2026-09-30&page=2&page_size=2", headers=headers).json()
+    page2 = client.get(f"{API_PREFIX}/finance/summary?date_from={MONTH_FROM}&date_to={MONTH_TO}&page=2&page_size=2", headers=headers).json()
     assert [item["order_item_id"] for item in page2["items"]] == [order_item_ids[0]]
 
 
@@ -397,7 +404,7 @@ def test_manual_cost_correction_survives_unrelated_order_edit(client, integratio
     headers = _admin_headers(client, integration_db_session, integration_admin)
 
     override_rate = client.put(
-        f"{API_PREFIX}/finance/exchange-rates/2026-09-23",
+        f"{API_PREFIX}/finance/exchange-rates/{TODAY}",
         headers=headers,
         json={"exchange_rate_value": "80.0000"},
     )
@@ -535,7 +542,7 @@ def test_finance_access_gated_by_crm_and_finance_sections(client, integration_db
     admin_token = login(client, "admin", "AdminPass123")["token"]
     worker_headers = lambda: {"Authorization": f"Bearer {login(client, 'worker', 'WorkerPass123')['token']}"}  # noqa: E731
 
-    summary_url = f"{API_PREFIX}/finance/summary?date_from=2026-09-01&date_to=2026-09-30"
+    summary_url = f"{API_PREFIX}/finance/summary?date_from={MONTH_FROM}&date_to={MONTH_TO}"
 
     # Явно ограничили работнику разделы, finance среди них нет → 403.
     restrict = client.put(
@@ -635,7 +642,7 @@ def test_summary_filters_by_shipped_date_not_order_created_date(client, integrat
     assert old_date_summary.json()["items_count"] == 0
 
     # А фильтр за сегодняшний день (дата фактической отгрузки) — должен.
-    today_summary = client.get(f"{API_PREFIX}/finance/summary?date_from=2026-09-23&date_to=2026-09-23", headers=headers)
+    today_summary = client.get(f"{API_PREFIX}/finance/summary?date_from={TODAY}&date_to={TODAY}", headers=headers)
     body = today_summary.json()
     assert body["items_count"] == 1
     assert body["items"][0]["order_item_id"] == updated_item["order_item_id"]
