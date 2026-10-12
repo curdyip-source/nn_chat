@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   bulkSetOrderItemCostRate,
   correctOrderItemCost,
@@ -146,41 +146,45 @@ function OverviewTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string })
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
 
-  const reload = (targetPage = page) => {
-    fetchFinanceSummary(dateFrom, dateTo, targetPage, PAGE_SIZE)
-      .then((r) => {
-        setData(r)
-        setSelected(new Set())
-        setError('')
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось загрузить'))
-  }
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  // Счётчик для ручной перезагрузки текущей страницы (после правки курса/себестоимости).
+  const [reloadTick, setReloadTick] = useState(0)
+  const reload = () => setReloadTick((t) => t + 1)
 
+  // Смена периода — всегда с первой страницы.
   useEffect(() => {
-    setData(null)
-    setSelected(new Set())
     setPage(1)
+  }, [dateFrom, dateTo])
+
+  // Единая загрузка на любую смену периода/страницы. Раньше страница 1 здесь
+  // пропускалась (её грузил эффект дат) — и «Назад» на первую страницу не
+  // перезагружал данные, оставались строки 2-й/3-й страницы.
+  useEffect(() => {
     // Пока «дата от» и «дата до» не согласованы (пользователь ещё не успел
     // поправить второе поле), бэкенд ответит 422 — не залипаем на этой ошибке
     // навсегда, а просто ждём следующего валидного сочетания дат.
     if (dateTo < dateFrom) {
+      setData(null)
       setError('')
       return
     }
-    fetchFinanceSummary(dateFrom, dateTo, 1, PAGE_SIZE)
+    // Ответ на уже неактуальный запрос (быстро листали) не должен перетирать текущий.
+    let cancelled = false
+    fetchFinanceSummary(dateFrom, dateTo, page, PAGE_SIZE)
       .then((r) => {
+        if (cancelled) return
         setData(r)
+        setSelected(new Set())
         setError('')
+        scrollAreaRef.current?.scrollTo({ top: 0 })
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось загрузить'))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom, dateTo])
-
-  useEffect(() => {
-    if (page === 1) return
-    reload(page)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page])
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Не удалось загрузить')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [dateFrom, dateTo, page, reloadTick])
 
   if (error) return <div className={styles.error}>{error}</div>
   if (!data) return <div className={styles.dim}>Загрузка…</div>
@@ -226,7 +230,7 @@ function OverviewTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string })
         </div>
       </div>
 
-      <div className={styles.itemsScrollArea}>
+      <div ref={scrollAreaRef} className={styles.itemsScrollArea}>
         {data.items.length === 0 && <div className={styles.dim}>За этот месяц отгруженных товаров пока нет.</div>}
         <div className={styles.list}>
           {data.items.map((item) => (
