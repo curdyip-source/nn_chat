@@ -1,0 +1,134 @@
+/* Каркас как у формы заказа (OrderCreate.module.css): шапка, скролл, липкий футер. */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px 32px 0;
+}
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 90px;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.back {
+  background: var(--surface-2);
+  border: 1px solid var(--stroke);
+  color: var(--text-muted);
+  border-radius: var(--r-sm);
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.back:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+}
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 900px;
+}
+.hint {
+  margin-top: -10px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.error {
+  background: rgba(255, 69, 58, 0.14);
+  border: 1px solid rgba(255, 69, 58, 0.3);
+  color: var(--danger);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+/* ===== Заказы покупателя ===== */
+.ordersToggle {
+  padding-top: 6px;
+  border-top: 1px solid var(--stroke);
+}
+.orders {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.order {
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+.orderHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.orderNo {
+  font-weight: 700;
+}
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+}
+.itemName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.itemQty {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ===== Футер ===== */
+.footer {
+  position: fixed;
+  bottom: 0;
+  left: 248px;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 32px;
+  background: var(--surface-solid);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--stroke-strong);
+  box-shadow: 0 -6px 20px var(--shadow);
+}
+.total {
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+.footerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+

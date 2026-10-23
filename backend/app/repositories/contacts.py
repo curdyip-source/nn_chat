@@ -81,3 +81,7 @@ class ContactRepository:
         self.db.commit()
         self.db.refresh(row)
         return self.get_by_id(row.contact_id)
+
+    def delete(self, row: Contact) -> None:
+        self.db.delete(row)
+        self.db.commit()

@@ -46,6 +46,9 @@ const EVENT_LABELS: Record<string, string> = {
   'product.update': 'Изменил товар',
   'product.delete': 'Удалил товар',
 
+  'contact.update': 'Изменил контрагента',
+  'contact.delete': 'Удалил контрагента',
+
   'push.delivery_failed': 'Пуш не доставлен',
   'push.dispatch_failed': 'Ошибка отправки пуша',
   'push.mention_dispatch_failed': 'Ошибка пуша об упоминании',
@@ -62,6 +65,7 @@ const GROUP_ICONS: Record<string, string> = {
   product: '🏷️',
   product_registration: '📥',
   inventory: '📊',
+  contact: '👥',
   document: '📄',
   message: '💬',
   push: '🔔',

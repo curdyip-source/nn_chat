@@ -20,6 +20,7 @@ import { ConfirmDeleteModal } from '../../ui/ConfirmDeleteModal'
 import { Field, TextArea } from '../../ui/Field'
 import { SearchSelect } from '../../ui/SearchSelect'
 import { cartItemFromProduct, newUid, type CartItem } from './cart'
+import { CONTACT_METHODS } from './contactMethods'
 import { CartRow } from './CartRow'
 import { CreateProductModal } from './CreateProductModal'
 import { CreateMissingProductsModal } from './CreateMissingProductsModal'
@@ -29,8 +30,6 @@ import styles from './OrderCreate.module.css'
 const ExcelImport = lazy(() =>
   import('./ExcelImport').then((m) => ({ default: m.ExcelImport })),
 )
-
-const CONTACT_METHODS = ['WA', 'TG', 'AV', 'IG', 'SMS', 'MX']
 
 const cdekInput: React.CSSProperties = {
   width: '100%',

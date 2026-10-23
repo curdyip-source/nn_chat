@@ -6,7 +6,7 @@ from sqlalchemy import and_, delete, false, func, or_
 from sqlalchemy.orm import Session, aliased, joinedload
 
 from app.models.orders import Order, OrderComment, OrderCommentAttachment, OrderItem
-from app.models.reference_data import Currency
+from app.models.reference_data import Currency, Status
 
 
 class OrderRepository:
@@ -160,6 +160,55 @@ class OrderRepository:
         )
         rows = query.group_by(Currency.currency_id, Currency.currency_sign).all()
         return [(currency_id, currency_sign, float(amount or 0)) for currency_id, currency_sign, amount in rows]
+
+    # --- Заказы покупателя (карточка контрагента) -----------------------------
+    # Заказ связан с покупателем только текстом order_customer — сравниваем точно.
+
+    def _customer_query(self, query, customer: str, *, status_ids, scoped_full_ids, scoped_own_ids, scoped_user_id):
+        query = query.filter(Order.order_customer == customer)
+        return self._apply_order_filters(
+            query,
+            status_ids=status_ids,
+            method_ids=None,
+            establishment_ids=None,
+            scoped_full_ids=scoped_full_ids,
+            scoped_own_ids=scoped_own_ids,
+            scoped_user_id=scoped_user_id,
+            search=None,
+            date_from=None,
+            date_to=None,
+        )
+
+    def list_by_customer(self, customer: str, *, limit: int = 500, **scope) -> list[Order]:
+        query = self._customer_query(self._base_query(), customer, **scope)
+        return query.order_by(Order.order_created_at.desc(), Order.order_id.desc()).limit(limit).all()
+
+    def shipped_totals_by_customer(self, customer: str, *, shipped_status_name: str, **scope) -> list[tuple[int | None, str | None, float]]:
+        # Сумма отгруженных позиций (цена × кол-во) по валютам — как totals_by_currency,
+        # но только позиции в статусе «Отгружено».
+        query = (
+            self.db.query(
+                Currency.currency_id,
+                Currency.currency_sign,
+                func.coalesce(func.sum(OrderItem.order_item_price * OrderItem.order_item_quantity), 0),
+            )
+            .select_from(OrderItem)
+            .join(Order, OrderItem.order_item_order_id == Order.order_id)
+            .join(Status, OrderItem.order_item_status_id == Status.status_id)
+            .outerjoin(Currency, OrderItem.order_item_currency_id == Currency.currency_id)
+            .filter(Status.status_status == shipped_status_name)
+        )
+        query = self._customer_query(query, customer, **scope)
+        rows = query.group_by(Currency.currency_id, Currency.currency_sign).all()
+        return [(currency_id, currency_sign, float(amount or 0)) for currency_id, currency_sign, amount in rows]
+
+    def rename_customer(self, old_name: str, new_name: str) -> list[int]:
+        # Переименование покупателя тянет за собой его заказы (связь — по имени).
+        ids = [row[0] for row in self.db.query(Order.order_id).filter(Order.order_customer == old_name).all()]
+        if ids:
+            self.db.query(Order).filter(Order.order_id.in_(ids)).update({Order.order_customer: new_name}, synchronize_session=False)
+            self.db.commit()
+        return ids
 
     def create(self, data: dict, items: list[dict]) -> Order:
         row = Order(**data)

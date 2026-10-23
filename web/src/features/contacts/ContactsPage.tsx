@@ -5,6 +5,7 @@ import { Button } from '../../ui/Button'
 import { SegmentedControl } from '../../ui/SegmentedControl'
 import { TextInput } from '../../ui/Field'
 import { useDebouncedValue } from '../../ui/useDebouncedValue'
+import { ContactEditor } from './ContactEditor'
 import styles from './ContactsPage.module.css'
 
 const PAGE_SIZE = 100
@@ -19,6 +20,7 @@ export function ContactsPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search.trim(), 300)
+  const [openContact, setOpenContact] = useState<Contact | null>(null)
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -39,6 +41,21 @@ export function ContactsPage() {
   }, [tab, debouncedSearch, page])
 
   useEffect(load, [load])
+
+  if (openContact) {
+    const close = () => {
+      setOpenContact(null)
+      load()
+    }
+    return (
+      <ContactEditor
+        contact={openContact}
+        onBack={() => setOpenContact(null)}
+        onSaved={close}
+        onDeleted={close}
+      />
+    )
+  }
 
   return (
     <div className={styles.page}>
@@ -72,14 +89,14 @@ export function ContactsPage() {
         ) : (
           <div className={styles.list}>
             {contacts.map((c) => (
-              <div key={c.contact_id} className={styles.row}>
+              <button key={c.contact_id} type="button" className={styles.row} onClick={() => setOpenContact(c)}>
                 <div className={styles.name}>{c.contact_name}</div>
                 <div className={styles.meta}>
                   {[c.contact_info, c.contact_establishment_name, c.contact_order_method_name, c.contact_order_sub_method]
                     .filter(Boolean)
                     .join(' · ')}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}

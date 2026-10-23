@@ -232,6 +232,33 @@ export function listContacts(
   return apiRequest<Paginated<Contact>>(`/contacts?${q}`)
 }
 
+export function getContact(contactId: number) {
+  return apiRequest<{ item: Contact }>(`/contacts/${contactId}`)
+}
+
+export type ContactUpdate = {
+  contact_name: string
+  contact_info: string | null
+  contact_establishment_id: number | null
+  contact_order_method_id: number | null
+  contact_order_sub_method: string | null
+  contact_contact_method: string | null
+  contact_sales_channel: string | null
+}
+
+export function updateContact(contactId: number, payload: ContactUpdate) {
+  return apiRequest<{ item: Contact }>(`/contacts/${contactId}`, { method: 'PUT', body: payload })
+}
+
+export function deleteContact(contactId: number) {
+  return apiRequest<void>(`/contacts/${contactId}`, { method: 'DELETE' })
+}
+
+/** Заказы покупателя (видимые пользователю) + сумма отгруженных позиций по валютам. */
+export function getContactOrders(contactId: number) {
+  return apiRequest<{ items: Order[]; shipped_totals: OrderTotal[] }>(`/contacts/${contactId}/orders`)
+}
+
 // ---------- Orders ----------
 
 export function listOrders(

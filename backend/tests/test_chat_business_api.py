@@ -1922,3 +1922,57 @@ def test_delete_inventory_and_registration_respect_delete_scope_and_tombstone_ca
     messages_after = client.get(f"{API_PREFIX}/messages?page=1&page_size=50", headers=admin).json()["items"]
     assert not any(m.get("message_inventory_id") == inv_id for m in messages_after)
     assert not any(m.get("message_product_registration_id") == reg_id for m in messages_after)
+
+
+def test_contact_card_edit_rename_orders_shipped_totals_and_delete(client, integration_db_session, integration_user):
+    from app.models.contacts import Contact
+    from app.models.orders import OrderItem
+
+    integration_user.user_password = hash_password("WorkerPass123")
+    other = User(user_login="worker2", user_password=hash_password("Worker2Pass123"), user_admin=False, user_active=True, user_first_name="Worker2", user_second_name="User", user_age=27, user_address="Street 2")
+    integration_db_session.add(other)
+    integration_db_session.commit()
+    token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, token)
+    auth = {"Authorization": f"Bearer {token}"}
+    est_id = _first_establishment_ids(client, token, 1)[0]
+
+    contact = Contact(contact_type="buyer", contact_name="Клиент", contact_establishment_id=est_id, contact_owner_user_id=integration_user.user_id)
+    integration_db_session.add(contact)
+    integration_db_session.commit()
+    contact_id = contact.contact_id
+
+    order_id = _create_simple_order(client, token)
+    shipped = integration_db_session.query(Status).filter_by(status_type="order_products", status_status="Отгружено").one()
+    item = integration_db_session.query(OrderItem).filter_by(order_item_order_id=order_id).one()
+    item.order_item_status_id = shipped.status_id
+    integration_db_session.commit()
+
+    orders = client.get(f"{API_PREFIX}/contacts/{contact_id}/orders", headers=auth).json()
+    assert [o["order_id"] for o in orders["items"]] == [order_id]
+    assert orders["items"][0]["items"][0]["order_item_status"] == "Отгружено"
+    assert [t["amount"] for t in orders["shipped_totals"]] == [10.0]
+
+    # Переименование тянет заказы за собой — связь и сумма сохраняются.
+    renamed = client.put(f"{API_PREFIX}/contacts/{contact_id}", headers=auth, json={"contact_name": "  Новый   Клиент ", "contact_info": "+7 900", "contact_establishment_id": est_id})
+    assert renamed.status_code == 200
+    assert renamed.json()["item"]["contact_name"] == "Новый Клиент"
+    assert client.get(f"{API_PREFIX}/orders/{order_id}", headers=auth).json()["item"]["order_customer"] == "Новый Клиент"
+    assert len(client.get(f"{API_PREFIX}/contacts/{contact_id}/orders", headers=auth).json()["items"]) == 1
+
+    # Чужой контакт: worker2 со складом, но delete/edit «только свои» → 403.
+    other_token = login(client, "worker2", "Worker2Pass123")["token"]
+    _set_profile_db(integration_db_session, other, establishment_ids=[est_id], view_scope="establishment", edit_scope="own", delete_scope="own")
+    other_auth = {"Authorization": f"Bearer {other_token}"}
+    assert client.put(f"{API_PREFIX}/contacts/{contact_id}", headers=other_auth, json={"contact_name": "X"}).status_code == 403
+    assert client.delete(f"{API_PREFIX}/contacts/{contact_id}", headers=other_auth).status_code == 403
+
+    # Без раздела «Контрагенты» карточка закрыта.
+    other.user_sections = ["chat", "crm", "orders"]
+    integration_db_session.commit()
+    assert client.get(f"{API_PREFIX}/contacts/{contact_id}", headers=other_auth).status_code == 403
+
+    assert client.delete(f"{API_PREFIX}/contacts/{contact_id}", headers=auth).status_code == 204
+    assert client.get(f"{API_PREFIX}/contacts/{contact_id}", headers=auth).status_code == 404
+    # Заказ остаётся.
+    assert client.get(f"{API_PREFIX}/orders/{order_id}", headers=auth).status_code == 200

@@ -68,10 +68,20 @@
   gap: 6px;
 }
 .row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
   background: var(--surface);
   border: 1px solid var(--stroke);
   border-radius: var(--r-md);
   padding: 12px 14px;
+}
+.row:hover {
+  background: var(--surface-2);
+  border-color: var(--stroke-strong);
 }
 .name {
   font-weight: 600;
