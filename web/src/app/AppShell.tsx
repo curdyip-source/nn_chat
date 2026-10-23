@@ -57,15 +57,19 @@ function AppShellInner() {
   const { sidebarHidden, setSidebarHidden } = useLayout()
   const [active, setActive] = useState('orders')
   // Видимость: админ — всё; не-админ — админ-разделы скрыты, остальное по user_sections
-  // (null = всё). Режимы: chat/price напрямую; пункты СРМ требуют режим 'crm' + свой ключ.
+  // (null = всё). Режим chat — напрямую; пункты СРМ (включая «Прайс» = web_price) требуют режим 'crm' + свой ключ.
   const secs = user?.user_sections
   const has = (key: string) => secs == null || secs.includes(key)
-  const CRM_KEYS = ['orders', 'products', 'inventory', 'registrations', 'contacts', 'finance']
+  const CRM_KEYS = ['orders', 'products', 'inventory', 'registrations', 'contacts', 'finance', 'web_price']
+  // Веб-раздел «Прайс» выдаётся ключом web_price в «Разделах СРМ (веб)»; ключ price —
+  // это режим приложения «Поиск по прайсу», к вебу отношения не имеет.
+  const accessKey = (key: string) => (key === 'price' ? 'web_price' : key)
   const visibleSections = SECTIONS.filter((s) => {
     if (user?.user_admin) return true
     if (s.adminOnly) return false
-    if (CRM_KEYS.includes(s.key)) return has('crm') && has(s.key)
-    return has(s.key) // chat, price
+    const key = accessKey(s.key)
+    if (CRM_KEYS.includes(key)) return has('crm') && has(key)
+    return has(key) // chat
   })
   const section = visibleSections.find((s) => s.key === active) ?? visibleSections[0]
 

@@ -27,7 +27,8 @@ const DEFAULT_SCOPES: Omit<EstablishmentPermission, 'establishment_id'> = {
 const APP_MODES: { key: string; label: string; icon: string }[] = [
   { key: 'chat', label: 'Чат', icon: '💬' },
   { key: 'crm', label: 'СРМ', icon: '📋' },
-  { key: 'price', label: 'Прайс', icon: '💲' },
+  // Только поиск по прайсу в приложении; веб-раздел «Прайс» — web_price ниже.
+  { key: 'price', label: 'Поиск по прайсу', icon: '🔎' },
   // Тудулист есть только в приложении — в вебе экран не рисуется, ключ гейтит iOS.
   { key: 'todo', label: 'Задачи', icon: '✅' },
 ]
@@ -38,6 +39,7 @@ const CRM_SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: 'registrations', label: 'Приёмки', icon: '📥' },
   { key: 'contacts', label: 'Контрагенты', icon: '👥' },
   { key: 'finance', label: 'Финансы', icon: '💰' },
+  { key: 'web_price', label: 'Прайс', icon: '💲' },
 ]
 // Вкладки СРМ в мобильном приложении (свой набор ключей, гейтят только iOS).
 const APP_CRM_SECTIONS: { key: string; label: string; icon: string }[] = [

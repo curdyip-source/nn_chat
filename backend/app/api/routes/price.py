@@ -6,14 +6,18 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import require_section
 from app.services.price_federation import proxy_search_all, proxy_suppliers
 
 router = APIRouter(tags=["price"])
 
+# Режим приложения «Поиск по прайсу» (ключ price). Веб-раздел «Прайс» — отдельный
+# ключ web_price, его проверяет сам бэкенд прайса.
+require_price_search = require_section("price")
+
 
 @router.get("/price/suppliers")
-def price_suppliers_route(_: dict = Depends(get_current_user)) -> dict:
+def price_suppliers_route(_: dict = Depends(require_price_search)) -> dict:
     try:
         return {"items": proxy_suppliers()}
     except Exception:
@@ -26,7 +30,7 @@ def price_search_route(
     emails: list[str] = Query(default=[], description="Источники: CL и/или email; пусто = все"),
     limit: int = Query(default=50, ge=1, le=200),
     strict: bool = Query(default=False, description="Точный режим: все токены запроса в наименовании"),
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(require_price_search),
 ) -> dict:
     try:
         return proxy_search_all(q, emails or None, limit, strict=strict)

@@ -3,11 +3,11 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 # Доступы, выдаваемые не-админу (админ-разделы недоступны через это). Режимы приложения:
-# chat / crm / price / todo (тудулист, только приложение). Разделы внутри СРМ веба:
-# orders / products / inventory / registrations / contacts / finance (видны только
-# вместе с режимом crm; finance — единственный раздел СРМ, где сервер реально
-# проверяет user_sections на бэкенде, см. app/dependencies/auth.py::require_section,
-# у остальных это только гейтинг вкладки во фронте). Вкладки СРМ в приложении (свой
+# chat / crm / price (поиск по прайсу, сервер проверяет на /price/*) / todo (тудулист,
+# только приложение). Разделы внутри СРМ веба: orders / products / inventory /
+# registrations / contacts / finance / web_price (видны только вместе с режимом crm;
+# finance проверяется сервером через require_section, web_price — бэкендом прайса
+# nn_vla по /auth/me, у остальных это только гейтинг вкладки во фронте). Вкладки СРМ в приложении (свой
 # набор, гейтят только iOS): app_orders (Все заказы) / app_products (Товары) /
 # app_shipments (Отгрузки).
 GRANTABLE_SECTIONS = (
@@ -21,6 +21,7 @@ GRANTABLE_SECTIONS = (
     "registrations",
     "contacts",
     "finance",
+    "web_price",
     "app_orders",
     "app_products",
     "app_shipments",

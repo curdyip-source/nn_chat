@@ -564,6 +564,32 @@ def test_regular_user_cannot_view_audit_events(client, integration_db_session, i
     assert response.json()["error"]["code"] == "http_error"
 
 
+def test_price_search_requires_price_mode(client, integration_db_session, integration_user):
+    # web_price (веб-раздел) не даёт поиск в приложении — нужен режим price.
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_user.user_sections = ["chat", "crm", "web_price"]
+    integration_db_session.commit()
+
+    user_token = login(client, "worker", "WorkerPass123")["token"]
+    for path in ("/price/search?q=test", "/price/suppliers"):
+        response = client.get(f"{API_PREFIX}{path}", headers={"Authorization": f"Bearer {user_token}"})
+        assert response.status_code == 403
+
+
+def test_web_price_is_grantable_section(client, integration_db_session, integration_admin, integration_user):
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+    response = client.put(
+        f"{API_PREFIX}/users/{integration_user.user_id}",
+        json={"user_sections": ["crm", "web_price"]},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["item"]["user_sections"] == ["crm", "web_price"]
+
+
 def test_validation_error_uses_global_error_format(client):
     response = client.post(
         f"{API_PREFIX}/auth/login",
