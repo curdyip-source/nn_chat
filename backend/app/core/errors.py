@@ -1,5 +1,6 @@
 import logging
 import time
+from ipaddress import ip_address
 from uuid import uuid4
 
 from fastapi import HTTPException, Request
@@ -15,6 +16,21 @@ logger = logging.getLogger("app.request")
 HEALTH_LOG_EXCLUDED_PREFIXES = (
     "/api/v1/health/",
 )
+
+
+def get_client_ip(request: Request) -> str | None:
+    # Бэкенд наружу не опубликован: к нему ходит nginx фронта из docker-сети и
+    # передаёт реальный IP в X-Real-IP. Верим заголовку только от приватного пира.
+    peer = request.client.host if request.client else None
+    forwarded = (request.headers.get("x-real-ip") or "").strip()
+    if not peer or not forwarded:
+        return peer
+    try:
+        if ip_address(peer).is_private:
+            return forwarded[:64]
+    except ValueError:
+        pass
+    return peer
 
 
 def get_request_id(request: Request) -> str:
@@ -38,7 +54,7 @@ async def request_id_middleware(request: Request, call_next):
     request_path = request.url.path
     request_context_tokens = set_request_context(
         request_id=request.state.request_id,
-        client_ip=request.client.host if request.client else None,
+        client_ip=get_client_ip(request),
         user_agent=request.headers.get("user-agent"),
     )
     try:

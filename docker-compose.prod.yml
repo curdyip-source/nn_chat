@@ -94,7 +94,9 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${FRONTEND_PORT}:8080"
+      # Только localhost: снаружи ходят через Caddy (443). Docker публикует
+      # порты в обход ufw, поэтому 0.0.0.0 здесь = дыра мимо фаервола.
+      - "127.0.0.1:${FRONTEND_PORT}:8080"
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/_healthz || exit 1"]
       interval: 15s
