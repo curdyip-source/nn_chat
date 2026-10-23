@@ -23,6 +23,9 @@ class Order(Base):
     # order_sales_channels, хранится строкой как order_sub_method.
     order_sales_channel: Mapped[str | None] = mapped_column(String(50), nullable=True)
     order_customer: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Покупатель по ключу (карточка «Контрагенты»). order_customer — лишь снимок имени:
+    # одинаковых имён много, поэтому связь заказа с покупателем — только через этот FK.
+    order_contact_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("contacts.contact_id", ondelete="SET NULL"), nullable=True, index=True)
     order_info: Mapped[str] = mapped_column(Text, nullable=False)
     order_status_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("statuses.status_id", ondelete="RESTRICT"), nullable=False, index=True)
     order_owner_user_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)

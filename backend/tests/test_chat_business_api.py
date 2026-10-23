@@ -1252,7 +1252,7 @@ def test_order_update_does_not_push_when_items_unchanged(client, integration_db_
     assert captured == []
 
 
-def _create_simple_order(client, token):
+def _create_simple_order(client, token, **extra):
     ref = client.get(f"{API_PREFIX}/reference-data", headers={"Authorization": f"Bearer {token}"}).json()
     establishment_id = ref["establishments"][0]["establishment_id"]
     order_method_id = ref["order_methods"][0]["order_method_id"]
@@ -1265,6 +1265,7 @@ def _create_simple_order(client, token):
             "order_customer": "Клиент",
             "order_info": "инфо",
             "items": [{"product_article": "DEL-001", "product_name": "Del Product", "order_item_quantity": 1, "order_item_price": "10.00"}],
+            **extra,
         },
     )
     assert response.status_code == 201
@@ -1942,7 +1943,10 @@ def test_contact_card_edit_rename_orders_shipped_totals_and_delete(client, integ
     integration_db_session.commit()
     contact_id = contact.contact_id
 
-    order_id = _create_simple_order(client, token)
+    order_id = _create_simple_order(client, token, order_contact_id=contact_id)
+    # Тёзка без привязки: то же имя «Клиент», но к карточке не относится.
+    namesake_id = _create_simple_order(client, token, cdek={"recipient_name": "Чужой", "city_code": 44, "city_name": "Москва"})
+    assert client.get(f"{API_PREFIX}/orders/{namesake_id}", headers=auth).json()["item"]["order_contact_id"] is None
     shipped = integration_db_session.query(Status).filter_by(status_type="order_products", status_status="Отгружено").one()
     item = integration_db_session.query(OrderItem).filter_by(order_item_order_id=order_id).one()
     item.order_item_status_id = shipped.status_id
@@ -1950,6 +1954,9 @@ def test_contact_card_edit_rename_orders_shipped_totals_and_delete(client, integ
 
     orders = client.get(f"{API_PREFIX}/contacts/{contact_id}/orders", headers=auth).json()
     assert [o["order_id"] for o in orders["items"]] == [order_id]
+    # СДЭК — только по ключу: по имени данные тёзки не подтягиваются, по contact_id у покупателя их нет.
+    assert client.get(f"{API_PREFIX}/cdek/prefill?customer=Клиент", headers=auth).json()["item"] == {}
+    assert client.get(f"{API_PREFIX}/cdek/prefill?contact_id={contact_id}", headers=auth).json()["item"] == {}
     assert orders["items"][0]["items"][0]["order_item_status"] == "Отгружено"
     assert [t["amount"] for t in orders["shipped_totals"]] == [10.0]
 
@@ -1958,6 +1965,8 @@ def test_contact_card_edit_rename_orders_shipped_totals_and_delete(client, integ
     assert renamed.status_code == 200
     assert renamed.json()["item"]["contact_name"] == "Новый Клиент"
     assert client.get(f"{API_PREFIX}/orders/{order_id}", headers=auth).json()["item"]["order_customer"] == "Новый Клиент"
+    # Тёзку переименование не задело.
+    assert client.get(f"{API_PREFIX}/orders/{namesake_id}", headers=auth).json()["item"]["order_customer"] == "Клиент"
     assert len(client.get(f"{API_PREFIX}/contacts/{contact_id}/orders", headers=auth).json()["items"]) == 1
 
     # Чужой контакт: worker2 со складом, но delete/edit «только свои» → 403.
@@ -1974,5 +1983,45 @@ def test_contact_card_edit_rename_orders_shipped_totals_and_delete(client, integ
 
     assert client.delete(f"{API_PREFIX}/contacts/{contact_id}", headers=auth).status_code == 204
     assert client.get(f"{API_PREFIX}/contacts/{contact_id}", headers=auth).status_code == 404
-    # Заказ остаётся.
-    assert client.get(f"{API_PREFIX}/orders/{order_id}", headers=auth).status_code == 200
+    # Заказ остаётся, привязка снята.
+    kept = client.get(f"{API_PREFIX}/orders/{order_id}", headers=auth)
+    assert kept.status_code == 200 and kept.json()["item"]["order_contact_id"] is None
+
+
+def test_order_contact_link_save_contact_update_and_cdek_prefill(client, integration_db_session, integration_user):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    token = login(client, "worker", "WorkerPass123")["token"]
+    _grant_full_access(client, integration_db_session, integration_user, token)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    # «Сохранить клиента» создаёт карточку и привязывает к ней заказ; СДЭК — по ключу.
+    order_id = _create_simple_order(client, token, save_contact=True, cdek={"recipient_name": "Мой", "recipient_phone": "+7900", "city_code": 44, "city_name": "Москва"})
+    order = client.get(f"{API_PREFIX}/orders/{order_id}", headers=auth).json()["item"]
+    contact_id = order["order_contact_id"]
+    assert contact_id is not None
+    prefill = client.get(f"{API_PREFIX}/cdek/prefill?contact_id={contact_id}", headers=auth).json()["item"]
+    assert prefill["recipient_name"] == "Мой" and prefill["city_code"] == 44
+
+    # Несуществующий покупатель — 400.
+    ref = client.get(f"{API_PREFIX}/reference-data", headers=auth).json()
+    body = {
+        "order_establishment_id": ref["establishments"][0]["establishment_id"],
+        "order_method_id": ref["order_methods"][0]["order_method_id"],
+        "order_customer": "Клиент",
+        "order_contact_id": 999999,
+        "items": [{"product_article": "DEL-001", "product_name": "Del Product", "order_item_quantity": 1, "order_item_price": "10.00"}],
+    }
+    assert client.post(f"{API_PREFIX}/orders", headers=auth, json=body).status_code == 400
+
+    # Правка без поля order_contact_id (старые клиенты) — привязка сохраняется; null — снимает.
+    update = {
+        "order_establishment_id": order["order_establishment_id"],
+        "order_method_id": order["order_method_id"],
+        "order_customer": order["order_customer"],
+        "order_info": order["order_info"],
+        "order_status_id": order["order_status_id"],
+        "items": [{"product_article": "DEL-001", "product_name": "Del Product", "order_item_quantity": 1, "order_item_price": "10.00"}],
+    }
+    assert client.put(f"{API_PREFIX}/orders/{order_id}", headers=auth, json=update).json()["item"]["order_contact_id"] == contact_id
+    assert client.put(f"{API_PREFIX}/orders/{order_id}", headers=auth, json={**update, "order_contact_id": None}).json()["item"]["order_contact_id"] is None

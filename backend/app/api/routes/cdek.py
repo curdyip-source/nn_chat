@@ -64,12 +64,17 @@ def tariffs_route(
 
 @router.get("/prefill")
 def prefill_route(
-    customer: str = Query(min_length=1, max_length=255),
+    contact_id: int | None = Query(default=None, ge=1),
+    customer: str | None = Query(default=None, max_length=255),
     _: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    """СДЭК-данные клиента (из прошлых заказов) — для автозаполнения при создании заказа."""
-    return {"item": cdek_orders.get_prefill(db, customer)}
+    """СДЭК-данные покупателя (из его прошлых заказов) — для автозаполнения заказа.
+
+    Только по contact_id. customer (имя) принимаем ради старых сборок приложения,
+    но игнорируем — по имени подтягивались данные чужих тёзок.
+    """
+    return {"item": cdek_orders.get_prefill(db, contact_id)}
 
 
 @router.get("/defaults")

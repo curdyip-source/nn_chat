@@ -43,6 +43,8 @@ class OrderCreatePayload(BaseModel):
     order_sales_channel: Optional[str] = Field(default=None, min_length=1, max_length=50)
     order_customer: str = Field(min_length=1, max_length=255)
     order_info: str = Field(default="", max_length=4000)
+    # Покупатель, выбранный из «Контрагентов». Без него и без save_contact заказ ни к кому не привязан.
+    order_contact_id: Optional[int] = Field(default=None, ge=1)
     save_contact: bool = False
     order_status_id: Optional[int] = Field(default=None, ge=1)
     message_text: Optional[str] = Field(default=None, max_length=4000)
@@ -67,6 +69,8 @@ class OrderUpdatePayload(BaseModel):
     order_sales_channel: Optional[str] = Field(default=None, min_length=1, max_length=50)
     order_customer: str = Field(min_length=1, max_length=255)
     order_info: str = Field(default="", max_length=4000)
+    # Передано (в т.ч. null) — меняем привязку; не передано (старые клиенты) — не трогаем.
+    order_contact_id: Optional[int] = Field(default=None, ge=1)
     order_status_id: int = Field(ge=1)
     items: list[OrderItemCreatePayload] = Field(min_length=1)
 

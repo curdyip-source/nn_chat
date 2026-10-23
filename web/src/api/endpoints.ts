@@ -579,8 +579,9 @@ export type CdekPrefill = {
   delivery_address?: string | null
 }
 
-export function cdekPrefill(customer: string) {
-  return apiRequest<{ item: CdekPrefill }>(`/cdek/prefill?customer=${encodeURIComponent(customer)}`)
+/** СДЭК-данные покупателя из его прошлых заказов — только по ключу контрагента. */
+export function cdekPrefill(contactId: number) {
+  return apiRequest<{ item: CdekPrefill }>(`/cdek/prefill?contact_id=${contactId}`)
 }
 
 // ---------- Финансы ----------

@@ -162,10 +162,10 @@ class OrderRepository:
         return [(currency_id, currency_sign, float(amount or 0)) for currency_id, currency_sign, amount in rows]
 
     # --- Заказы покупателя (карточка контрагента) -----------------------------
-    # Заказ связан с покупателем только текстом order_customer — сравниваем точно.
+    # Только по ключу order_contact_id: по имени не связываем — одинаковых имён много.
 
-    def _customer_query(self, query, customer: str, *, status_ids, scoped_full_ids, scoped_own_ids, scoped_user_id):
-        query = query.filter(Order.order_customer == customer)
+    def _contact_query(self, query, contact_id: int, *, status_ids, scoped_full_ids, scoped_own_ids, scoped_user_id):
+        query = query.filter(Order.order_contact_id == contact_id)
         return self._apply_order_filters(
             query,
             status_ids=status_ids,
@@ -179,11 +179,11 @@ class OrderRepository:
             date_to=None,
         )
 
-    def list_by_customer(self, customer: str, *, limit: int = 500, **scope) -> list[Order]:
-        query = self._customer_query(self._base_query(), customer, **scope)
+    def list_by_contact(self, contact_id: int, *, limit: int = 500, **scope) -> list[Order]:
+        query = self._contact_query(self._base_query(), contact_id, **scope)
         return query.order_by(Order.order_created_at.desc(), Order.order_id.desc()).limit(limit).all()
 
-    def shipped_totals_by_customer(self, customer: str, *, shipped_status_name: str, **scope) -> list[tuple[int | None, str | None, float]]:
+    def shipped_totals_by_contact(self, contact_id: int, *, shipped_status_name: str, **scope) -> list[tuple[int | None, str | None, float]]:
         # Сумма отгруженных позиций (цена × кол-во) по валютам — как totals_by_currency,
         # но только позиции в статусе «Отгружено».
         query = (
@@ -198,17 +198,27 @@ class OrderRepository:
             .outerjoin(Currency, OrderItem.order_item_currency_id == Currency.currency_id)
             .filter(Status.status_status == shipped_status_name)
         )
-        query = self._customer_query(query, customer, **scope)
+        query = self._contact_query(query, contact_id, **scope)
         rows = query.group_by(Currency.currency_id, Currency.currency_sign).all()
         return [(currency_id, currency_sign, float(amount or 0)) for currency_id, currency_sign, amount in rows]
 
-    def rename_customer(self, old_name: str, new_name: str) -> list[int]:
-        # Переименование покупателя тянет за собой его заказы (связь — по имени).
-        ids = [row[0] for row in self.db.query(Order.order_id).filter(Order.order_customer == old_name).all()]
+    def rename_contact_orders(self, contact_id: int, new_name: str) -> list[int]:
+        # Переименование покупателя меняет имя-снимок только в привязанных к нему заказах.
+        ids = [
+            row[0]
+            for row in self.db.query(Order.order_id)
+            .filter(Order.order_contact_id == contact_id, Order.order_customer != new_name)
+            .all()
+        ]
         if ids:
             self.db.query(Order).filter(Order.order_id.in_(ids)).update({Order.order_customer: new_name}, synchronize_session=False)
             self.db.commit()
         return ids
+
+    def unlink_contact(self, contact_id: int) -> None:
+        # FK и так ON DELETE SET NULL; явно — чтобы не зависеть от движка (SQLite в тестах).
+        self.db.query(Order).filter(Order.order_contact_id == contact_id).update({Order.order_contact_id: None}, synchronize_session=False)
+        self.db.commit()
 
     def create(self, data: dict, items: list[dict]) -> Order:
         row = Order(**data)

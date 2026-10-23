@@ -243,6 +243,8 @@ export type OrderCreate = {
   order_sales_channel?: string | null
   order_customer: string
   order_info: string
+  /** Покупатель из «Контрагентов» (ключ). По имени заказы ни к кому не привязываются. */
+  order_contact_id?: number | null
   save_contact: boolean
   order_status_id?: number | null
   cdek?: OrderCreateCdek | null
@@ -294,6 +296,7 @@ export type Order = {
   order_contact_method?: string | null
   order_sales_channel?: string | null
   order_customer: string
+  order_contact_id?: number | null
   order_info: string
   order_status_id?: number | null
   order_status?: string | null
@@ -329,6 +332,7 @@ export type OrderUpdate = {
   order_sales_channel?: string | null
   order_customer: string
   order_info: string
+  order_contact_id: number | null
   order_status_id: number
   items: OrderUpdateItem[]
 }

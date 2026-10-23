@@ -10,6 +10,7 @@ from app.core.audit_types import ENTITY_TYPE_CDEK, ENTITY_TYPE_ORDER, EVENT_TYPE
 from app.models.messages import Message
 from app.models.orders import Order, OrderItem
 from app.repositories.audit_events import AuditEventRepository
+from app.repositories.contacts import ContactRepository
 from app.repositories.message_attachment_assets import MessageAttachmentAssetRepository
 from app.repositories.messages import MessageRepository
 from app.repositories.orders import OrderRepository
@@ -359,6 +360,16 @@ def _order_history_entries_for_event(event) -> list[dict]:
     ]
 
 
+def _resolve_buyer_contact_id(db: Session, contact_id: int | None) -> int | None:
+    """Проверить, что переданный order_contact_id — существующий покупатель."""
+    if contact_id is None:
+        return None
+    contact = ContactRepository(db).get_by_id(contact_id)
+    if contact is None or contact.contact_type != "buyer":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Покупатель не найден")
+    return contact.contact_id
+
+
 class OrderService:
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -469,8 +480,10 @@ class OrderService:
             )
 
         cdek = payload.cdek
+        contact_id = _resolve_buyer_contact_id(self.db, payload.order_contact_id)
         row = self.repository.create(
             {
+                "order_contact_id": contact_id,
                 "order_establishment_id": payload.order_establishment_id,
                 "order_method_id": payload.order_method_id,
                 "order_sub_method": normalized_order_sub_method,
@@ -493,7 +506,7 @@ class OrderService:
         )
         _save_supplier_contacts_from_items(self.db, items=items, current_user=current_user)
         if payload.save_contact:
-            save_buyer_contact_from_order(
+            saved_contact = save_buyer_contact_from_order(
                 self.db,
                 order_customer=payload.order_customer,
                 order_info=payload.order_info,
@@ -504,6 +517,9 @@ class OrderService:
                 order_sales_channel=normalized_order_sales_channel,
                 current_user=current_user,
             )
+            # «Сохранить клиента» без явного выбора — привязываем к созданной/найденной карточке.
+            if contact_id is None and saved_contact is not None:
+                row = self.repository.update(row, {"order_contact_id": saved_contact["contact_id"]})
         message = self.message_repository.create(
             {
                 "message_type": "order",
@@ -635,6 +651,11 @@ class OrderService:
                 "order_contact_method": normalized_order_contact_method,
                 "order_sales_channel": normalized_order_sales_channel,
                 "order_customer": payload.order_customer,
+                "order_contact_id": (
+                    _resolve_buyer_contact_id(self.db, payload.order_contact_id)
+                    if "order_contact_id" in payload.model_fields_set
+                    else row.order_contact_id
+                ),
                 "order_info": payload.order_info,
                 "order_status_id": status_row.status_id,
             },
@@ -1008,6 +1029,7 @@ class OrderService:
             order_contact_method=order.order_contact_method,
             order_sales_channel=order.order_sales_channel,
             order_customer=order.order_customer,
+            order_contact_id=order.order_contact_id,
             order_info=order.order_info,
             order_status_id=order.order_status_id,
             order_owner_user_id=current_user["user_id"],

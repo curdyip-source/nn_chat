@@ -236,14 +236,17 @@ def create_waybill(db: Session, order_id: int, payload, current_user: dict) -> d
     return _serialize(order)
 
 
-def get_prefill(db: Session, customer: str) -> dict:
-    """Автозаполнение СДЭК-данных для клиента: последние сохранённые из его прошлых заказов."""
-    customer = (customer or "").strip()
-    if not customer:
+def get_prefill(db: Session, contact_id: int | None) -> dict:
+    """Автозаполнение СДЭК-данных покупателя: из его последнего заказа со СДЭК.
+
+    Только по ключу order_contact_id — по имени не ищем: тёзок много, и раньше
+    подтягивались данные чужого клиента.
+    """
+    if contact_id is None:
         return {}
     row = db.execute(
         select(Order)
-        .where(Order.order_customer == customer)
+        .where(Order.order_contact_id == contact_id)
         .where(Order.order_cdek_recipient_name.isnot(None) | Order.order_cdek_city_code.isnot(None))
         .order_by(desc(Order.order_created_at))
         .limit(1)

@@ -88,7 +88,13 @@ export function OrderCreate({
   const [cdekPvzAddress, setCdekPvzAddress] = useState(ec?.pvz_address ?? '')
   const [cdekPvzCode, setCdekPvzCode] = useState<string | null>(ec?.pvz_code ?? null)
   const [cdekDeliveryAddress, setCdekDeliveryAddress] = useState(ec?.delivery_address ?? '')
-  const [cdekPrefilledFor, setCdekPrefilledFor] = useState<string | null>(null)
+  const [cdekPrefilledFor, setCdekPrefilledFor] = useState<number | null>(null)
+  // Покупатель по ключу: ставится выбором из поиска контактов, снимается ручной
+  // правкой имени. По одному имени заказ ни к кому не привязываем — тёзок много.
+  const [contactId, setContactId] = useState<number | null>(editOrder?.order_contact_id ?? null)
+  const [contactName, setContactName] = useState<string | null>(
+    editOrder?.order_contact_id ? editOrder.order_customer : null,
+  )
   const [items, setItems] = useState<CartItem[]>(
     editOrder
       ? editOrder.items.map((it) => ({
@@ -121,12 +127,12 @@ export function OrderCreate({
   const subMethods = selectedMethod?.order_method_sub_methods ?? []
   const isCdek = selectedMethod?.order_method_name === 'СДЭК' || subMethod === 'СДЭК'
 
-  // Автозаполнение СДЭК-данных клиента из его прошлых заказов (один раз на имя клиента).
+  // Автозаполнение СДЭК-данных из прошлых заказов покупателя — только по ключу
+  // (выбранный контакт), один раз на покупателя.
   useEffect(() => {
-    const name = customer.trim()
-    if (!isCdek || !name || cdekPrefilledFor === name) return
-    setCdekPrefilledFor(name)
-    cdekPrefill(name)
+    if (!isCdek || contactId == null || cdekPrefilledFor === contactId) return
+    setCdekPrefilledFor(contactId)
+    cdekPrefill(contactId)
       .then(({ item }) => {
         if (!item) return
         if (item.recipient_name && !cdekName) setCdekName(item.recipient_name)
@@ -140,7 +146,7 @@ export function OrderCreate({
       })
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCdek, customer])
+  }, [isCdek, contactId])
 
   const cdekPayload = (): OrderCreateCdek | undefined =>
     isCdek
@@ -162,8 +168,18 @@ export function OrderCreate({
     [items],
   )
 
+  const changeCustomer = (value: string) => {
+    setCustomer(value)
+    if (contactName != null && value.trim() !== contactName) {
+      setContactId(null)
+      setContactName(null)
+    }
+  }
+
   const applyContact = (c: Contact) => {
     setCustomer(c.contact_name)
+    setContactId(c.contact_id)
+    setContactName(c.contact_name)
     if (c.contact_info) setInfo(c.contact_info)
     if (c.contact_establishment_id) setEstablishmentId(c.contact_establishment_id)
     if (c.contact_order_method_id) setMethodId(c.contact_order_method_id)
@@ -260,6 +276,7 @@ export function OrderCreate({
           order_sales_channel: salesChannel,
           order_customer: customer.trim(),
           order_info: info.trim(),
+          order_contact_id: contactId,
           order_status_id: editOrder.order_status_id!,
           items: mappedItems,
         })
@@ -272,6 +289,7 @@ export function OrderCreate({
           order_sales_channel: salesChannel,
           order_customer: customer.trim(),
           order_info: info.trim(),
+          order_contact_id: contactId,
           save_contact: saveContact,
           cdek: cdekPayload(),
           order_status_id: null,
@@ -325,7 +343,7 @@ export function OrderCreate({
             <SearchSelect<Contact>
               placeholder="Имя клиента"
               value={customer}
-              onValueChange={setCustomer}
+              onValueChange={changeCustomer}
               search={(q, signal) => searchContacts('buyer', q, signal).then((r) => r.items)}
               getKey={(c) => c.contact_id}
               renderItem={(c) => (
@@ -337,7 +355,9 @@ export function OrderCreate({
               onSelect={applyContact}
             />
             <span className={styles.clientHint}>
-              Вводите имя — поиск по контактам; выбор подставит данные заказа
+              {contactId != null
+                ? 'Привязан к карточке покупателя. Исправите имя вручную — привязка снимется'
+                : 'Вводите имя — поиск по контактам; выбор подставит данные заказа и привяжет заказ к покупателю'}
             </span>
           </div>
 

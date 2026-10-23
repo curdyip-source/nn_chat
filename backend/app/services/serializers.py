@@ -380,6 +380,7 @@ def serialize_order(row) -> dict:
         "order_contact_method": row.order_contact_method,
         "order_sales_channel": row.order_sales_channel,
         "order_customer": row.order_customer,
+        "order_contact_id": row.order_contact_id,
         "order_info": row.order_info,
         "order_status_id": row.order_status_id,
         "order_status": status.status_status if status else None,

@@ -61,10 +61,10 @@ export function ContactEditor({
   // (тот же источник, что автозаполнение в форме заказа).
   useEffect(() => {
     if (!isBuyer) return
-    cdekPrefill(contact.contact_name)
+    cdekPrefill(contact.contact_id)
       .then(({ item }) => setCdek(item && Object.values(item).some((v) => v != null && v !== '') ? item : null))
       .catch(() => setCdek(null))
-  }, [contact.contact_name, isBuyer])
+  }, [contact.contact_id, isBuyer])
 
   const cdekRows: [string, string | null | undefined][] = cdek
     ? [

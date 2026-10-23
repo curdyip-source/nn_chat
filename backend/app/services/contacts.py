@@ -144,11 +144,11 @@ def update_contact(db: Session, contact_id: int, payload: ContactUpdatePayload, 
     old_name = row.contact_name
     row = ContactRepository(db).update(row, data)
 
-    # Заказы связаны с покупателем по имени — переименовываем и их, чтобы история
-    # и сумма отгрузок остались за покупателем. Карточки заказов в чате обновляем.
+    # Имя в заказах — снимок: в привязанных (по ключу) заказах обновляем его, чтобы
+    # карточки в чате показывали актуальное имя. Чужие тёзки не затрагиваются.
     renamed_order_ids: list[int] = []
     if row.contact_type == "buyer" and old_name != new_name:
-        renamed_order_ids = OrderRepository(db).rename_customer(old_name, new_name)
+        renamed_order_ids = OrderRepository(db).rename_contact_orders(row.contact_id, new_name)
         for order_id in renamed_order_ids:
             notify_order_changed(db, order_id)
 
@@ -169,10 +169,12 @@ def update_contact(db: Session, contact_id: int, payload: ContactUpdatePayload, 
 
 
 def delete_contact(db: Session, contact_id: int, current_user: dict) -> None:
-    # Удаляется только карточка контрагента; заказы остаются (в них имя — текстом).
+    # Удаляется только карточка контрагента; заказы остаются (имя в них — снимок),
+    # привязка к удалённой карточке снимается.
     row = _get_contact_or_404(db, contact_id)
     _ensure_contact_permission(db, row, current_user, delete=True)
     snapshot = {"contact_type": row.contact_type, "contact_name": row.contact_name}
+    OrderRepository(db).unlink_contact(contact_id)
     ContactRepository(db).delete(row)
     log_audit_event(
         db,
@@ -201,8 +203,8 @@ def list_contact_orders(db: Session, contact_id: int, current_user: dict) -> dic
         "scoped_user_id": scoped_user_id,
     }
     repository = OrderRepository(db)
-    orders = repository.list_by_customer(row.contact_name, **scope)
-    totals = repository.shipped_totals_by_customer(row.contact_name, shipped_status_name=SOLD_ITEM_STATUS_NAME, **scope)
+    orders = repository.list_by_contact(row.contact_id, **scope)
+    totals = repository.shipped_totals_by_contact(row.contact_id, shipped_status_name=SOLD_ITEM_STATUS_NAME, **scope)
     return {
         "items": [serialize_order(order) for order in orders],
         "shipped_totals": [
