@@ -84,11 +84,8 @@ export function orderToUpdate(
     order_sales_channel: order.order_sales_channel ?? null,
     order_customer: overrides.customer ?? order.order_customer,
     order_info: overrides.info ?? order.order_info,
-    // Привязка к покупателю сохраняется; ручная правка имени её снимает (как в форме заказа).
-    order_contact_id:
-      overrides.customer != null && overrides.customer.trim() !== order.order_customer
-        ? null
-        : (order.order_contact_id ?? null),
+    // Привязка к покупателю — по ключу, правка имени (подписи) её не трогает.
+    order_contact_id: order.order_contact_id ?? null,
     order_status_id: overrides.statusId ?? order.order_status_id!,
     items: overrides.items ?? defaultItems(order),
   }

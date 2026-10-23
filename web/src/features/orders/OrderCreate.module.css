@@ -67,6 +67,15 @@
   font-size: 12px;
   color: var(--text-dim);
 }
+.unlink {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--danger);
+  text-decoration: underline;
+  cursor: pointer;
+}
 .saveContact {
   display: inline-flex;
   align-items: center;

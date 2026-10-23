@@ -89,12 +89,10 @@ export function OrderCreate({
   const [cdekPvzCode, setCdekPvzCode] = useState<string | null>(ec?.pvz_code ?? null)
   const [cdekDeliveryAddress, setCdekDeliveryAddress] = useState(ec?.delivery_address ?? '')
   const [cdekPrefilledFor, setCdekPrefilledFor] = useState<number | null>(null)
-  // Покупатель по ключу: ставится выбором из поиска контактов, снимается ручной
-  // правкой имени. По одному имени заказ ни к кому не привязываем — тёзок много.
+  // Покупатель по ключу: ставится выбором из поиска контактов, меняется выбором
+  // другого, снимается только кнопкой «Отвязать». Правка имени (подписи) ключ не
+  // трогает. По одному имени заказ ни к кому не привязываем — тёзок много.
   const [contactId, setContactId] = useState<number | null>(editOrder?.order_contact_id ?? null)
-  const [contactName, setContactName] = useState<string | null>(
-    editOrder?.order_contact_id ? editOrder.order_customer : null,
-  )
   const [items, setItems] = useState<CartItem[]>(
     editOrder
       ? editOrder.items.map((it) => ({
@@ -168,18 +166,9 @@ export function OrderCreate({
     [items],
   )
 
-  const changeCustomer = (value: string) => {
-    setCustomer(value)
-    if (contactName != null && value.trim() !== contactName) {
-      setContactId(null)
-      setContactName(null)
-    }
-  }
-
   const applyContact = (c: Contact) => {
     setCustomer(c.contact_name)
     setContactId(c.contact_id)
-    setContactName(c.contact_name)
     if (c.contact_info) setInfo(c.contact_info)
     if (c.contact_establishment_id) setEstablishmentId(c.contact_establishment_id)
     if (c.contact_order_method_id) setMethodId(c.contact_order_method_id)
@@ -343,7 +332,7 @@ export function OrderCreate({
             <SearchSelect<Contact>
               placeholder="Имя клиента"
               value={customer}
-              onValueChange={changeCustomer}
+              onValueChange={setCustomer}
               search={(q, signal) => searchContacts('buyer', q, signal).then((r) => r.items)}
               getKey={(c) => c.contact_id}
               renderItem={(c) => (
@@ -355,9 +344,16 @@ export function OrderCreate({
               onSelect={applyContact}
             />
             <span className={styles.clientHint}>
-              {contactId != null
-                ? 'Привязан к карточке покупателя. Исправите имя вручную — привязка снимется'
-                : 'Вводите имя — поиск по контактам; выбор подставит данные заказа и привяжет заказ к покупателю'}
+              {contactId != null ? (
+                <>
+                  Привязан к карточке покупателя (№{contactId}). Имя можно править — привязка сохранится.{' '}
+                  <button type="button" className={styles.unlink} onClick={() => setContactId(null)}>
+                    Отвязать
+                  </button>
+                </>
+              ) : (
+                'Вводите имя — поиск по контактам; выбор подставит данные заказа и привяжет заказ к покупателю'
+              )}
             </span>
           </div>
 
