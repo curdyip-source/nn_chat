@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { deleteContact, getContactOrders, updateContact, type OrderTotal } from '../../api/endpoints'
+import { cdekPrefill, deleteContact, getContactOrders, updateContact, type CdekPrefill, type OrderTotal } from '../../api/endpoints'
 import type { Contact, Order } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { formatAmount } from '../../lib/format'
@@ -13,6 +13,7 @@ import { CONTACT_METHODS } from '../orders/contactMethods'
 import styles from './ContactEditor.module.css'
 
 const formatDate = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString('ru-RU') : '')
+const DELIVERY_MODE_LABELS: Record<string, string> = { pvz: 'В пункт выдачи', door: 'Курьером' }
 
 /** Карточка контрагента: правка/удаление; у покупателя — сумма отгруженного и его заказы. */
 export function ContactEditor({
@@ -44,6 +45,7 @@ export function ContactEditor({
   const [orders, setOrders] = useState<Order[] | null>(null)
   const [shippedTotals, setShippedTotals] = useState<OrderTotal[] | null>(null)
   const [ordersError, setOrdersError] = useState('')
+  const [cdek, setCdek] = useState<CdekPrefill | null>(null)
 
   useEffect(() => {
     if (!isBuyer) return
@@ -54,6 +56,26 @@ export function ContactEditor({
       })
       .catch((e) => setOrdersError(e instanceof Error ? e.message : 'Не удалось загрузить заказы'))
   }, [contact.contact_id, isBuyer])
+
+  // СДЭК-данные живут в заказах: берём из последнего заказа покупателя со СДЭК
+  // (тот же источник, что автозаполнение в форме заказа).
+  useEffect(() => {
+    if (!isBuyer) return
+    cdekPrefill(contact.contact_name)
+      .then(({ item }) => setCdek(item && Object.values(item).some((v) => v != null && v !== '') ? item : null))
+      .catch(() => setCdek(null))
+  }, [contact.contact_name, isBuyer])
+
+  const cdekRows: [string, string | null | undefined][] = cdek
+    ? [
+        ['Получатель', cdek.recipient_name],
+        ['Телефон', cdek.recipient_phone],
+        ['Город', cdek.city_name],
+        ['Способ доставки', cdek.delivery_mode ? DELIVERY_MODE_LABELS[cdek.delivery_mode] ?? cdek.delivery_mode : null],
+        ['Пункт выдачи', cdek.delivery_mode === 'door' ? null : cdek.pvz_address],
+        ['Адрес доставки', cdek.delivery_mode === 'door' ? cdek.delivery_address : null],
+      ]
+    : []
 
   const subMethods = ref.order_methods.find((m) => m.order_method_id === methodId)?.order_method_sub_methods ?? []
   const canSave = name.trim().length > 0
@@ -166,6 +188,23 @@ export function ContactEditor({
                     options={subMethods.map((s) => ({ value: s, label: s }))}
                   />
                 </Field>
+              )}
+
+              {cdek && (
+                <div className={styles.cdek}>
+                  <div className={styles.cdekTitle}>Данные СДЭК</div>
+                  <div className={styles.cdekGrid}>
+                    {cdekRows
+                      .filter(([, value]) => value)
+                      .map(([label, value]) => (
+                        <div key={label} className={styles.cdekRow}>
+                          <span className={styles.cdekLabel}>{label}</span>
+                          <span>{value}</span>
+                        </div>
+                      ))}
+                  </div>
+                  <div className={styles.cdekHint}>Из последнего заказа со СДЭК — меняются в заказе.</div>
+                </div>
               )}
 
               <div className={styles.ordersToggle}>

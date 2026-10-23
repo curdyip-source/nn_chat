@@ -39,7 +39,6 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  max-width: 900px;
 }
 .hint {
   margin-top: -10px;
@@ -53,6 +52,38 @@
   border-radius: var(--r-md);
   padding: 10px 14px;
   font-size: 14px;
+}
+
+/* ===== Данные СДЭК (из последнего заказа) ===== */
+.cdek {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+}
+.cdekTitle {
+  font-weight: 600;
+  font-size: 14px;
+}
+.cdekGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cdekRow {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+  font-size: 14px;
+}
+.cdekLabel {
+  color: var(--text-muted);
+}
+.cdekHint {
+  color: var(--text-dim);
+  font-size: 12.5px;
 }
 
 /* ===== Заказы покупателя ===== */
