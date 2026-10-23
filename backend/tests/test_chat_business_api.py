@@ -1886,3 +1886,39 @@ def test_packed_item_status_is_seeded(client, integration_db_session, integratio
     packed = next((s for s in statuses if s["status_type"] == "order_products" and s["status_status"] == "Упаковано"), None)
     assert packed is not None
     assert packed["status_color"]
+
+
+def test_delete_inventory_and_registration_respect_delete_scope_and_tombstone_cards(client, integration_db_session, integration_user, integration_admin):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    admin_token = login(client, "admin", "AdminPass123")["token"]
+    worker_token = login(client, "worker", "WorkerPass123")["token"]
+    est_id = _first_establishment_ids(client, admin_token, 1)[0]
+    admin = {"Authorization": f"Bearer {admin_token}"}
+    worker = {"Authorization": f"Bearer {worker_token}"}
+
+    inv_id = client.post(f"{API_PREFIX}/inventories", headers=admin,
+        json={"inventory_establishment_id": est_id,
+              "items": [{"product_article": "IV-D", "product_name": "P", "inventory_item_quantity": 1, "inventory_item_cost": "10.00"}]}).json()["item"]["inventory_id"]
+    reg_id = client.post(f"{API_PREFIX}/product-registrations", headers=admin,
+        json={"product_registration_establishment_id": est_id, "product_registration_supplier": "Поставщик",
+              "items": [{"product_article": "RG-D", "product_name": "P", "product_registration_item_quantity": 1, "product_registration_item_cost": "10.00"}]}).json()["item"]["product_registration_id"]
+
+    messages = client.get(f"{API_PREFIX}/messages?page=1&page_size=50", headers=admin).json()["items"]
+    assert any(m.get("message_inventory_id") == inv_id for m in messages)
+    assert any(m.get("message_product_registration_id") == reg_id for m in messages)
+
+    # worker видит склад, но удалять может только свои документы → чужие 403.
+    _set_profile_db(integration_db_session, integration_user, establishment_ids=[est_id], view_scope="establishment", delete_scope="own")
+    assert client.delete(f"{API_PREFIX}/inventories/{inv_id}", headers=worker).status_code == 403
+    assert client.delete(f"{API_PREFIX}/product-registrations/{reg_id}", headers=worker).status_code == 403
+
+    assert client.delete(f"{API_PREFIX}/inventories/{inv_id}", headers=admin).status_code == 204
+    assert client.delete(f"{API_PREFIX}/product-registrations/{reg_id}", headers=admin).status_code == 204
+    assert client.get(f"{API_PREFIX}/inventories/{inv_id}", headers=admin).status_code == 404
+    assert client.get(f"{API_PREFIX}/product-registrations/{reg_id}", headers=admin).status_code == 404
+
+    messages_after = client.get(f"{API_PREFIX}/messages?page=1&page_size=50", headers=admin).json()["items"]
+    assert not any(m.get("message_inventory_id") == inv_id for m in messages_after)
+    assert not any(m.get("message_product_registration_id") == reg_id for m in messages_after)

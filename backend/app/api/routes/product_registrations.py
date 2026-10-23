@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.schemas.product_registrations import ProductRegistrationCreatePayload, ProductRegistrationStatusUpdatePayload, ProductRegistrationUpdatePayload
-from app.services.product_registrations import create_product_registration, get_product_registration, list_product_registrations, update_product_registration, update_product_registration_status
+from app.services.product_registrations import create_product_registration, delete_product_registration, get_product_registration, list_product_registrations, update_product_registration, update_product_registration_status
 
 router = APIRouter(prefix="/product-registrations", tags=["product-registrations"])
 
@@ -32,3 +32,8 @@ def update_product_registration_route(product_registration_id: int, payload: Pro
 @router.put("/{product_registration_id}/status")
 def update_product_registration_status_route(product_registration_id: int, payload: ProductRegistrationStatusUpdatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     return {"item": update_product_registration_status(db, product_registration_id, payload, current_user)}
+
+
+@router.delete("/{product_registration_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_product_registration_route(product_registration_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
+    delete_product_registration(db, product_registration_id, current_user)

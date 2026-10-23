@@ -373,6 +373,9 @@ export function createInventory(payload: unknown) {
 export function updateInventory(id: number, payload: unknown) {
   return apiRequest<{ item: Inventory }>(`/inventories/${id}`, { method: 'PUT', body: payload })
 }
+export function deleteInventory(id: number) {
+  return apiRequest<void>(`/inventories/${id}`, { method: 'DELETE' })
+}
 export function updateInventoryStatus(id: number, statusId: number) {
   return apiRequest<{ item: Inventory }>(`/inventories/${id}/status`, {
     method: 'PUT',
@@ -394,6 +397,9 @@ export function createRegistration(payload: unknown) {
 }
 export function updateRegistration(id: number, payload: unknown) {
   return apiRequest<{ item: ProductRegistration }>(`/product-registrations/${id}`, { method: 'PUT', body: payload })
+}
+export function deleteRegistration(id: number) {
+  return apiRequest<void>(`/product-registrations/${id}`, { method: 'DELETE' })
 }
 export function updateRegistrationStatus(id: number, statusId: number) {
   return apiRequest<{ item: ProductRegistration }>(`/product-registrations/${id}/status`, {

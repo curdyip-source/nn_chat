@@ -51,6 +51,12 @@ class ProductRegistrationRepository:
         self.db.refresh(row)
         return self.get_by_id(row.product_registration_id)
 
+    def delete(self, row: ProductRegistration) -> None:
+        # Жёсткое удаление: позиции уходят каскадом (relationship cascade="all,
+        # delete-orphan"). Карточки чата гасятся мягко заранее — см. сервис.
+        self.db.delete(row)
+        self.db.commit()
+
     def update(self, row: ProductRegistration, data: dict) -> ProductRegistration:
         for field_name, field_value in data.items():
             setattr(row, field_name, field_value)

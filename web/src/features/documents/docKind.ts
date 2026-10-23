@@ -1,6 +1,8 @@
 import {
   createInventory,
   createRegistration,
+  deleteInventory,
+  deleteRegistration,
   getInventory,
   getRegistration,
   listInventories,
@@ -47,6 +49,8 @@ export type DocKind = {
   key: 'inventory' | 'registration'
   title: string
   singular: string
+  /** Винительный падеж для «Удалить …»: инвентаризацию / приёмку. */
+  accusative: string
   createTitle: string
   supplierLabel: string
   supplierRequired: boolean
@@ -56,6 +60,7 @@ export type DocKind = {
   create: (state: ComposerState) => Promise<void>
   update: (id: number, state: ComposerState) => Promise<void>
   updateStatus: (id: number, statusId: number) => Promise<DocView>
+  remove: (id: number) => Promise<void>
 }
 
 function normInventory(r: Inventory): DocView {
@@ -119,6 +124,7 @@ export const INVENTORY_KIND: DocKind = {
   key: 'inventory',
   title: 'Инвентаризации',
   singular: 'Инвентаризация',
+  accusative: 'инвентаризацию',
   createTitle: 'Новая инвентаризация',
   supplierLabel: 'Поставщик',
   supplierRequired: false,
@@ -143,12 +149,14 @@ export const INVENTORY_KIND: DocKind = {
       items: s.items.map((it) => itemBody(it, 'inventory_item')),
     }).then(() => undefined),
   updateStatus: (id, statusId) => updateInventoryStatus(id, statusId).then((r) => normInventory(r.item)),
+  remove: (id) => deleteInventory(id),
 }
 
 export const REGISTRATION_KIND: DocKind = {
   key: 'registration',
   title: 'Приёмки',
   singular: 'Приёмка',
+  accusative: 'приёмку',
   createTitle: 'Новая приёмка',
   supplierLabel: 'Поставщик',
   supplierRequired: true,
@@ -174,4 +182,5 @@ export const REGISTRATION_KIND: DocKind = {
     }).then(() => undefined),
   updateStatus: (id, statusId) =>
     updateRegistrationStatus(id, statusId).then((r) => normRegistration(r.item)),
+  remove: (id) => deleteRegistration(id),
 }

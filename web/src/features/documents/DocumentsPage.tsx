@@ -46,6 +46,7 @@ export function DocumentsPage({ kind }: { kind: DocKind }) {
           setCreating(false)
           setEditDoc(null)
         }}
+        onDeleted={() => setEditDoc(null)}
       />
     )
   }

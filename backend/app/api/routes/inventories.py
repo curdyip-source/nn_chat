@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.schemas.inventories import InventoryCreatePayload, InventoryStatusUpdatePayload, InventoryUpdatePayload
-from app.services.inventories import create_inventory, get_inventory, list_inventories, update_inventory, update_inventory_status
+from app.services.inventories import create_inventory, delete_inventory, get_inventory, list_inventories, update_inventory, update_inventory_status
 
 router = APIRouter(prefix="/inventories", tags=["inventories"])
 
@@ -32,3 +32,8 @@ def update_inventory_route(inventory_id: int, payload: InventoryUpdatePayload, c
 @router.put("/{inventory_id}/status")
 def update_inventory_status_route(inventory_id: int, payload: InventoryStatusUpdatePayload, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     return {"item": update_inventory_status(db, inventory_id, payload, current_user)}
+
+
+@router.delete("/{inventory_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_inventory_route(inventory_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
+    delete_inventory(db, inventory_id, current_user)

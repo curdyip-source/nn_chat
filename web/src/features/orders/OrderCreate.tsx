@@ -4,6 +4,7 @@ import {
   cdekPrefill,
   cdekSuggestCities,
   createOrder,
+  deleteOrder,
   matchProductsByName,
   searchContacts,
   searchProducts,
@@ -15,6 +16,7 @@ import type { Contact, Order, OrderCreateCdek, Product } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
 import { ButtonGroup } from '../../ui/ButtonGroup'
+import { ConfirmDeleteModal } from '../../ui/ConfirmDeleteModal'
 import { Field, TextArea } from '../../ui/Field'
 import { SearchSelect } from '../../ui/SearchSelect'
 import { cartItemFromProduct, newUid, type CartItem } from './cart'
@@ -57,10 +59,12 @@ export function OrderCreate({
   editOrder,
   onCancel,
   onCreated,
+  onDeleted,
 }: {
   editOrder?: Order | null
   onCancel: () => void
   onCreated: () => void
+  onDeleted: () => void
 }) {
   const ref = useReference()
   const defaultCurrencyId = ref.defaultCurrency?.currency_id ?? null
@@ -107,6 +111,7 @@ export function OrderCreate({
   const [excelOpen, setExcelOpen] = useState(false)
   const [createProductName, setCreateProductName] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState('')
   const [bulkNote, setBulkNote] = useState<string | null>(null)
   const [missingNames, setMissingNames] = useState<string[]>([])
@@ -545,10 +550,30 @@ export function OrderCreate({
         <div className={styles.total}>
           {items.length} поз. · итого {total}
         </div>
-        <Button variant="primary" loading={submitting} disabled={!canSubmit} onClick={submit}>
-          {editOrder ? 'Сохранить' : 'Создать заказ'}
-        </Button>
+        <div className={styles.footerActions}>
+          {editOrder && (
+            <Button variant="danger" disabled={submitting} onClick={() => setConfirmDelete(true)}>
+              Удалить
+            </Button>
+          )}
+          <Button variant="primary" loading={submitting} disabled={!canSubmit} onClick={submit}>
+            {editOrder ? 'Сохранить' : 'Создать заказ'}
+          </Button>
+        </div>
       </footer>
+
+      {editOrder && (
+        <ConfirmDeleteModal
+          open={confirmDelete}
+          title="Удалить заказ"
+          message={`Точно удалить заказ №${editOrder.order_id} целиком, вместе с позициями, комментариями и карточкой в чате?`}
+          onClose={() => setConfirmDelete(false)}
+          onConfirm={async () => {
+            await deleteOrder(editOrder.order_id)
+            onDeleted()
+          }}
+        />
+      )}
 
       {excelOpen && (
         <Suspense fallback={null}>

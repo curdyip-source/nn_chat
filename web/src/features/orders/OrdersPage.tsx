@@ -278,6 +278,7 @@ export function OrdersPage() {
           setCreating(false)
           setEditOrder(null)
         }}
+        onDeleted={() => setEditOrder(null)}
       />
     )
   }

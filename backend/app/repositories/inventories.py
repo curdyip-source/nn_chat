@@ -51,6 +51,12 @@ class InventoryRepository:
         self.db.refresh(row)
         return self.get_by_id(row.inventory_id)
 
+    def delete(self, row: Inventory) -> None:
+        # Жёсткое удаление: позиции уходят каскадом (relationship cascade="all,
+        # delete-orphan"). Карточки чата гасятся мягко заранее — см. сервис.
+        self.db.delete(row)
+        self.db.commit()
+
     def update(self, row: Inventory, data: dict) -> Inventory:
         for field_name, field_value in data.items():
             setattr(row, field_name, field_value)

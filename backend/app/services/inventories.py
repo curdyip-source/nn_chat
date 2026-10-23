@@ -3,15 +3,15 @@ import logging
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.audit_types import ENTITY_TYPE_INVENTORY, EVENT_TYPE_INVENTORY_CREATE, EVENT_TYPE_INVENTORY_UPDATE
+from app.core.audit_types import ENTITY_TYPE_INVENTORY, EVENT_TYPE_INVENTORY_CREATE, EVENT_TYPE_INVENTORY_DELETE, EVENT_TYPE_INVENTORY_UPDATE
 from app.repositories.inventories import InventoryRepository
 from app.repositories.messages import MessageRepository
 from app.schemas.common import build_pagination
 from app.schemas.inventories import InventoryCreatePayload, InventoryStatusUpdatePayload, InventoryUpdatePayload
 from app.services.contacts import save_supplier_contact
 from app.services.audit import log_audit_event
-from app.services.access_control import can_create_on_establishment, can_edit_document, can_view_document, list_visibility
-from app.services.card_sync import notify_inventory_changed
+from app.services.access_control import can_create_on_establishment, can_delete_document, can_edit_document, can_view_document, list_visibility
+from app.services.card_sync import notify_cards_deleted, notify_inventory_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_status_or_404, resolve_product_snapshot
 from app.services.push_notifications import send_push_notification_event
 from app.services.serializers import serialize_inventory
@@ -170,6 +170,19 @@ class InventoryService:
         notify_inventory_changed(self.db, row.inventory_id)
         return serialize_inventory(row)
 
+    def delete_inventory(self, inventory_id: int, current_user: dict) -> None:
+        row = self.get_accessible_inventory_or_404(inventory_id, current_user)
+        # Право на удаление (профиль delete_scope).
+        if not can_delete_document(self.db, current_user, row.inventory_establishment_id, row.inventory_owner_user_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для удаления этой инвентаризации")
+        items_count = len(row.items)
+        supplier = row.inventory_supplier
+        # Карточки в чате гасим мягко и отвязываем (как у заказа), потом сносим документ.
+        message_ids = self.message_repository.soft_delete_for_inventory(inventory_id)
+        self.repository.delete(row)
+        log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_INVENTORY, entity_id=inventory_id, event_type=EVENT_TYPE_INVENTORY_DELETE, event_payload={"inventory_supplier": supplier, "items_count": items_count})
+        notify_cards_deleted(message_ids)
+
 
 def list_inventories(db: Session, current_user: dict, *, page: int = 1, page_size: int = 20) -> dict:
     return InventoryService(db).list_inventories(current_user, page=page, page_size=page_size)
@@ -189,3 +202,7 @@ def update_inventory(db: Session, inventory_id: int, payload: InventoryUpdatePay
 
 def update_inventory_status(db: Session, inventory_id: int, payload: InventoryStatusUpdatePayload, current_user: dict) -> dict:
     return InventoryService(db).update_inventory_status(inventory_id, payload, current_user)
+
+
+def delete_inventory(db: Session, inventory_id: int, current_user: dict) -> None:
+    InventoryService(db).delete_inventory(inventory_id, current_user)

@@ -27,6 +27,7 @@ const EVENT_LABELS: Record<string, string> = {
 
   'order.create': 'Создал заказ',
   'order.update': 'Изменил заказ',
+  'order.delete': 'Удалил заказ',
   'order.comment.create': 'Прокомментировал заказ',
   'order.comment.update': 'Изменил комментарий',
   'order.comment.delete': 'Удалил комментарий',
@@ -35,9 +36,11 @@ const EVENT_LABELS: Record<string, string> = {
 
   'inventory.create': 'Создал инвентаризацию',
   'inventory.update': 'Изменил инвентаризацию',
+  'inventory.delete': 'Удалил инвентаризацию',
 
   'product_registration.create': 'Создал приёмку',
   'product_registration.update': 'Изменил приёмку',
+  'product_registration.delete': 'Удалил приёмку',
 
   'product.create': 'Добавил товар',
   'product.update': 'Изменил товар',

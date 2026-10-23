@@ -4,6 +4,7 @@ import type { Contact, Product } from '../../api/types'
 import { useReference } from '../../data/ReferenceContext'
 import { Button } from '../../ui/Button'
 import { ButtonGroup } from '../../ui/ButtonGroup'
+import { ConfirmDeleteModal } from '../../ui/ConfirmDeleteModal'
 import { SearchSelect } from '../../ui/SearchSelect'
 import { cartItemFromProduct, newUid, type CartItem } from '../orders/cart'
 import { CartRow } from '../orders/CartRow'
@@ -20,11 +21,13 @@ export function DocumentComposer({
   editDoc,
   onCancel,
   onCreated,
+  onDeleted,
 }: {
   kind: DocKind
   editDoc?: DocView | null
   onCancel: () => void
   onCreated: () => void
+  onDeleted: () => void
 }) {
   const ref = useReference()
   const defaultCurrencyId = ref.defaultCurrency?.currency_id ?? null
@@ -49,6 +52,7 @@ export function DocumentComposer({
   const [createProductName, setCreateProductName] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const total = useMemo(
     () => items.reduce((s, it) => s + (Number(it.price) || 0) * it.quantity, 0).toFixed(2),
@@ -185,10 +189,30 @@ export function DocumentComposer({
         <div className={styles.total}>
           {items.length} поз. · итого {total}
         </div>
-        <Button variant="primary" loading={submitting} disabled={!canSubmit} onClick={submit}>
-          {editDoc ? 'Сохранить' : 'Создать'}
-        </Button>
+        <div className={styles.footerActions}>
+          {editDoc && (
+            <Button variant="danger" disabled={submitting} onClick={() => setConfirmDelete(true)}>
+              Удалить
+            </Button>
+          )}
+          <Button variant="primary" loading={submitting} disabled={!canSubmit} onClick={submit}>
+            {editDoc ? 'Сохранить' : 'Создать'}
+          </Button>
+        </div>
       </footer>
+
+      {editDoc && (
+        <ConfirmDeleteModal
+          open={confirmDelete}
+          title={`Удалить ${kind.accusative}`}
+          message={`Точно удалить ${kind.accusative} №${editDoc.id} вместе со всеми позициями и карточкой в чате?`}
+          onClose={() => setConfirmDelete(false)}
+          onConfirm={async () => {
+            await kind.remove(editDoc.id)
+            onDeleted()
+          }}
+        />
+      )}
 
       {excelOpen && (
         <Suspense fallback={null}>
