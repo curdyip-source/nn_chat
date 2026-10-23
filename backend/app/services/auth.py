@@ -1,5 +1,7 @@
 import logging
+from datetime import datetime, timedelta
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from fastapi import HTTPException, status
@@ -13,9 +15,12 @@ from app.core.audit_types import (
     EVENT_TYPE_AUTH_LOGOUT_CURRENT,
     EVENT_TYPE_AUTH_REFRESH_SUCCEEDED,
 )
+from app.core.config import LOGIN_MAX_FAILURES, LOGIN_WINDOW_MINUTES
+from app.core.request_context import get_request_context
 from app.core.security import verify_password
 from app.core.session import generate_session_token, get_session_expires_at
 from app.core.tokens import create_access_token
+from app.models.audit_events import AuditEvent
 from app.repositories.sessions import SessionRepository
 from app.schemas.auth import LoginPayload, RefreshTokenPayload, RegisterPayload
 from app.services.audit import log_audit_event
@@ -41,7 +46,29 @@ def _build_auth_response(user_row, refresh_session) -> dict:
     }
 
 
+def _login_blocked(db: Session, user_login: str, ip_address: str | None) -> bool:
+    since = datetime.utcnow() - timedelta(minutes=LOGIN_WINDOW_MINUTES)
+    failures = db.query(func.count(AuditEvent.audit_event_id)).filter(
+        AuditEvent.event_type == EVENT_TYPE_AUTH_LOGIN_FAILED,
+        AuditEvent.created_at >= since,
+    )
+    if failures.filter(AuditEvent.event_payload["user_login"].as_string() == user_login).scalar() >= LOGIN_MAX_FAILURES:
+        return True
+    return bool(ip_address) and failures.filter(AuditEvent.ip_address == ip_address).scalar() >= LOGIN_MAX_FAILURES
+
+
 def login_user(db: Session, payload: LoginPayload) -> dict:
+    ip_address = get_request_context()["ip_address"]
+    if _login_blocked(db, payload.user_login, ip_address):
+        logger.warning(
+            "auth.login.blocked",
+            extra={"event_type": "auth.login.blocked", "auth_login": payload.user_login},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Слишком много неудачных попыток входа. Попробуйте через {LOGIN_WINDOW_MINUTES} минут",
+        )
+
     user_row = get_user_by_login(db, payload.user_login)
     if user_row is None or not verify_password(payload.user_password, user_row.user_password):
         logger.warning(

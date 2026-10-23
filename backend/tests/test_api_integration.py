@@ -1,8 +1,11 @@
 from datetime import datetime
 
+from fastapi.testclient import TestClient
+
 from app.core.audit_types import EVENT_TYPE_DOCUMENT_CREATE
 from app.core.config import FIRST_ADMIN_PASS
 from app.core.security import hash_password
+from app.main import app
 from app.models import AuditEvent, User
 
 
@@ -193,6 +196,55 @@ def test_refresh_endpoint_rotates_refresh_token_and_returns_new_access_token(cli
     )
     assert me_response.status_code == 200
     assert me_response.json()["user"]["user_login"] == "worker"
+
+
+def test_login_is_blocked_after_repeated_failures(client, integration_db_session, integration_user):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+
+    for _ in range(5):
+        failed = client.post(
+            f"{API_PREFIX}/auth/login",
+            json={"user_login": "worker", "user_password": "WrongPass123"},
+        )
+        assert failed.status_code == 401
+
+    # Даже верный пароль не пускает, пока окно блокировки не истекло.
+    blocked = client.post(
+        f"{API_PREFIX}/auth/login",
+        json={"user_login": "worker", "user_password": "WorkerPass123"},
+    )
+    assert blocked.status_code == 429
+
+
+def test_login_block_by_ip_covers_other_logins(client, integration_db_session, integration_user):
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    # Запросы идут как от nginx фронта (приватный пир) с реальным IP в X-Real-IP.
+    proxied = TestClient(app, client=("172.19.0.4", 50000))
+    headers = {"X-Real-IP": "203.0.113.7"}
+
+    for i in range(5):
+        proxied.post(
+            f"{API_PREFIX}/auth/login",
+            json={"user_login": f"guess{i}", "user_password": "WrongPass123"},
+            headers=headers,
+        )
+
+    blocked = proxied.post(
+        f"{API_PREFIX}/auth/login",
+        json={"user_login": "worker", "user_password": "WorkerPass123"},
+        headers=headers,
+    )
+    assert blocked.status_code == 429
+
+    # Другой IP с верным паролем входит.
+    other = proxied.post(
+        f"{API_PREFIX}/auth/login",
+        json={"user_login": "worker", "user_password": "WorkerPass123"},
+        headers={"X-Real-IP": "198.51.100.9"},
+    )
+    assert other.status_code == 200
 
 
 def test_inactive_user_cannot_login(client, integration_db_session, integration_admin):

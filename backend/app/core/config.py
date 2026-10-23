@@ -37,6 +37,11 @@ PRICE_BACKEND_URL = os.getenv("PRICE_BACKEND_URL", "http://price-backend:8000").
 # user_id для сервисного токена к nn_vla (подпись общим AUTH_TOKEN_SECRET; nn_vla
 # не проверяет существование юзера — идентичность берётся из токена).
 PRICE_FEDERATION_USER_ID = int(os.getenv("PRICE_FEDERATION_USER_ID", "1"))
+# Защита от подбора пароля: после LOGIN_MAX_FAILURES неудачных входов за окно
+# вход по этому логину и с этого IP закрыт до конца окна (считаем по аудиту).
+# Пароли у всех сохранены в браузере/устройстве — ошибаются редко, порог низкий.
+LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "5"))
+LOGIN_WINDOW_MINUTES = int(os.getenv("LOGIN_WINDOW_MINUTES", "15"))
 SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()
 SENTRY_ENVIRONMENT = os.getenv("SENTRY_ENVIRONMENT", APP_ENV or "development").strip()
 SENTRY_TRACES_SAMPLE_RATE = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0"))
