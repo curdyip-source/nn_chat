@@ -100,6 +100,13 @@ class OrderItem(Base):
     # Заполняются при ручной коррекции себестоимости в разделе «Финансы».
     order_item_cost_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     order_item_cost_updated_by_user_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+    # Закупочная цена за единицу В ВАЛЮТЕ ПОЗИЦИИ — то, что вносят в «Финансах»
+    # приложения (cost_usd при этом пересчитывается для веба). NULL — не внесена.
+    order_item_purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    # «Фиксатор»: зафиксированную позицию нельзя править (ни закупку, ни курс).
+    order_item_cost_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    order_item_cost_locked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    order_item_cost_locked_by_user_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     # Момент, когда позиция стала «Отгружено» (не дата создания заказа!) — по этому
     # полю «Финансы» фильтруют «проданное» за период. Ставится при переходе статуса
     # в «Отгружено» и сохраняется как есть, если статус остаётся «Отгружено» при

@@ -20,6 +20,7 @@ from app.schemas.finance import (
     FinanceExpensePayload,
     OrderItemCostCorrectionPayload,
 )
+from app.services.finance_app import purchase_from_cost_usd, sync_cost_usd_from_purchase
 from app.services.serializers import (
     compute_order_item_money,
     serialize_exchange_rate,
@@ -106,8 +107,13 @@ class FinanceService:
         row = self.order_items.get_item(order_item_id)
         if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Позиция заказа не найдена")
+        # Фиксатор из «Финансов» приложения — зафиксированное не правим и отсюда.
+        if row.order_item_cost_locked:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Позиция зафиксирована в приложении")
         row.order_item_cost_usd = payload.order_item_cost_usd
         row.order_item_cost_rate = payload.order_item_cost_rate
+        # Закупка в валюте продажи (её видит приложение) — следом за правкой веба.
+        row.order_item_purchase_price = purchase_from_cost_usd(row)
         row.order_item_cost_updated_at = datetime.utcnow()
         row.order_item_cost_updated_by_user_id = current_user["user_id"]
         self.db.commit()
@@ -126,7 +132,13 @@ class FinanceService:
             if row is None:
                 not_found_ids.append(order_item_id)
                 continue
+            # Зафиксированные в приложении позиции не трогаем.
+            if row.order_item_cost_locked:
+                continue
             row.order_item_cost_rate = rate
+            # Закупка, внесённая в валюте продажи, — первична: при смене курса
+            # пересчитываем USD-себестоимость, чтобы закупка в рублях не «поплыла».
+            sync_cost_usd_from_purchase(self.db, row)
             row.order_item_cost_updated_at = now
             row.order_item_cost_updated_by_user_id = current_user["user_id"]
             updated_ids.append(order_item_id)

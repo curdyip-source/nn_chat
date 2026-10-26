@@ -46,6 +46,7 @@ const APP_CRM_SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: 'app_orders', label: 'Все заказы', icon: '📦' },
   { key: 'app_products', label: 'Товары', icon: '🏷️' },
   { key: 'app_shipments', label: 'Отгрузки', icon: '🚚' },
+  { key: 'app_finance', label: 'Финансы', icon: '💰' },
 ]
 const ALL_SECTION_KEYS = [...APP_MODES, ...CRM_SECTIONS, ...APP_CRM_SECTIONS].map((s) => s.key)
 

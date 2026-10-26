@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 # finance проверяется сервером через require_section, web_price — бэкендом прайса
 # nn_vla по /auth/me, у остальных это только гейтинг вкладки во фронте). Вкладки СРМ в приложении (свой
 # набор, гейтят только iOS): app_orders (Все заказы) / app_products (Товары) /
-# app_shipments (Отгрузки).
+# app_shipments (Отгрузки) / app_finance (Финансы — проверяется и сервером, /finance/app/*).
 GRANTABLE_SECTIONS = (
     "chat",
     "crm",
@@ -25,6 +25,7 @@ GRANTABLE_SECTIONS = (
     "app_orders",
     "app_products",
     "app_shipments",
+    "app_finance",
 )
 
 

@@ -612,6 +612,14 @@ class OrderService:
                 cost_rate = existing_item.order_item_cost_rate
                 cost_updated_at = existing_item.order_item_cost_updated_at
                 cost_updated_by_user_id = existing_item.order_item_cost_updated_by_user_id
+            # Закупка и фиксатор из «Финансов» приложения — тоже переносим, иначе
+            # любая правка заказа сбрасывала бы внесённое и снимала фиксацию.
+            finance_carry = {
+                "order_item_purchase_price": existing_item.order_item_purchase_price if existing_item is not None else None,
+                "order_item_cost_locked": bool(existing_item.order_item_cost_locked) if existing_item is not None else False,
+                "order_item_cost_locked_at": existing_item.order_item_cost_locked_at if existing_item is not None else None,
+                "order_item_cost_locked_by_user_id": existing_item.order_item_cost_locked_by_user_id if existing_item is not None else None,
+            }
             shipped_at = _resolve_item_shipped_at(item_status, existing_item)
             items.append(
                 {
@@ -634,6 +642,7 @@ class OrderService:
                     "order_item_cost_updated_at": cost_updated_at,
                     "order_item_cost_updated_by_user_id": cost_updated_by_user_id,
                     "order_item_shipped_at": shipped_at,
+                    **finance_carry,
                 }
             )
 
@@ -1058,6 +1067,10 @@ class OrderService:
                     order_item_cost_updated_at=item.order_item_cost_updated_at,
                     order_item_cost_updated_by_user_id=item.order_item_cost_updated_by_user_id,
                     order_item_shipped_at=item.order_item_shipped_at,
+                    order_item_purchase_price=item.order_item_purchase_price,
+                    order_item_cost_locked=item.order_item_cost_locked,
+                    order_item_cost_locked_at=item.order_item_cost_locked_at,
+                    order_item_cost_locked_by_user_id=item.order_item_cost_locked_by_user_id,
                 )
             )
 

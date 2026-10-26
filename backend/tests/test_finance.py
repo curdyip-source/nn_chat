@@ -646,3 +646,74 @@ def test_summary_filters_by_shipped_date_not_order_created_date(client, integrat
     body = today_summary.json()
     assert body["items_count"] == 1
     assert body["items"][0]["order_item_id"] == updated_item["order_item_id"]
+
+
+def test_app_finance_purchase_lock_and_totals(client, integration_db_session, integration_admin, integration_user):
+    # «Финансы» приложения: суммы в валюте продажи, закупка в той же валюте (для веба
+    # пересчитывается в USD по курсу), фиксатор запрещает правку и здесь, и в вебе;
+    # закупка и фиксатор переживают правку заказа; доступ — по ключу app_finance.
+    headers = _admin_headers(client, integration_db_session, integration_admin)
+    assert client.put(f"{API_PREFIX}/finance/exchange-rates/{TODAY}", headers=headers, json={"exchange_rate_value": "100.0000"}).status_code == 200
+    ref = client.get(f"{API_PREFIX}/reference-data", headers=headers).json()
+    shipped = _shipped_status_id(ref)
+    usd_id = next(c["currency_id"] for c in ref["currencies"] if c["currency_name"] == "USD")
+    rub_id = next(c["currency_id"] for c in ref["currencies"] if c["currency_name"] == "RUB")
+    order_body = {
+        "order_establishment_id": ref["establishments"][0]["establishment_id"],
+        "order_method_id": ref["order_methods"][0]["order_method_id"],
+        "order_customer": "Покупатель",
+        "order_info": "Тест",
+        "items": [
+            {"product_article": "APPFIN-USD", "product_name": "Usd Product", "order_item_quantity": 2,
+             "order_item_price": "150.00", "order_item_status_id": shipped, "order_item_currency_id": usd_id},
+            {"product_article": "APPFIN-RUB", "product_name": "Rub Product", "order_item_quantity": 1,
+             "order_item_price": "15000.00", "order_item_status_id": shipped, "order_item_currency_id": rub_id},
+        ],
+    }
+    order = client.post(f"{API_PREFIX}/orders", headers=headers, json=order_body).json()["item"]
+    url = f"{API_PREFIX}/finance/app/items?date_from={TODAY}&date_to={TODAY}"
+
+    body = client.get(url, headers=headers).json()
+    items = {i["name"]: i for i in body["items"]}
+    usd_item, rub_item = items["Usd Product"], items["Rub Product"]
+    assert usd_item["purchase_price"] is None and usd_item["locked"] is False
+    assert body["missing_purchase_count"] == 2 and body["profit"] == []
+    revenue = {r["currency"]: r["amount"] for r in body["revenue"]}
+    assert len(revenue) == 2 and "300.00" in revenue.values() and "15000.00" in revenue.values()
+
+    # Закупка в рублях → cost_usd = 12000 / 100 = 120.00 (веб видит то же).
+    put = client.put(f"{API_PREFIX}/finance/app/items/{rub_item['order_item_id']}/purchase", headers=headers, json={"purchase_price": "12000.00"})
+    assert put.status_code == 200 and put.json()["item"]["purchase_price"] == "12000.00"
+    assert client.put(f"{API_PREFIX}/finance/app/items/{usd_item['order_item_id']}/purchase", headers=headers, json={"purchase_price": "100.00"}).status_code == 200
+    summary_items = client.get(f"{API_PREFIX}/finance/summary?date_from={TODAY}&date_to={TODAY}", headers=headers).json()["items"]
+    web_rub = next(i for i in summary_items if i["order_item_name"] == "Rub Product")
+    assert float(web_rub["order_item_cost_usd"]) == 120.0
+
+    body = client.get(url, headers=headers).json()
+    profit = {p["currency"]: p["amount"] for p in body["profit"]}
+    assert "100.00" in profit.values() and "3000.00" in profit.values()  # (150-100)*2 и 15000-12000
+    assert body["missing_purchase_count"] == 0
+
+    # Фиксатор: без закупки нельзя; с закупкой — правка закрыта и в приложении, и в вебе.
+    lock_url = f"{API_PREFIX}/finance/app/items/{rub_item['order_item_id']}/lock"
+    assert client.put(lock_url, headers=headers, json={"locked": True}).json()["item"]["locked"] is True
+    assert client.put(f"{API_PREFIX}/finance/app/items/{rub_item['order_item_id']}/purchase", headers=headers, json={"purchase_price": "1.00"}).status_code == 409
+    assert client.put(f"{API_PREFIX}/finance/order-items/{rub_item['order_item_id']}/cost", headers=headers, json={"order_item_cost_usd": "1.00", "order_item_cost_rate": "100.0000"}).status_code == 409
+
+    # Правка заказа пересоздаёт позиции — закупка и фиксатор должны сохраниться.
+    edit = {**order_body, "order_status_id": order["order_status_id"]}
+    edit["items"] = [{**i, "order_item_quantity": i["order_item_quantity"]} for i in order_body["items"]]
+    assert client.put(f"{API_PREFIX}/orders/{order['order_id']}", headers=headers, json=edit).status_code == 200
+    after = {i["name"]: i for i in client.get(url, headers=headers).json()["items"]}
+    assert after["Rub Product"]["purchase_price"] == "12000.00" and after["Rub Product"]["locked"] is True
+    assert after["Usd Product"]["purchase_price"] == "100.00" and after["Usd Product"]["locked"] is False
+
+    # Доступ: без app_finance — 403, с ним — 200.
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    worker = lambda: {"Authorization": f"Bearer {login(client, 'worker', 'WorkerPass123')['token']}"}  # noqa: E731
+    users_url = f"{API_PREFIX}/users/{integration_user.user_id}"
+    assert client.put(users_url, headers=headers, json={"user_sections": ["chat", "crm", "finance"]}).status_code == 200
+    assert client.get(url, headers=worker()).status_code == 403
+    assert client.put(users_url, headers=headers, json={"user_sections": ["chat", "crm", "app_finance"]}).status_code == 200
+    assert client.get(url, headers=worker()).status_code == 200

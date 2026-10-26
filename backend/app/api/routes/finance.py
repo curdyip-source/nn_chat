@@ -6,12 +6,15 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.dependencies.auth import require_section
 from app.schemas.finance import (
+    AppLockPayload,
+    AppPurchasePricePayload,
     BulkOrderItemCostRatePayload,
     ExchangeRateOverridePayload,
     FinanceExpenseCategoryPayload,
     FinanceExpensePayload,
     OrderItemCostCorrectionPayload,
 )
+from app.services.finance_app import list_app_finance, set_locked, set_purchase_price
 from app.services.finance import (
     bulk_set_order_item_cost_rate,
     correct_order_item_cost,
@@ -32,6 +35,9 @@ from app.services.finance import (
 # «Разделы СРМ (веб)» в правах пользователя.
 router = APIRouter(prefix="/finance", tags=["finance"])
 require_finance = require_section("crm", "finance")
+# «Финансы» в приложении — свой ключ из «Разделы приложения (СРМ)», как вкладки
+# app_orders/app_products/app_shipments, но проверяется сервером (тут деньги).
+require_app_finance = require_section("crm", "app_finance")
 
 
 @router.get("/exchange-rates")
@@ -143,3 +149,36 @@ def get_summary_route(
     page_size: int = Query(default=100, ge=1, le=500),
 ) -> dict:
     return get_summary(db, date_from, date_to, page=page, page_size=page_size)
+
+
+# --- «Финансы» в приложении (упрощённо: в валюте продажи, без курса) ---
+
+
+@router.get("/app/items")
+def get_app_finance_route(
+    date_from: date = Query(),
+    date_to: date = Query(),
+    _: dict = Depends(require_app_finance),
+    db: Session = Depends(get_db),
+) -> dict:
+    return list_app_finance(db, date_from, date_to)
+
+
+@router.put("/app/items/{order_item_id}/purchase")
+def set_app_purchase_route(
+    order_item_id: int,
+    payload: AppPurchasePricePayload,
+    current_user: dict = Depends(require_app_finance),
+    db: Session = Depends(get_db),
+) -> dict:
+    return {"item": set_purchase_price(db, order_item_id, payload.purchase_price, current_user)}
+
+
+@router.put("/app/items/{order_item_id}/lock")
+def set_app_lock_route(
+    order_item_id: int,
+    payload: AppLockPayload,
+    current_user: dict = Depends(require_app_finance),
+    db: Session = Depends(get_db),
+) -> dict:
+    return {"item": set_locked(db, order_item_id, payload.locked, current_user)}
