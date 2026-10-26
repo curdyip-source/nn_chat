@@ -2065,3 +2065,52 @@ def test_inventory_and_registration_history(client, integration_db_session, inte
         # worker видит только est[0] → история чужого документа скрыта.
         _set_profile_db(integration_db_session, integration_user, establishment_ids=[est[0]], view_scope="establishment")
         assert client.get(f"{API_PREFIX}/{path}/{doc_id}/history", headers=worker).status_code == 404
+
+
+def test_price_search_by_registrations(client, integration_db_session, integration_admin):
+    # «Поиск по приёмкам»: точный отбор по словам, цена по режиму (последняя / средние).
+    from datetime import datetime, timedelta
+    from app.models.product_registrations import ProductRegistration
+
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    admin = {"Authorization": f"Bearer {login(client, 'admin', 'AdminPass123')['token']}"}
+    est = _first_establishment_ids(client, admin["Authorization"].split()[1], 1)[0]
+
+    def make_reg(cost: str, name: str = "Kilian Angels Share 50ml", article: str = "KAS-50") -> int:
+        resp = client.post(f"{API_PREFIX}/product-registrations", headers=admin, json={
+            "product_registration_establishment_id": est, "product_registration_supplier": "Поставщик",
+            "items": [{"product_article": article, "product_name": name, "product_registration_item_quantity": 1, "product_registration_item_cost": cost}],
+        })
+        assert resp.status_code == 201
+        return resp.json()["item"]["product_registration_id"]
+
+    old_id = make_reg("100.00")
+    mid_id = make_reg("200.00")
+    last_id = make_reg("120.00")
+    make_reg("999.00", name="Другой товар", article="OTHER-1")
+    # Первая приёмка — полгода назад: не входит в «за 3 месяца».
+    base = datetime.utcnow()
+    for reg_id, age in ((old_id, 180), (mid_id, 10), (last_id, 1)):
+        row = integration_db_session.get(ProductRegistration, reg_id)
+        row.product_registration_created_at = base - timedelta(days=age)
+    integration_db_session.commit()
+
+    def search(q: str, mode: str) -> list[dict]:
+        resp = client.get(f"{API_PREFIX}/price/registrations", headers=admin, params={"q": q, "mode": mode})
+        assert resp.status_code == 200
+        return resp.json()["results"]
+
+    # Все слова должны быть в наименовании/артикуле (порядок не важен, регистр тоже).
+    assert [r["name"] for r in search("share kilian", "last")] == ["Kilian Angels Share 50ml"]
+    assert search("kilian 100ml", "last") == []
+    assert len(search("kas-50", "last")) == 1  # по артикулу
+    # Части слов, как в точном поиске по прайсам («To Fo Tob Ch 100» → Tom Ford Tobacco Chocolat 100ml).
+    make_reg("150.00", name="Tom Ford: Tobacco Chocolat 100ml", article="TF-TC-100")
+    assert [r["name"] for r in search("To Fo Tob Ch 100", "last")] == ["Tom Ford: Tobacco Chocolat 100ml"]
+
+    last = search("kilian", "last")[0]
+    assert last["price"] == "120.00" and last["registration_id"] == last_id
+    assert search("kilian", "avg_all")[0]["price"] == "140.00"  # (100+200+120)/3
+    assert search("kilian", "avg_3m")[0]["price"] == "160.00"   # (200+120)/2
+    assert client.get(f"{API_PREFIX}/price/registrations", headers=admin, params={"q": "x", "mode": "bad"}).status_code == 400

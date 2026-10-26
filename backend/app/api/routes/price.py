@@ -6,8 +6,12 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
 from app.dependencies.auth import require_section
 from app.services.price_federation import proxy_search_all, proxy_suppliers
+from app.services.registration_price_search import search_registration_prices
 
 router = APIRouter(tags=["price"])
 
@@ -36,3 +40,15 @@ def price_search_route(
         return proxy_search_all(q, emails or None, limit, strict=strict)
     except Exception:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Прайс недоступен")
+
+
+@router.get("/price/registrations")
+def price_registrations_route(
+    q: str = Query(default=""),
+    mode: str = Query(default="last", description="last — последняя приёмка; avg_all — средняя за всё время; avg_3m — средняя за 3 месяца"),
+    limit: int = Query(default=50, ge=1, le=200),
+    current_user: dict = Depends(require_price_search),
+    db: Session = Depends(get_db),
+) -> dict:
+    # «Поиск по приёмкам»: цены из наших приёмок, отбор как у точного поиска по прайсам.
+    return search_registration_prices(db, current_user, q, mode, limit)
