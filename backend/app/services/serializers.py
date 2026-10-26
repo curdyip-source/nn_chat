@@ -448,6 +448,8 @@ def serialize_inventory(row) -> dict:
         "inventory_status_color": status.status_color if status else None,
         "inventory_owner_user_id": row.inventory_owner_user_id,
         "inventory_owner_user_login": owner.user_login if owner else None,
+        "inventory_owner_first_name": owner.user_first_name if owner else None,
+        "inventory_owner_second_name": owner.user_second_name if owner else None,
         "inventory_created_at": serialize_datetime(row.inventory_created_at),
         "items": [serialize_inventory_item(item) for item in getattr(row, "items", [])],
     }
@@ -480,6 +482,8 @@ def serialize_product_registration(row) -> dict:
         "product_registration_status_color": status.status_color if status else None,
         "product_registration_owner_user_id": row.product_registration_owner_user_id,
         "product_registration_owner_user_login": owner.user_login if owner else None,
+        "product_registration_owner_first_name": owner.user_first_name if owner else None,
+        "product_registration_owner_second_name": owner.user_second_name if owner else None,
         "product_registration_created_at": serialize_datetime(row.product_registration_created_at),
         "items": [serialize_product_registration_item(item) for item in getattr(row, "items", [])],
     }
