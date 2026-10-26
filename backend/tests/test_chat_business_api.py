@@ -2025,3 +2025,43 @@ def test_order_contact_link_save_contact_update_and_cdek_prefill(client, integra
     }
     assert client.put(f"{API_PREFIX}/orders/{order_id}", headers=auth, json=update).json()["item"]["order_contact_id"] == contact_id
     assert client.put(f"{API_PREFIX}/orders/{order_id}", headers=auth, json={**update, "order_contact_id": None}).json()["item"]["order_contact_id"] is None
+
+
+def test_inventory_and_registration_history(client, integration_db_session, integration_user, integration_admin):
+    # История документа собирается из аудита: создание, смена статуса (с названием)
+    # и полная правка; новые сверху, вне области видимости — 404, как у карточки.
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    admin = {"Authorization": f"Bearer {login(client, 'admin', 'AdminPass123')['token']}"}
+    worker = {"Authorization": f"Bearer {login(client, 'worker', 'WorkerPass123')['token']}"}
+    est = _first_establishment_ids(client, admin["Authorization"].split()[1], 2)
+    statuses = client.get(f"{API_PREFIX}/reference-data", headers=admin).json()["statuses"]
+
+    cases = [
+        ("inventories", "inventory", "инвентаризацию",
+         {"items": [{"product_article": "IH-1", "product_name": "P", "inventory_item_quantity": 1, "inventory_item_cost": "10.00"}]}),
+        ("product-registrations", "product_registration", "приёмку",
+         {"product_registration_supplier": "Поставщик",
+          "items": [{"product_article": "RH-1", "product_name": "P", "product_registration_item_quantity": 1, "product_registration_item_cost": "10.00"}]}),
+    ]
+    for path, prefix, noun, body in cases:
+        doc = client.post(f"{API_PREFIX}/{path}", headers=admin, json={f"{prefix}_establishment_id": est[1], **body}).json()["item"]
+        doc_id = doc[f"{prefix}_id"]
+        target = next(s for s in statuses if s["status_type"] == prefix and s["status_id"] != doc[f"{prefix}_status_id"])
+        assert client.put(f"{API_PREFIX}/{path}/{doc_id}/status", headers=admin, json={f"{prefix}_status_id": target["status_id"]}).status_code == 200
+        edited = {f"{prefix}_establishment_id": est[1], **body}
+        edited["items"] = [{**body["items"][0], f"{prefix}_item_quantity": 2}]
+        assert client.put(f"{API_PREFIX}/{path}/{doc_id}", headers=admin, json=edited).status_code == 200
+
+        response = client.get(f"{API_PREFIX}/{path}/{doc_id}/history", headers=admin)
+        assert response.status_code == 200
+        items = response.json()["items"]
+        assert [i["kind"] for i in items] == ["edit", "status", "create"]
+        assert items[0]["text"] == f"отредактировал {noun}"
+        assert items[1]["text"] == f"сменил статус на «{target['status_status']}»"
+        assert items[2]["text"] == f"создал {noun}"
+
+        # worker видит только est[0] → история чужого документа скрыта.
+        _set_profile_db(integration_db_session, integration_user, establishment_ids=[est[0]], view_scope="establishment")
+        assert client.get(f"{API_PREFIX}/{path}/{doc_id}/history", headers=worker).status_code == 404

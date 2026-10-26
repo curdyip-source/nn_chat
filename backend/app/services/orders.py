@@ -18,6 +18,7 @@ from app.repositories.reference_data import ReferenceDataRepository
 from app.schemas.common import build_pagination
 from app.schemas.orders import OrderCommentCreatePayload, OrderCommentPinPayload, OrderCommentUpdatePayload, OrderCreatePayload, OrderPaymentUpdatePayload, OrderStatusUpdatePayload, OrderUpdatePayload
 from app.services.contacts import save_buyer_contact_from_order, save_supplier_contact
+from app.services.document_history import history_actor
 from app.services.audit import log_audit_event
 from app.services.access_control import allowed_order_status_ids, can_create_on_establishment, can_delete_document, can_edit_document, can_view_document, can_view_order_status, list_visibility
 from app.services.card_sync import notify_cards_deleted, notify_order_changed
@@ -256,13 +257,7 @@ def _build_order_update_audit_payload(before: dict, after: dict) -> dict:
     }
 
 
-def _order_history_actor(event) -> tuple[str | None, str]:
-    # ФИО актора (как в чате: «Фамилия Имя»), fallback — логин, затем «Система».
-    actor = getattr(event, "actor", None)
-    if actor is None:
-        return None, "Система"
-    full = " ".join(part for part in (actor.user_second_name, actor.user_first_name) if part).strip()
-    return actor.user_login, (full or actor.user_login or "Пользователь")
+_order_history_actor = history_actor
 
 
 def _order_update_history_texts(payload: dict) -> list[tuple[str, str]]:

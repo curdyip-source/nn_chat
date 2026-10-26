@@ -9,6 +9,7 @@ from app.repositories.product_registrations import ProductRegistrationRepository
 from app.schemas.common import build_pagination
 from app.schemas.product_registrations import ProductRegistrationCreatePayload, ProductRegistrationStatusUpdatePayload, ProductRegistrationUpdatePayload
 from app.services.contacts import save_supplier_contact
+from app.services.document_history import build_document_history
 from app.services.audit import log_audit_event
 from app.services.access_control import can_create_on_establishment, can_delete_document, can_edit_document, can_view_document, list_visibility
 from app.services.card_sync import notify_cards_deleted, notify_product_registration_changed
@@ -202,6 +203,12 @@ def update_product_registration(db: Session, product_registration_id: int, paylo
 
 def update_product_registration_status(db: Session, product_registration_id: int, payload: ProductRegistrationStatusUpdatePayload, current_user: dict) -> dict:
     return ProductRegistrationService(db).update_product_registration_status(product_registration_id, payload, current_user)
+
+
+def get_product_registration_history(db: Session, product_registration_id: int, current_user: dict) -> dict:
+    # Проверка видимости документа — как у карточки.
+    ProductRegistrationService(db).get_accessible_product_registration_or_404(product_registration_id, current_user)
+    return build_document_history(db, entity_type=ENTITY_TYPE_PRODUCT_REGISTRATION, entity_id=product_registration_id, status_field="product_registration_status_id", noun="приёмку")
 
 
 def delete_product_registration(db: Session, product_registration_id: int, current_user: dict) -> None:

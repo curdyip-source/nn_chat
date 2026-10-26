@@ -9,6 +9,7 @@ from app.repositories.messages import MessageRepository
 from app.schemas.common import build_pagination
 from app.schemas.inventories import InventoryCreatePayload, InventoryStatusUpdatePayload, InventoryUpdatePayload
 from app.services.contacts import save_supplier_contact
+from app.services.document_history import build_document_history
 from app.services.audit import log_audit_event
 from app.services.access_control import can_create_on_establishment, can_delete_document, can_edit_document, can_view_document, list_visibility
 from app.services.card_sync import notify_cards_deleted, notify_inventory_changed
@@ -202,6 +203,12 @@ def update_inventory(db: Session, inventory_id: int, payload: InventoryUpdatePay
 
 def update_inventory_status(db: Session, inventory_id: int, payload: InventoryStatusUpdatePayload, current_user: dict) -> dict:
     return InventoryService(db).update_inventory_status(inventory_id, payload, current_user)
+
+
+def get_inventory_history(db: Session, inventory_id: int, current_user: dict) -> dict:
+    # Проверка видимости документа — как у карточки.
+    InventoryService(db).get_accessible_inventory_or_404(inventory_id, current_user)
+    return build_document_history(db, entity_type=ENTITY_TYPE_INVENTORY, entity_id=inventory_id, status_field="inventory_status_id", noun="инвентаризацию")
 
 
 def delete_inventory(db: Session, inventory_id: int, current_user: dict) -> None:
