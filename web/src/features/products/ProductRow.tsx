@@ -74,6 +74,11 @@ export function ProductRow({ product, showOwner = false, onChanged, onError }: P
     <div className={[styles.row, showOwner ? styles.rowWithOwner : '', saving ? styles.saving : ''].join(' ')}>
       <input className={styles.cellInput} value={article} onChange={(e) => setArticle(e.target.value)} onBlur={saveArticle} />
       <input className={styles.cellInput} value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} />
+      {showOwner && (
+        <span className={styles.owner} title={product.product_created_at ?? undefined}>
+          {product.product_owner_user_login ?? '—'}
+        </span>
+      )}
       <input
         className={[styles.cellInput, styles.rightInput].join(' ')}
         inputMode="decimal"
@@ -81,11 +86,6 @@ export function ProductRow({ product, showOwner = false, onChanged, onError }: P
         onChange={(e) => setCost(e.target.value)}
         onBlur={saveCost}
       />
-      {showOwner && (
-        <span className={styles.owner} title={product.product_created_at ?? undefined}>
-          {product.product_owner_user_login ?? '—'}
-        </span>
-      )}
       <button className={styles.delBtn} onClick={remove} title="Удалить">
         ✕
       </button>

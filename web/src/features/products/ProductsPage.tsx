@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { listProducts } from '../../api/endpoints'
 import type { Product, ProductSource } from '../../api/types'
 import { Button } from '../../ui/Button'
-import { ButtonGroup } from '../../ui/ButtonGroup'
 import { TextInput } from '../../ui/Field'
 import { useDebouncedValue } from '../../ui/useDebouncedValue'
 import { ImportXlsxModal } from './ImportXlsxModal'
@@ -11,6 +10,11 @@ import { ProductRow } from './ProductRow'
 import styles from './ProductsPage.module.css'
 
 const PAGE_SIZE = 50
+
+const SOURCES: { value: ProductSource; label: string }[] = [
+  { value: 'price', label: 'Из прайса' },
+  { value: 'user', label: 'Созданные' },
+]
 
 export function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -64,15 +68,20 @@ export function ProductsPage() {
       </header>
 
       <div className={styles.filters}>
-        <ButtonGroup<ProductSource>
-          size="sm"
-          value={source}
-          onChange={(v) => v && setSource(v)}
-          options={[
-            { value: 'price', label: 'Из прайса' },
-            { value: 'user', label: 'Созданные пользователями' },
-          ]}
-        />
+        <div className={styles.switcher} role="tablist">
+          {SOURCES.map((s) => (
+            <button
+              key={s.value}
+              type="button"
+              role="tab"
+              aria-selected={source === s.value}
+              className={source === s.value ? styles.switcherActive : undefined}
+              onClick={() => setSource(s.value)}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
         <div className={styles.search}>
           <TextInput
             placeholder="Поиск по артикулу или наименованию…"
@@ -122,8 +131,8 @@ export function ProductsPage() {
             <div className={[styles.row, styles.headRow, source === 'user' ? styles.rowWithOwner : ''].join(' ')}>
               <span>Артикул</span>
               <span>Наименование</span>
-              <span className={styles.right}>Цена, USD</span>
               {source === 'user' && <span>Кем создан</span>}
+              <span className={styles.right}>Цена, USD</span>
               <span />
             </div>
             {products.map((p) => (

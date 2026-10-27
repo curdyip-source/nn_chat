@@ -30,17 +30,41 @@
 }
 .filters {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 14px;
   margin-bottom: 16px;
 }
 .search {
   flex: 1;
+  min-width: 0;
   max-width: 480px;
 }
-/* Созданные пользователями — с колонкой автора. */
-.rowWithOwner {
-  grid-template-columns: 180px 1fr 130px 150px 36px;
+/* Переключатель «Из прайса / Созданные» — компактный сегмент, в строку с поиском. */
+.switcher {
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+}
+.switcher button {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.switcher button:hover {
+  color: var(--text);
+}
+.switcher .switcherActive {
+  background: var(--text);
+  color: var(--bg);
 }
 .owner {
   color: var(--text-dim);
@@ -116,6 +140,12 @@
   border-radius: var(--r-sm);
   padding: 6px 10px;
   font-size: 14px;
+}
+/* Созданные пользователями — колонка автора перед ценой; ширину отдаёт наименование.
+   Селектор из двух классов — иначе .row (объявлен выше) перебивал колонки и крестик
+   удаления уезжал на вторую строку. */
+.row.rowWithOwner {
+  grid-template-columns: 180px minmax(0, 1fr) 140px 130px 36px;
 }
 .saving {
   opacity: 0.6;
