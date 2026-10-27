@@ -132,8 +132,14 @@ class ProductRepository:
             .all()
         )
 
-    def list(self, *, search: str | None = None, page: int = 1, page_size: int = 20, sort_by: str = "product_id", sort_order: str = "desc") -> tuple[list[Product], int]:
+    def list(self, *, search: str | None = None, page: int = 1, page_size: int = 20, sort_by: str = "product_id", sort_order: str = "desc", source: str | None = None) -> tuple[list[Product], int]:
         query = self.db.query(Product).options(joinedload(Product.owner))
+        # Источник товара: «price» — подтянут из прайса CL (без владельца, см.
+        # price_federation), «user» — заведён пользователем (руками, из заказа, импортом).
+        if source == "price":
+            query = query.filter(Product.product_owner_user_id.is_(None))
+        elif source == "user":
+            query = query.filter(Product.product_owner_user_id.isnot(None))
         if search:
             tokens = _split_product_search_tokens(search)
             for token in tokens:

@@ -189,6 +189,9 @@ def hydrate_products(db: Session, *, query: str) -> int:
         set_={
             "product_name": stmt.excluded.product_name,
             "product_cost_usd": stmt.excluded.product_cost_usd,
+            # Артикул есть в прайсе CL — товар живёт по прайсу (цену перезаписали выше),
+            # значит он «из прайса», а не созданный пользователем: владельца снимаем.
+            "product_owner_user_id": None,
         },
     )
     try:

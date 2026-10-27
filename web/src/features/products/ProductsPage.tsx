@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listProducts } from '../../api/endpoints'
-import type { Product } from '../../api/types'
+import type { Product, ProductSource } from '../../api/types'
 import { Button } from '../../ui/Button'
+import { ButtonGroup } from '../../ui/ButtonGroup'
 import { TextInput } from '../../ui/Field'
 import { useDebouncedValue } from '../../ui/useDebouncedValue'
 import { ImportXlsxModal } from './ImportXlsxModal'
@@ -18,6 +19,9 @@ export function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  // Из прайса CL / созданные пользователями: у вторых себестоимость вбита руками,
+  // и в ней бывают рубли, записанные как доллары (16 000 «USD») — смотреть отдельно.
+  const [source, setSource] = useState<ProductSource>('price')
   const debouncedSearch = useDebouncedValue(search.trim(), 300)
 
   const [creating, setCreating] = useState(false)
@@ -27,11 +31,11 @@ export function ProductsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch])
+  }, [debouncedSearch, source])
 
   const load = useCallback(() => {
     setLoading(true)
-    listProducts({ search: debouncedSearch, page, pageSize: PAGE_SIZE })
+    listProducts({ search: debouncedSearch, page, pageSize: PAGE_SIZE, source })
       .then((res) => {
         setProducts(res.items)
         setTotal(res.pagination?.total ?? res.items.length)
@@ -39,7 +43,7 @@ export function ProductsPage() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
-  }, [debouncedSearch, page])
+  }, [debouncedSearch, page, source])
 
   useEffect(load, [load])
 
@@ -60,11 +64,22 @@ export function ProductsPage() {
       </header>
 
       <div className={styles.filters}>
-        <TextInput
-          placeholder="Поиск по артикулу или наименованию…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+        <ButtonGroup<ProductSource>
+          size="sm"
+          value={source}
+          onChange={(v) => v && setSource(v)}
+          options={[
+            { value: 'price', label: 'Из прайса' },
+            { value: 'user', label: 'Созданные пользователями' },
+          ]}
         />
+        <div className={styles.search}>
+          <TextInput
+            placeholder="Поиск по артикулу или наименованию…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
         <div className={styles.pager}>
           <Button variant="secondary" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
             ←
@@ -90,6 +105,12 @@ export function ProductsPage() {
         </div>
       </div>
 
+      {source === 'user' && (
+        <div className={styles.sourceHint}>
+          Товары, заведённые вручную. Цена — себестоимость в USD: если она вбита в рублях (например, 16 000), «Финансы» её
+          посчитают как доллары — исправьте здесь.
+        </div>
+      )}
       {error && <div className={styles.error}>{error}</div>}
       <div className={styles.scroll}>
         {loading ? (
@@ -98,14 +119,21 @@ export function ProductsPage() {
           <div className={styles.empty}>Товаров не найдено</div>
         ) : (
           <div className={styles.list}>
-            <div className={[styles.row, styles.headRow].join(' ')}>
+            <div className={[styles.row, styles.headRow, source === 'user' ? styles.rowWithOwner : ''].join(' ')}>
               <span>Артикул</span>
               <span>Наименование</span>
               <span className={styles.right}>Цена, USD</span>
+              {source === 'user' && <span>Кем создан</span>}
               <span />
             </div>
             {products.map((p) => (
-              <ProductRow key={p.product_id} product={p} onChanged={load} onError={(m) => setError(m || null)} />
+              <ProductRow
+                key={p.product_id}
+                product={p}
+                showOwner={source === 'user'}
+                onChanged={load}
+                onError={(m) => setError(m || null)}
+              />
             ))}
           </div>
         )}

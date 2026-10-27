@@ -2114,3 +2114,33 @@ def test_price_search_by_registrations(client, integration_db_session, integrati
     assert search("kilian", "avg_all")[0]["price"] == "140.00"  # (100+200+120)/3
     assert search("kilian", "avg_3m")[0]["price"] == "160.00"   # (200+120)/2
     assert client.get(f"{API_PREFIX}/price/registrations", headers=admin, params={"q": "x", "mode": "bad"}).status_code == 400
+
+
+def test_products_list_filters_by_source(client, integration_db_session, integration_admin):
+    # «Товары» делятся на подтянутые из прайса CL (без владельца) и созданные
+    # пользователями (с владельцем) — фильтр source.
+    from app.models.reference_data import Product
+
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    admin = {"Authorization": f"Bearer {login(client, 'admin', 'AdminPass123')['token']}"}
+
+    created = client.post(f"{API_PREFIX}/products", headers=admin, json={
+        "product_article": "SRC-USER-1", "product_name": "Созданный руками", "product_cost_usd": "16000.00",
+    })
+    assert created.status_code == 201
+    integration_db_session.add(Product(product_article="SRC-CL-1", product_name="Из прайса CL", product_cost_usd="10.00", product_owner_user_id=None))
+    integration_db_session.commit()
+
+    def articles(source: str | None) -> set[str]:
+        params = {"page_size": 100, "search": "SRC-"}
+        if source:
+            params["source"] = source
+        resp = client.get(f"{API_PREFIX}/products", headers=admin, params=params)
+        assert resp.status_code == 200
+        return {p["product_article"] for p in resp.json()["items"]}
+
+    assert articles("price") == {"SRC-CL-1"}
+    assert articles("user") == {"SRC-USER-1"}
+    assert articles(None) == {"SRC-CL-1", "SRC-USER-1"}
+    assert client.get(f"{API_PREFIX}/products", headers=admin, params={"source": "bad"}).status_code == 422

@@ -18,8 +18,9 @@ def get_products(
     page_size: int = Query(default=20, ge=1, le=100),
     sort_by: str = Query(default="product_id"),
     sort_order: str = Query(default="desc", pattern="^(asc|desc)$"),
+    source: str | None = Query(default=None, pattern="^(price|user)$", description="price — из прайса CL, user — созданные пользователями; пусто — все"),
 ) -> dict:
-    return list_products(db, search=search, page=page, page_size=page_size, sort_by=sort_by, sort_order=sort_order)
+    return list_products(db, search=search, page=page, page_size=page_size, sort_by=sort_by, sort_order=sort_order, source=source)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

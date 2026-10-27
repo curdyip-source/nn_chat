@@ -475,18 +475,18 @@ class ReferenceDataService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Валюта не найдена")
         return serialize_currency(self.repository.update_row(row, model_to_dict(payload)))
 
-    def list_products(self, *, search: str | None = None, page: int = 1, page_size: int = 20, sort_by: str = "product_id", sort_order: str = "desc") -> dict:
+    def list_products(self, *, search: str | None = None, page: int = 1, page_size: int = 20, sort_by: str = "product_id", sort_order: str = "desc", source: str | None = None) -> dict:
         self.ensure_seed_data()
         # Свежий каталог — из nn_vla (источник правды). Гидратация идёт в ФОНЕ: поиск
         # отвечает сразу локальными результатами (быстро), свежий CL подтягивается
         # отдельным потоком и появляется при следующем поиске.
         if search and search.strip():
             hydrate_products_async(search)
-        rows, total = self.product_repository.list(search=search, page=page, page_size=page_size, sort_by=sort_by, sort_order=sort_order)
+        rows, total = self.product_repository.list(search=search, page=page, page_size=page_size, sort_by=sort_by, sort_order=sort_order, source=source)
         return {
             "items": [serialize_product(item) for item in rows],
             "pagination": build_pagination(page, page_size, total),
-            "filters": {"search": search, "sort_by": sort_by, "sort_order": sort_order},
+            "filters": {"search": search, "sort_by": sort_by, "sort_order": sort_order, "source": source},
         }
 
     def match_products_by_name(self, names: list[str]) -> dict:
@@ -651,8 +651,8 @@ def update_currency(db: Session, currency_id: int, payload: CurrencyPayload) -> 
     return ReferenceDataService(db).update_currency(currency_id, payload)
 
 
-def list_products(db: Session, *, search: str | None = None, page: int = 1, page_size: int = 20, sort_by: str = "product_id", sort_order: str = "desc") -> dict:
-    return ReferenceDataService(db).list_products(search=search, page=page, page_size=page_size, sort_by=sort_by, sort_order=sort_order)
+def list_products(db: Session, *, search: str | None = None, page: int = 1, page_size: int = 20, sort_by: str = "product_id", sort_order: str = "desc", source: str | None = None) -> dict:
+    return ReferenceDataService(db).list_products(search=search, page=page, page_size=page_size, sort_by=sort_by, sort_order=sort_order, source=source)
 
 
 def create_product(db: Session, payload: ProductCreatePayload, current_user: dict) -> dict:

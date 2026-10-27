@@ -105,7 +105,13 @@ export type Product = {
   product_article: string
   product_name: string
   product_cost_usd: string
+  /** Логин автора; null — товар подтянут из прайса CL. */
+  product_owner_user_login?: string | null
+  product_created_at?: string | null
 }
+
+/** Источник товара: из прайса CL или созданный пользователем. */
+export type ProductSource = 'price' | 'user'
 
 // --- Финансы: курс USD/RUB, себестоимость, расходы, закрытие месяца ---
 

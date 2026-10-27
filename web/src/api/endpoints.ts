@@ -18,6 +18,7 @@ import type {
   OrderUpdate,
   Paginated,
   Product,
+  ProductSource,
   ProductImportJob,
   ProductRegistration,
   ReferenceData,
@@ -147,12 +148,13 @@ export function searchProducts(search: string, signal?: AbortSignal) {
   return apiRequest<Paginated<Product>>(`/products?${q}`, { signal })
 }
 
-export function listProducts(opts: { search?: string; page?: number; pageSize?: number } = {}) {
+export function listProducts(opts: { search?: string; page?: number; pageSize?: number; source?: ProductSource } = {}) {
   const q = new URLSearchParams({
     page: String(opts.page ?? 1),
     page_size: String(opts.pageSize ?? 50),
   })
   if (opts.search) q.set('search', opts.search)
+  if (opts.source) q.set('source', opts.source)
   return apiRequest<Paginated<Product>>(`/products?${q}`)
 }
 

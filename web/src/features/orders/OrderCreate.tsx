@@ -5,7 +5,6 @@ import {
   cdekSuggestCities,
   createOrder,
   deleteOrder,
-  matchProductsByName,
   searchContacts,
   searchProducts,
   updateOrder,
@@ -23,7 +22,7 @@ import { cartItemFromProduct, newUid, type CartItem } from './cart'
 import { CONTACT_METHODS } from './contactMethods'
 import { CartRow } from './CartRow'
 import { CreateProductModal } from './CreateProductModal'
-import { CreateMissingProductsModal } from './CreateMissingProductsModal'
+import { PastedListHint, usePastedListImport } from './usePastedListImport'
 import styles from './OrderCreate.module.css'
 
 // SheetJS тяжёлый — грузим экран импорта отдельным чанком только при открытии.
@@ -41,15 +40,6 @@ const cdekInput: React.CSSProperties = {
   fontSize: 14,
   outline: 'none',
   boxSizing: 'border-box',
-}
-
-// Строка вставленного списка: «Наименование <таб/2+ пробела> Цена».
-// Цену отделяем только явным разделителем (таб или 2+ пробела), чтобы не спутать
-// её с числами внутри названия («Кабель 2x2», «Лампа LED 9W»).
-function parsePastedLine(line: string): { name: string; price: string | null } {
-  const m = line.match(/^(.*\S)(?:\t+| {2,})(\d+(?:[.,]\d+)?)$/)
-  if (m) return { name: m[1].trim(), price: Number(m[2].replace(',', '.')).toFixed(2) }
-  return { name: line.trim(), price: null }
 }
 
 type Step = 'info' | 'cart'
@@ -116,10 +106,6 @@ export function OrderCreate({
   const [submitting, setSubmitting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState('')
-  const [bulkNote, setBulkNote] = useState<string | null>(null)
-  const [missingNames, setMissingNames] = useState<string[]>([])
-  const [missingOpen, setMissingOpen] = useState(false)
-  const [pastedPrices, setPastedPrices] = useState<Record<string, string>>({})
 
   const selectedMethod = ref.order_methods.find((m) => m.order_method_id === methodId)
   const subMethods = selectedMethod?.order_method_sub_methods ?? []
@@ -181,48 +167,10 @@ export function OrderCreate({
     setItems((prev) => [...prev, cartItemFromProduct(p, defaultCurrencyId)])
   const addMany = (newItems: CartItem[]) => setItems((prev) => [...prev, ...newItems])
 
-  // Вставка списка прямо в поиск: «Наименование[<таб/2+ пробела>Цена]».
-  // Сопоставляем с номенклатурой, кладём найденное в корзину и сразу проставляем цену из строки.
-  const addFromPastedList = async (lines: string[]) => {
-    const parsed = lines.map(parsePastedLine)
-    setBulkNote(`Ищу ${parsed.length} поз. в номенклатуре…`)
-    try {
-      const { results } = await matchProductsByName(parsed.map((p) => p.name))
-      const items: CartItem[] = []
-      const missing: string[] = []
-      const priceByName: Record<string, string> = {}
-      results.forEach((r, i) => {
-        const price = parsed[i].price
-        if (price != null) priceByName[parsed[i].name] = price
-        if (r.matched) {
-          const base = cartItemFromProduct(r.matched, defaultCurrencyId)
-          items.push(price != null ? { ...base, price } : base)
-        } else {
-          missing.push(r.query)
-        }
-      })
-      if (items.length) addMany(items)
-      setMissingNames(missing)
-      setPastedPrices(priceByName)
-      const anyPrice = parsed.some((p) => p.price != null)
-      setBulkNote(
-        `Добавлено ${items.length} из ${results.length}` +
-          (anyPrice ? ', цены подтянуты' : '') +
-          (missing.length ? ` · не найдено: ${missing.length}` : ''),
-      )
-    } catch {
-      setMissingNames([])
-      setBulkNote('Не удалось распознать список')
-    }
-  }
+  // Вставка списка прямо в поиск — общий разбор с приёмкой/инвентаризацией
+  // (форматы те же, что в приложении), см. usePastedListImport.
+  const pasted = usePastedListImport({ currencies: ref.currencies, defaultCurrencyId, addMany })
 
-  // Товар создан в мастере для строки name — кладём в корзину (с ценой из списка, если была) и убираем из «ненайденных».
-  const onMissingCreated = (name: string, product: Product) => {
-    const base = cartItemFromProduct(product, defaultCurrencyId)
-    const price = pastedPrices[name]
-    addMany([price != null ? { ...base, price } : base])
-    setMissingNames((prev) => prev.filter((n) => n !== name))
-  }
   const patchItem = (uid: string, patch: Partial<CartItem>) =>
     setItems((prev) => prev.map((it) => (it.uid === uid ? { ...it, ...patch } : it)))
   const removeItem = (uid: string) => setItems((prev) => prev.filter((it) => it.uid !== uid))
@@ -503,35 +451,15 @@ export function OrderCreate({
                 )}
                 onSelect={addProduct}
                 itemFillText={(p) => p.product_name}
-                onBulkPaste={addFromPastedList}
+                onBulkPaste={pasted.onBulkPaste}
                 renderEmptyAction={(q) => (
                   <button className={styles.createLink} onClick={() => setCreateProductName(q)}>
                     + Создать товар «{q}»
                   </button>
                 )}
               />
-              {bulkNote && (
-                <div className={styles.bulkNote}>
-                  <span>{bulkNote}</span>
-                  {missingNames.length > 0 && (
-                    <button
-                      type="button"
-                      className={styles.createLink}
-                      onClick={() => setMissingOpen(true)}
-                    >
-                      + Создать ненайденные ({missingNames.length})
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className={styles.bulkClose}
-                    onClick={() => setBulkNote(null)}
-                    aria-label="Скрыть"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
+              {pasted.noteView}
+              <PastedListHint />
             </div>
             <Button variant="secondary" onClick={() => setExcelOpen(true)}>
               📄 Импорт из Excel
@@ -607,13 +535,7 @@ export function OrderCreate({
         onClose={() => setCreateProductName(null)}
         onCreated={addProduct}
       />
-      <CreateMissingProductsModal
-        open={missingOpen}
-        names={missingNames}
-        prices={pastedPrices}
-        onCreated={onMissingCreated}
-        onClose={() => setMissingOpen(false)}
-      />
+      {pasted.modal}
     </div>
   )
 }

@@ -34,9 +34,25 @@
   gap: 14px;
   margin-bottom: 16px;
 }
-.filters > :first-child {
+.search {
   flex: 1;
   max-width: 480px;
+}
+/* Созданные пользователями — с колонкой автора. */
+.rowWithOwner {
+  grid-template-columns: 180px 1fr 130px 150px 36px;
+}
+.owner {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sourceHint {
+  margin: -6px 0 12px;
+  color: var(--text-dim);
+  font-size: 12.5px;
 }
 .pager {
   display: flex;

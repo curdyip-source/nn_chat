@@ -9,6 +9,7 @@ import { SearchSelect } from '../../ui/SearchSelect'
 import { cartItemFromProduct, newUid, type CartItem } from '../orders/cart'
 import { CartRow } from '../orders/CartRow'
 import { CreateProductModal } from '../orders/CreateProductModal'
+import { PastedListHint, usePastedListImport } from '../orders/usePastedListImport'
 import type { DocKind, DocView } from './docKind'
 import styles from './documents.module.css'
 
@@ -60,6 +61,9 @@ export function DocumentComposer({
   )
 
   const addProduct = (p: Product) => setItems((prev) => [...prev, cartItemFromProduct(p, defaultCurrencyId)])
+  const addMany = (newItems: CartItem[]) => setItems((prev) => [...prev, ...newItems])
+  // Вставка списка в поиск товаров — как в заказе (те же форматы, что в приложении).
+  const pasted = usePastedListImport({ currencies: ref.currencies, defaultCurrencyId, addMany })
   const patchItem = (uid: string, patch: Partial<CartItem>) =>
     setItems((prev) => prev.map((it) => (it.uid === uid ? { ...it, ...patch } : it)))
   const removeItem = (uid: string) => setItems((prev) => prev.filter((it) => it.uid !== uid))
@@ -153,12 +157,15 @@ export function DocumentComposer({
                   </span>
                 )}
                 onSelect={addProduct}
+                onBulkPaste={pasted.onBulkPaste}
                 renderEmptyAction={(q) => (
                   <button className={styles.createLink} onClick={() => setCreateProductName(q)}>
                     + Создать товар «{q}»
                   </button>
                 )}
               />
+              {pasted.noteView}
+              <PastedListHint />
             </div>
             <Button variant="secondary" onClick={() => setExcelOpen(true)}>
               📄 Импорт из Excel
@@ -166,7 +173,7 @@ export function DocumentComposer({
           </div>
 
           {items.length === 0 ? (
-            <div className={styles.emptyCart}>Добавьте товары поиском или импортом из Excel</div>
+            <div className={styles.emptyCart}>Добавьте товары поиском, вставкой списка или импортом из Excel</div>
           ) : (
             <div className={styles.cart}>
               {items.map((it) => (
@@ -221,7 +228,7 @@ export function DocumentComposer({
             onClose={() => setExcelOpen(false)}
             currencies={ref.currencies}
             defaultCurrencyId={defaultCurrencyId}
-            onImport={(newItems) => setItems((prev) => [...prev, ...newItems])}
+            onImport={addMany}
           />
         </Suspense>
       )}
@@ -231,6 +238,7 @@ export function DocumentComposer({
         onClose={() => setCreateProductName(null)}
         onCreated={addProduct}
       />
+      {pasted.modal}
     </div>
   )
 }

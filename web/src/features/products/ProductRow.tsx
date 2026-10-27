@@ -5,11 +5,13 @@ import styles from './ProductsPage.module.css'
 
 type Props = {
   product: Product
+  /** Колонка «Кем создан» — для созданных пользователями. */
+  showOwner?: boolean
   onChanged: () => void
   onError: (msg: string) => void
 }
 
-export function ProductRow({ product, onChanged, onError }: Props) {
+export function ProductRow({ product, showOwner = false, onChanged, onError }: Props) {
   const [article, setArticle] = useState(product.product_article)
   const [name, setName] = useState(product.product_name)
   const [cost, setCost] = useState(product.product_cost_usd)
@@ -69,7 +71,7 @@ export function ProductRow({ product, onChanged, onError }: Props) {
   }
 
   return (
-    <div className={[styles.row, saving ? styles.saving : ''].join(' ')}>
+    <div className={[styles.row, showOwner ? styles.rowWithOwner : '', saving ? styles.saving : ''].join(' ')}>
       <input className={styles.cellInput} value={article} onChange={(e) => setArticle(e.target.value)} onBlur={saveArticle} />
       <input className={styles.cellInput} value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} />
       <input
@@ -79,6 +81,11 @@ export function ProductRow({ product, onChanged, onError }: Props) {
         onChange={(e) => setCost(e.target.value)}
         onBlur={saveCost}
       />
+      {showOwner && (
+        <span className={styles.owner} title={product.product_created_at ?? undefined}>
+          {product.product_owner_user_login ?? '—'}
+        </span>
+      )}
       <button className={styles.delBtn} onClick={remove} title="Удалить">
         ✕
       </button>
