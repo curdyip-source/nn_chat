@@ -14,7 +14,9 @@ export function PastedListHint() {
       <code>1. Kajal: Dahab 100ml 1 x 8224₽ = 8224₽</code>
       <code>1 шт⇥Kajal: Dahab 100ml⇥64</code>
       <code>1 шт. * Kajal: Dahab 100ml * 8224 ₽</code>
-      или просто наименования. Количество и цена берутся из строки, ₽ / $ / € — валюта.
+      <code>1⇥Kajal: Dahab 100ml⇥шт⇥82,24⇥3⇥246,72</code> (копия таблицы: №, наименование, ед., цена, кол-во, сумма)
+      или просто наименования. Количество и цена берутся из строки, ₽ / $ / € — валюта; без знака валюту
+      можно выбрать сразу для всего вставленного списка.
     </div>
   )
 }
@@ -29,15 +31,21 @@ export function usePastedListImport({
   currencies,
   defaultCurrencyId,
   addMany,
+  setCurrency,
 }: {
   currencies: Currency[]
   defaultCurrencyId: number | null
   addMany: (items: CartItem[]) => void
+  /** Сменить валюту у позиций корзины (по uid) — «валюта для всего вставленного». */
+  setCurrency: (uids: string[], currencyId: number) => void
 }) {
   const [note, setNote] = useState<string | null>(null)
   const [missingNames, setMissingNames] = useState<string[]>([])
   const [missingOpen, setMissingOpen] = useState(false)
   const [pastedByName, setPastedByName] = useState<Record<string, PastedItem>>({})
+  // Позиции последней вставки — им разом меняется валюта из строки результата.
+  const [pastedUids, setPastedUids] = useState<string[]>([])
+  const [pastedCurrencyId, setPastedCurrencyId] = useState<number | null>(null)
 
   const currencyIdFor = (code: string | null) =>
     (code && currencies.find((c) => c.currency_name.toUpperCase() === code)?.currency_id) || defaultCurrencyId
@@ -70,6 +78,8 @@ export function usePastedListImport({
         else missing.push(r.query)
       })
       if (found.length) addMany(found)
+      setPastedUids(found.map((it) => it.uid))
+      setPastedCurrencyId(found[0]?.currencyId ?? defaultCurrencyId)
       setMissingNames(missing)
       setPastedByName(byName)
       const anyPrice = parsed.some((p) => p.price != null)
@@ -86,7 +96,11 @@ export function usePastedListImport({
 
   // Товар создан в мастере для строки name — кладём в корзину с данными из строки.
   const onMissingCreated = (name: string, product: Product) => {
-    addMany([toCartItem(product, pastedByName[name])])
+    const item = toCartItem(product, pastedByName[name])
+    // Валюту, уже выбранную для всего списка, получает и созданный позже товар.
+    const withCurrency = pastedCurrencyId != null && !pastedByName[name]?.currencyCode ? { ...item, currencyId: pastedCurrencyId } : item
+    addMany([withCurrency])
+    setPastedUids((prev) => [...prev, withCurrency.uid])
     setMissingNames((prev) => prev.filter((n) => n !== name))
   }
 
@@ -99,6 +113,25 @@ export function usePastedListImport({
   const noteView = note && (
     <div className={styles.bulkNote}>
       <span>{note}</span>
+      {pastedUids.length > 0 && currencies.length > 0 && (
+        <label className={styles.pasteCurrency}>
+          Валюта для всех вставленных:
+          <select
+            value={pastedCurrencyId ?? ''}
+            onChange={(e) => {
+              const id = Number(e.target.value)
+              setPastedCurrencyId(id)
+              setCurrency(pastedUids, id)
+            }}
+          >
+            {currencies.map((c) => (
+              <option key={c.currency_id} value={c.currency_id}>
+                {c.currency_sign || c.currency_name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {missingNames.length > 0 && (
         <button type="button" className={styles.createLink} onClick={() => setMissingOpen(true)}>
           + Создать ненайденные ({missingNames.length})

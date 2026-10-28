@@ -169,7 +169,13 @@ export function OrderCreate({
 
   // Вставка списка прямо в поиск — общий разбор с приёмкой/инвентаризацией
   // (форматы те же, что в приложении), см. usePastedListImport.
-  const pasted = usePastedListImport({ currencies: ref.currencies, defaultCurrencyId, addMany })
+  const pasted = usePastedListImport({
+    currencies: ref.currencies,
+    defaultCurrencyId,
+    addMany,
+    setCurrency: (uids, currencyId) =>
+      setItems((prev) => prev.map((it) => (uids.includes(it.uid) ? { ...it, currencyId } : it))),
+  })
 
   const patchItem = (uid: string, patch: Partial<CartItem>) =>
     setItems((prev) => prev.map((it) => (it.uid === uid ? { ...it, ...patch } : it)))

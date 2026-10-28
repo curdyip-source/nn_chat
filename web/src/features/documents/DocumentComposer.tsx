@@ -63,7 +63,13 @@ export function DocumentComposer({
   const addProduct = (p: Product) => setItems((prev) => [...prev, cartItemFromProduct(p, defaultCurrencyId)])
   const addMany = (newItems: CartItem[]) => setItems((prev) => [...prev, ...newItems])
   // Вставка списка в поиск товаров — как в заказе (те же форматы, что в приложении).
-  const pasted = usePastedListImport({ currencies: ref.currencies, defaultCurrencyId, addMany })
+  const pasted = usePastedListImport({
+    currencies: ref.currencies,
+    defaultCurrencyId,
+    addMany,
+    setCurrency: (uids, currencyId) =>
+      setItems((prev) => prev.map((it) => (uids.includes(it.uid) ? { ...it, currencyId } : it))),
+  })
   const patchItem = (uid: string, patch: Partial<CartItem>) =>
     setItems((prev) => prev.map((it) => (it.uid === uid ? { ...it, ...patch } : it)))
   const removeItem = (uid: string) => setItems((prev) => prev.filter((it) => it.uid !== uid))

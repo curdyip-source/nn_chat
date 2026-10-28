@@ -8,6 +8,9 @@
 //     1 шт⇥Гель для душа Amouage Guidance 360 ml⇥64
 //   Те же колонки, но через звёздочку:
 //     1 шт. *  Armand Basi: In Red edp 100ml tester *  2159 ₽
+//   Копия таблицы (Excel) — №, наименование, ед., цена, кол-во, сумма через таб
+//   (только в вебе, в приложении этого формата нет):
+//     1⇥Creed: Absolu Aventus edp 50ml⇥шт⇥208,22⇥36⇥7495,92
 //
 // Строка без количества/цены — просто наименование (кол-во 1, цену дозаполнят).
 // Служебные строки («Итого: …», «Телефон: …», ссылки) пропускаем.
@@ -49,6 +52,8 @@ const FIELD_RE = /^(?<key>[^:]{1,40}?)\s*:\s*(?<value>.*)$/u
 const URL_RE = /https?\s*:\/\/|www\./iu
 const NUMBERING_RE = /^\s*\d+\s*[.)]\s*/u
 const LEADING_SEPARATOR_RE = /^[ \t]*[*•|][ \t]*/u
+const UNIT_CELL_RE = /^(?:шт|штук[аи]?|pcs|pc|ед|упак|уп)\.?$/iu
+const NUMBER_CELL_RE = /^\d[\d\s]*(?:[.,]\d+)?$/u
 
 const CURRENCY_BY_TOKEN: Record<string, string> = {
   '₽': 'RUB', руб: 'RUB', 'руб.': 'RUB', 'р.': 'RUB', rub: 'RUB',
@@ -83,11 +88,39 @@ function parseLine(rawLine: string): PastedItem | null {
   const line = rawLine.trim()
   if (!line) return null
   // Позицию разбираем ДО «ключ: значение» — в наименовании бывает двоеточие.
-  const item = matchQuantityFirst(line) ?? matchItem(line)
+  const item = matchTableRow(rawLine) ?? matchQuantityFirst(line) ?? matchItem(line)
   if (item) return item
   if (isServiceLine(line)) return null
   const name = cleanedName(line.replace(NUMBERING_RE, ''))
-  return name ? { name, quantity: 1, price: null, currencyCode: null } : null
+  // Одни цифры — пустая строка таблицы («7⇥⇥⇥⇥»), не товар.
+  if (!name || /^[\d\s.,]+$/u.test(name)) return null
+  return { name, quantity: 1, price: null, currencyCode: null }
+}
+
+/**
+ * Строка таблицы, скопированной из Excel: «№⇥наименование⇥ед.⇥цена⇥кол-во⇥сумма».
+ * Срабатывает, только если после наименования стоят минимум ДВА числа (цена и
+ * количество; сумма — необязательна), так что «1 шт⇥…⇥64» (одно число) остаётся
+ * за форматом «количество в начале». Где цена, а где количество: целое — количество;
+ * оба целые — по порядку колонок (цена, затем кол-во), как в выгрузке.
+ */
+function matchTableRow(rawLine: string): PastedItem | null {
+  if (!rawLine.includes('\t')) return null
+  const cells = rawLine.split('\t').map((c) => c.trim()).filter(Boolean)
+  const nameIndex = cells.findIndex((c) => !NUMBER_CELL_RE.test(c) && !UNIT_CELL_RE.test(c))
+  if (nameIndex < 0) return null
+  const numbers = cells
+    .slice(nameIndex + 1)
+    .filter((c) => !UNIT_CELL_RE.test(c))
+    .map((c) => (NUMBER_CELL_RE.test(c) ? Number(normalizedPrice(c)) : NaN))
+  if (numbers.length < 2 || numbers.some((n) => !Number.isFinite(n))) return null
+  const [a, b] = numbers
+  const isInt = (n: number) => Number.isInteger(n) && n >= 1
+  const [price, quantity] = isInt(a) && !isInt(b) ? [b, a] : [a, b]
+  if (!isInt(quantity)) return null
+  const name = cleanedName(cells[nameIndex])
+  if (!name) return null
+  return { name, quantity, price: price.toFixed(2), currencyCode: null }
 }
 
 function matchQuantityFirst(line: string): PastedItem | null {
