@@ -78,6 +78,9 @@ export function DocumentDetail({
     const sign = currencySign(doc?.shippingCurrencyId ?? null) || '—'
     totalsWithShipping.set(sign, (totalsWithShipping.get(sign) ?? 0) + (Number(doc?.shippingCost) || 0))
   }
+  // Как в приложении: разные валюты — одной строкой через «+».
+  const joinTotals = (map: Map<string, number>) =>
+    [...map.entries()].map(([sign, sum]) => `${formatAmount(sum)} ${sign}`).join(' + ')
   const money = (value: string | null | undefined, sign: string) =>
     value == null ? '—' : `${formatAmount(Number(value) || 0)} ${sign}`.trim()
 
@@ -138,17 +141,26 @@ export function DocumentDetail({
                         {it.name}
                         {it.article && <span className="dim"> · {it.article}</span>}
                       </div>
-                      <div className={styles.regMetrics}>
-                        <Metric title="Кол-во" value={String(it.quantity)} />
-                        <Metric title="Цена" value={money(it.cost, currencySign(it.currencyId))} />
-                        <Metric title="Сумма" value={money(String((Number(it.cost) || 0) * it.quantity), currencySign(it.currencyId))} />
-                      </div>
-                      {(hasShipping || it.weight) && (
+                      {hasShipping || it.weight ? (
+                        <>
+                          {/* Первая строка — за единицу, вторая — за всю позицию. */}
+                          <div className={styles.regMetrics}>
+                            <Metric title="Вес" value={it.weight ? `${Number(it.weight)} кг` : '—'} />
+                            <Metric title="Цена" value={money(it.cost, currencySign(it.currencyId))} />
+                            <Metric title="Доставка" value={money(it.shippingPerUnit, currencySign(doc.shippingCurrencyId ?? null))} />
+                            <Metric title="С доставкой" value={money(it.costPerUnit, currencySign(it.currencyId))} />
+                          </div>
+                          <div className={styles.regMetrics}>
+                            <Metric title="Кол-во" value={String(it.quantity)} />
+                            <Metric title="Сумма" value={money(String((Number(it.cost) || 0) * it.quantity), currencySign(it.currencyId))} />
+                            <Metric title="Итого с доставкой" value={money(it.lineTotal, currencySign(it.currencyId))} />
+                          </div>
+                        </>
+                      ) : (
                         <div className={styles.regMetrics}>
-                          <Metric title="Вес 1 шт" value={it.weight ? `${Number(it.weight)} кг` : '—'} />
-                          <Metric title="Доставка 1 шт" value={money(it.shippingPerUnit, currencySign(doc.shippingCurrencyId ?? null))} />
-                          <Metric title="С доставкой 1 шт" value={money(it.costPerUnit, currencySign(it.currencyId))} />
-                          <Metric title="Итого" value={money(it.lineTotal, currencySign(it.currencyId))} />
+                          <Metric title="Кол-во" value={String(it.quantity)} />
+                          <Metric title="Цена" value={money(it.cost, currencySign(it.currencyId))} />
+                          <Metric title="Сумма" value={money(String((Number(it.cost) || 0) * it.quantity), currencySign(it.currencyId))} />
                         </div>
                       )}
                     </div>
@@ -172,20 +184,16 @@ export function DocumentDetail({
                   ),
                 )}
               </div>
-              <div className={styles.totals}>
-                {[...totals.entries()].map(([sign, sum]) => (
-                  <span key={sign} className={hasShipping ? styles.totalMuted : styles.total}>
-                    Итого: {formatAmount(sum)}
-                    {sign}
-                  </span>
-                ))}
-              </div>
-              {hasShipping && (
+              {hasShipping ? (
+                <div className={styles.regTotals}>
+                  <span className={styles.totalMuted}>Итого: {joinTotals(totals)}</span>
+                  <span className={styles.total}>Итого с учетом доставки: {joinTotals(totalsWithShipping)}</span>
+                </div>
+              ) : (
                 <div className={styles.totals}>
-                  {[...totalsWithShipping.entries()].map(([sign, sum]) => (
+                  {[...totals.entries()].map(([sign, sum]) => (
                     <span key={sign} className={styles.total}>
-                      Итого с учетом доставки: {formatAmount(sum)}
-                      {sign}
+                      Итого: {formatAmount(sum)} {sign}
                     </span>
                   ))}
                 </div>
