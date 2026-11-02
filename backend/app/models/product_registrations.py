@@ -18,6 +18,10 @@ class ProductRegistration(Base):
     product_registration_status_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("statuses.status_id", ondelete="RESTRICT"), nullable=False, index=True)
     product_registration_owner_user_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
     product_registration_created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now(), index=True)
+    # Доставка всей приёмки — распределяется по позициям пропорционально весу (см.
+    # serializers.distribute_registration_shipping).
+    product_registration_shipping_cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    product_registration_shipping_currency_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("currencies.currency_id", ondelete="SET NULL"), nullable=True)
 
     establishment = relationship("Establishment", back_populates="product_registrations")
     status = relationship("Status", back_populates="product_registrations")
@@ -39,6 +43,8 @@ class ProductRegistrationItem(Base):
     product_registration_item_currency_id: Mapped[int | None] = mapped_column(SQL_ID_TYPE, ForeignKey("currencies.currency_id", ondelete="SET NULL"), nullable=True, index=True)
     product_registration_item_owner_user_id: Mapped[int] = mapped_column(SQL_ID_TYPE, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
     product_registration_item_created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    # Вес ОДНОЙ штуки, кг. NULL — не указан (на такую позицию доставка не приходится).
+    product_registration_item_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
 
     product_registration = relationship("ProductRegistration", back_populates="items")
     product = relationship("Product", back_populates="product_registration_items")

@@ -2144,3 +2144,67 @@ def test_products_list_filters_by_source(client, integration_db_session, integra
     assert articles("user") == {"SRC-USER-1"}
     assert articles(None) == {"SRC-CL-1", "SRC-USER-1"}
     assert client.get(f"{API_PREFIX}/products", headers=admin, params={"source": "bad"}).status_code == 422
+
+
+def test_registration_shipping_distributed_by_weight(client, integration_db_session, integration_admin):
+    # Доставка приёмки делится по весу (вес штуки × кол-во), остаток округления — на
+    # последнюю позицию. Правка без ключей веса/доставки (веб) их не теряет.
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    admin = {"Authorization": f"Bearer {login(client, 'admin', 'AdminPass123')['token']}"}
+    ref = client.get(f"{API_PREFIX}/reference-data", headers=admin).json()
+    est = ref["establishments"][0]["establishment_id"]
+    usd = next(c["currency_id"] for c in ref["currencies"] if c["currency_name"] == "USD")
+    rub = next(c["currency_id"] for c in ref["currencies"] if c["currency_name"] == "RUB")
+    armani = {"product_article": "SHIP-1", "product_name": "Giorgio Armani Si Passione Eclat 100ml", "product_registration_item_quantity": 5, "product_registration_item_cost": "50.00", "product_registration_item_currency_id": usd}
+    parfums = {"product_article": "SHIP-2", "product_name": "Essential Parfums Bois Imperial 2ml", "product_registration_item_quantity": 2, "product_registration_item_cost": "200.00", "product_registration_item_currency_id": usd}
+    base = {"product_registration_establishment_id": est, "product_registration_supplier": "Поставщик"}
+
+    created = client.post(f"{API_PREFIX}/product-registrations", headers=admin, json={
+        **base,
+        "product_registration_shipping_cost": "100.00",
+        "items": [{**armani, "product_registration_item_weight": "1.000"}, {**parfums, "product_registration_item_weight": "0.500"}],
+    })
+    assert created.status_code == 201
+    doc = created.json()["item"]
+    assert doc["product_registration_shipping_currency_id"] == usd  # валюта по умолчанию
+    first, second = doc["items"]
+    assert first["product_registration_item_line_shipping"] == "83.33"
+    assert first["product_registration_item_shipping_per_unit"] == "16.67"
+    assert first["product_registration_item_cost_per_unit"] == "66.67"
+    assert second["product_registration_item_line_shipping"] == "16.67"  # сумма сходится: 100.00
+    assert second["product_registration_item_shipping_per_unit"] == "8.34"
+    assert second["product_registration_item_cost_per_unit"] == "208.34"
+    url = f"{API_PREFIX}/product-registrations/{doc['product_registration_id']}"
+
+    # Как правит веб: ключей веса и доставки нет — всё остаётся.
+    web_edit = client.put(url, headers=admin, json={**base, "items": [{**armani, "product_registration_item_quantity": 10}, parfums]}).json()["item"]
+    assert web_edit["product_registration_shipping_cost"] == "100.00"
+    assert web_edit["items"][0]["product_registration_item_weight"] == "1.000"
+    assert web_edit["items"][1]["product_registration_item_weight"] == "0.500"
+    assert web_edit["items"][0]["product_registration_item_line_shipping"] == "90.91"  # 10 кг из 11
+
+    # Позиция в другой валюте: доля доставки есть, но с доставкой не сложить без курса.
+    mixed = client.put(url, headers=admin, json={
+        **base,
+        "product_registration_shipping_cost": "100.00",
+        "items": [{**armani, "product_registration_item_weight": "1.000"}, {**parfums, "product_registration_item_currency_id": rub, "product_registration_item_weight": "0.500"}],
+    }).json()["item"]
+    assert mixed["items"][0]["product_registration_item_cost_per_unit"] == "66.67"
+    assert mixed["items"][1]["product_registration_item_line_shipping"] == "16.67"
+    assert mixed["items"][1]["product_registration_item_cost_per_unit"] is None
+
+    # Явный null: вес снят — на позицию доставка не приходится, всё идёт на вторую.
+    cleared = client.put(url, headers=admin, json={
+        **base,
+        "items": [{**armani, "product_registration_item_weight": None}, {**parfums, "product_registration_item_weight": "0.500"}],
+    }).json()["item"]
+    assert cleared["items"][0]["product_registration_item_weight"] is None
+    assert cleared["items"][0]["product_registration_item_cost_per_unit"] is None
+    assert cleared["items"][1]["product_registration_item_line_shipping"] == "100.00"
+
+    # Явный null у доставки — очистка.
+    no_shipping = client.put(url, headers=admin, json={**base, "product_registration_shipping_cost": None, "items": [armani, parfums]}).json()["item"]
+    assert no_shipping["product_registration_shipping_cost"] is None
+    assert no_shipping["product_registration_shipping_currency_id"] is None
+    assert no_shipping["items"][1]["product_registration_item_line_shipping"] is None

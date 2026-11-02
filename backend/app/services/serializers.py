@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 
 def serialize_datetime(value: datetime | None) -> str | None:
@@ -455,7 +455,48 @@ def serialize_inventory(row) -> dict:
     }
 
 
-def serialize_product_registration_item(row) -> dict:
+def distribute_registration_shipping(shipping_cost: Decimal | None, items: list) -> dict[int, Decimal]:
+    """Доставка приёмки по позициям пропорционально весу: {order_index: доля строки}.
+
+    Вес строки = вес штуки × кол-во. Копейки округляем, остаток отдаём последней
+    позиции с весом, чтобы сумма сошлась с доставкой до цента. Позиции без веса в
+    расчёт не входят; если веса нет ни у кого — распределять нечего.
+    """
+    if shipping_cost is None:
+        return {}
+    weighted = [
+        (index, Decimal(item.product_registration_item_weight) * item.product_registration_item_quantity)
+        for index, item in enumerate(items)
+        if item.product_registration_item_weight
+    ]
+    total_weight = sum((line_weight for _, line_weight in weighted), Decimal("0"))
+    if not total_weight:
+        return {}
+    cent = Decimal("0.01")
+    shipping = Decimal(shipping_cost)
+    shares: dict[int, Decimal] = {}
+    allocated = Decimal("0")
+    for position, (index, line_weight) in enumerate(weighted):
+        if position == len(weighted) - 1:
+            line_shipping = shipping - allocated
+        else:
+            line_shipping = (shipping * line_weight / total_weight).quantize(cent, rounding=ROUND_HALF_UP)
+        allocated += line_shipping
+        shares[index] = line_shipping
+    return shares
+
+
+def serialize_product_registration_item(row, *, line_shipping: Decimal | None = None, shipping_currency_id: int | None = None) -> dict:
+    cent = Decimal("0.01")
+    shipping_per_unit = None
+    cost_per_unit = None
+    if line_shipping is not None:
+        exact_per_unit = line_shipping / row.product_registration_item_quantity
+        shipping_per_unit = exact_per_unit.quantize(cent, rounding=ROUND_HALF_UP)
+        # Себестоимость с доставкой — только если доставка в валюте позиции: складывать
+        # доллары с рублями без курса нельзя.
+        if row.product_registration_item_currency_id == shipping_currency_id:
+            cost_per_unit = (Decimal(row.product_registration_item_cost) + exact_per_unit).quantize(cent, rounding=ROUND_HALF_UP)
     return {
         "product_registration_item_id": row.product_registration_item_id,
         "product_registration_item_product_id": row.product_registration_item_product_id,
@@ -465,6 +506,10 @@ def serialize_product_registration_item(row) -> dict:
         "product_registration_item_cost": serialize_decimal(row.product_registration_item_cost),
         "product_registration_item_currency_id": row.product_registration_item_currency_id,
         "product_registration_item_created_at": serialize_datetime(row.product_registration_item_created_at),
+        "product_registration_item_weight": serialize_decimal(row.product_registration_item_weight),
+        "product_registration_item_line_shipping": serialize_decimal(line_shipping),
+        "product_registration_item_shipping_per_unit": serialize_decimal(shipping_per_unit),
+        "product_registration_item_cost_per_unit": serialize_decimal(cost_per_unit),
     }
 
 
@@ -472,6 +517,10 @@ def serialize_product_registration(row) -> dict:
     establishment = getattr(row, "establishment", None)
     status = getattr(row, "status", None)
     owner = getattr(row, "owner", None)
+    # Порядок по id: остаток округления достаётся последней позиции — она должна быть
+    # одной и той же при каждом чтении.
+    items = sorted(getattr(row, "items", []), key=lambda item: item.product_registration_item_id)
+    shares = distribute_registration_shipping(row.product_registration_shipping_cost, items)
     return {
         "product_registration_id": row.product_registration_id,
         "product_registration_establishment_id": row.product_registration_establishment_id,
@@ -485,7 +534,12 @@ def serialize_product_registration(row) -> dict:
         "product_registration_owner_first_name": owner.user_first_name if owner else None,
         "product_registration_owner_second_name": owner.user_second_name if owner else None,
         "product_registration_created_at": serialize_datetime(row.product_registration_created_at),
-        "items": [serialize_product_registration_item(item) for item in getattr(row, "items", [])],
+        "product_registration_shipping_cost": serialize_decimal(row.product_registration_shipping_cost),
+        "product_registration_shipping_currency_id": row.product_registration_shipping_currency_id,
+        "items": [
+            serialize_product_registration_item(item, line_shipping=shares.get(index), shipping_currency_id=row.product_registration_shipping_currency_id)
+            for index, item in enumerate(items)
+        ],
     }
 
 

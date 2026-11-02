@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit_types import ENTITY_TYPE_PRODUCT_REGISTRATION, EVENT_TYPE_PRODUCT_REGISTRATION_CREATE, EVENT_TYPE_PRODUCT_REGISTRATION_DELETE, EVENT_TYPE_PRODUCT_REGISTRATION_UPDATE
 from app.repositories.messages import MessageRepository
+from app.repositories.reference_data import ReferenceDataRepository
 from app.repositories.product_registrations import ProductRegistrationRepository
 from app.schemas.common import build_pagination
 from app.schemas.product_registrations import ProductRegistrationCreatePayload, ProductRegistrationStatusUpdatePayload, ProductRegistrationUpdatePayload
@@ -50,6 +51,16 @@ class ProductRegistrationService:
         rows, total = self.repository.list(page=page, page_size=page_size, scoped_full_ids=scoped_full_ids, scoped_own_ids=scoped_own_ids, scoped_user_id=scoped_user_id)
         return {"items": [serialize_product_registration(item) for item in rows], "pagination": build_pagination(page, page_size, total)}
 
+    def _resolve_shipping_currency_id(self, shipping_cost, currency_id: int | None, default_currency_id: int) -> int | None:
+        # Без доставки валюта не нужна; без явной валюты — валюта по умолчанию (USD).
+        if shipping_cost is None:
+            return None
+        if currency_id is None:
+            return default_currency_id
+        if ReferenceDataRepository(self.db).get_currency(currency_id) is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Валюта доставки не найдена")
+        return currency_id
+
     def create_product_registration(self, payload: ProductRegistrationCreatePayload, current_user: dict) -> dict:
         get_establishment_or_404(self.db, payload.product_registration_establishment_id)
         if not can_create_on_establishment(self.db, current_user, payload.product_registration_establishment_id):
@@ -75,6 +86,7 @@ class ProductRegistrationService:
                     "product_registration_item_cost": cost,
                     "product_registration_item_currency_id": item.product_registration_item_currency_id or default_currency.currency_id,
                     "product_registration_item_owner_user_id": current_user["user_id"],
+                    "product_registration_item_weight": item.product_registration_item_weight,
                 }
             )
         row = self.repository.create(
@@ -83,6 +95,8 @@ class ProductRegistrationService:
                 "product_registration_supplier": payload.product_registration_supplier.strip(),
                 "product_registration_status_id": status_row.status_id,
                 "product_registration_owner_user_id": current_user["user_id"],
+                "product_registration_shipping_cost": payload.product_registration_shipping_cost,
+                "product_registration_shipping_currency_id": self._resolve_shipping_currency_id(payload.product_registration_shipping_cost, payload.product_registration_shipping_currency_id, default_currency.currency_id),
             },
             items,
         )
@@ -128,6 +142,12 @@ class ProductRegistrationService:
         if payload.product_registration_status_id:
             status_id = get_status_or_404(self.db, payload.product_registration_status_id, expected_type="product_registration").status_id
         default_currency = get_default_currency_or_400(self.db)
+        # update_with_items пересоздаёт позиции, а веб про вес не знает: если ключа веса
+        # в запросе нет, берём вес прежней позиции того же товара (по очереди — товар
+        # может стоять в приёмке несколькими строками).
+        previous_weights: dict[int | None, list] = {}
+        for old_item in row.items:
+            previous_weights.setdefault(old_item.product_registration_item_product_id, []).append(old_item.product_registration_item_weight)
         items = []
         for item in payload.items:
             product_row, article, name, cost = resolve_product_snapshot(
@@ -138,6 +158,9 @@ class ProductRegistrationService:
                 product_name=item.product_name,
                 product_cost_usd=item.product_registration_item_cost,
             )
+            carried = previous_weights.get(product_row.product_id) or []
+            carried_weight = carried.pop(0) if carried else None
+            weight = item.product_registration_item_weight if "product_registration_item_weight" in item.model_fields_set else carried_weight
             items.append(
                 {
                     "product_registration_item_product_id": product_row.product_id,
@@ -147,17 +170,18 @@ class ProductRegistrationService:
                     "product_registration_item_cost": cost,
                     "product_registration_item_currency_id": item.product_registration_item_currency_id or default_currency.currency_id,
                     "product_registration_item_owner_user_id": current_user["user_id"],
+                    "product_registration_item_weight": weight,
                 }
             )
-        row = self.repository.update_with_items(
-            row,
-            {
-                "product_registration_establishment_id": payload.product_registration_establishment_id,
-                "product_registration_supplier": payload.product_registration_supplier.strip(),
-                "product_registration_status_id": status_id,
-            },
-            items,
-        )
+        header = {
+            "product_registration_establishment_id": payload.product_registration_establishment_id,
+            "product_registration_supplier": payload.product_registration_supplier.strip(),
+            "product_registration_status_id": status_id,
+        }
+        if "product_registration_shipping_cost" in payload.model_fields_set:
+            header["product_registration_shipping_cost"] = payload.product_registration_shipping_cost
+            header["product_registration_shipping_currency_id"] = self._resolve_shipping_currency_id(payload.product_registration_shipping_cost, payload.product_registration_shipping_currency_id, default_currency.currency_id)
+        row = self.repository.update_with_items(row, header, items)
         log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_PRODUCT_REGISTRATION, entity_id=row.product_registration_id, event_type=EVENT_TYPE_PRODUCT_REGISTRATION_UPDATE, event_payload={"items_count": len(items)})
         notify_product_registration_changed(self.db, row.product_registration_id)
         return serialize_product_registration(row)
