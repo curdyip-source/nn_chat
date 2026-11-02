@@ -2115,6 +2115,18 @@ def test_price_search_by_registrations(client, integration_db_session, integrati
     assert search("kilian", "avg_3m")[0]["price"] == "160.00"   # (200+120)/2
     assert client.get(f"{API_PREFIX}/price/registrations", headers=admin, params={"q": "x", "mode": "bad"}).status_code == 400
 
+    # С доставкой: цена в поиске — себестоимость с долей доставки (50 + 100/5 шт = 70),
+    # и в последней приёмке, и в средней.
+    usd = next(c["currency_id"] for c in client.get(f"{API_PREFIX}/reference-data", headers=admin).json()["currencies"] if c["currency_name"] == "USD")
+    resp = client.post(f"{API_PREFIX}/product-registrations", headers=admin, json={
+        "product_registration_establishment_id": est, "product_registration_supplier": "Поставщик",
+        "product_registration_shipping_cost": "100.00", "product_registration_shipping_currency_id": usd,
+        "items": [{"product_article": "SHIP-SEARCH", "product_name": "Shipping Search Product", "product_registration_item_quantity": 5, "product_registration_item_cost": "50.00", "product_registration_item_currency_id": usd, "product_registration_item_weight": "1.000"}],
+    })
+    assert resp.status_code == 201
+    assert search("shipping search", "last")[0]["price"] == "70.00"
+    assert search("shipping search", "avg_all")[0]["price"] == "70.00"
+
 
 def test_products_list_filters_by_source(client, integration_db_session, integration_admin):
     # «Товары» делятся на подтянутые из прайса CL (без владельца) и созданные

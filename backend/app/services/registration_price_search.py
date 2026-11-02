@@ -9,7 +9,9 @@
 - ``avg_all`` — средняя за всё время;
 - ``avg_3m``  — средняя за последние 3 месяца (90 дней).
 
-Средняя — по приёмкам, а не по штукам: каждая позиция приёмки считается один раз.
+Цена везде — с долей доставки приёмки (распределение по весу, см.
+serializers.registration_unit_costs): это реальная себестоимость. Средняя — по
+приёмкам, а не по штукам: каждая позиция приёмки считается один раз.
 Видимость — как у списка приёмок (склады пользователя, см. list_visibility).
 """
 
@@ -18,11 +20,12 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, false, func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.product_registrations import ProductRegistration, ProductRegistrationItem
 from app.models.reference_data import Currency
 from app.services.access_control import list_visibility
+from app.services.serializers import registration_unit_costs
 
 MODES = ("last", "avg_all", "avg_3m")
 _THREE_MONTHS = timedelta(days=90)
@@ -51,6 +54,8 @@ def search_registration_prices(db: Session, current_user: dict, query: str, mode
         db.query(ProductRegistrationItem, ProductRegistration, Currency)
         .join(ProductRegistration, ProductRegistration.product_registration_id == ProductRegistrationItem.product_registration_item_product_registration_id)
         .outerjoin(Currency, Currency.currency_id == ProductRegistrationItem.product_registration_item_currency_id)
+        # Доля доставки зависит от всех позиций приёмки, а не только найденных.
+        .options(selectinload(ProductRegistrationItem.product_registration).selectinload(ProductRegistration.items))
     )
     for token in tokens:
         q = q.filter(haystack.like(f"%{_escape_like(token)}%", escape="\\"))
@@ -76,7 +81,12 @@ def search_registration_prices(db: Session, current_user: dict, query: str, mode
 
     # Строки идут от новых к старым: первая встреченная по ключу — последняя приёмка.
     groups: dict[tuple, dict] = {}
+    unit_costs_by_registration: dict[int, dict[int, Decimal]] = {}
     for item, registration, currency in rows:
+        unit_costs = unit_costs_by_registration.get(registration.product_registration_id)
+        if unit_costs is None:
+            unit_costs = unit_costs_by_registration[registration.product_registration_id] = registration_unit_costs(registration)
+        unit_cost = unit_costs[item.product_registration_item_id]
         product_key = item.product_registration_item_product_id or item.product_registration_item_name.strip().lower()
         key = (product_key, item.product_registration_item_currency_id)
         group = groups.get(key)
@@ -84,14 +94,14 @@ def search_registration_prices(db: Session, current_user: dict, query: str, mode
             group = groups[key] = {
                 "name": item.product_registration_item_name,
                 "code": item.product_registration_item_article,
-                "last_cost": item.product_registration_item_cost,
+                "last_cost": unit_cost,
                 "last_registration_id": registration.product_registration_id,
                 "last_date": registration.product_registration_created_at,
                 "currency": (currency.currency_sign or currency.currency_name) if currency else None,
                 "currency_name": currency.currency_name if currency else None,
                 "costs": [],
             }
-        group["costs"].append(Decimal(item.product_registration_item_cost))
+        group["costs"].append(unit_cost)
 
     results = []
     for (product_key, currency_id), group in groups.items():

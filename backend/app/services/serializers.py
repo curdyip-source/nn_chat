@@ -486,6 +486,23 @@ def distribute_registration_shipping(shipping_cost: Decimal | None, items: list)
     return shares
 
 
+def registration_unit_costs(registration) -> dict[int, Decimal]:
+    """{id позиции: цена за штуку с доставкой} без округления. Доставка в другой валюте
+    или позиция без веса — просто цена: складывать разные валюты без курса нельзя."""
+    # Порядок по id — как в serialize_product_registration: от него зависит, какой
+    # позиции достанется остаток округления.
+    items = sorted(registration.items, key=lambda item: item.product_registration_item_id)
+    shares = distribute_registration_shipping(registration.product_registration_shipping_cost, items)
+    costs: dict[int, Decimal] = {}
+    for index, item in enumerate(items):
+        cost = Decimal(item.product_registration_item_cost)
+        share = shares.get(index)
+        if share is not None and item.product_registration_item_currency_id == registration.product_registration_shipping_currency_id:
+            cost += share / item.product_registration_item_quantity
+        costs[item.product_registration_item_id] = cost
+    return costs
+
+
 def serialize_product_registration_item(row, *, line_shipping: Decimal | None = None, shipping_currency_id: int | None = None) -> dict:
     cent = Decimal("0.01")
     shipping_per_unit = None
