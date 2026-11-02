@@ -10,7 +10,7 @@ import { cartItemFromProduct, newUid, type CartItem } from '../orders/cart'
 import { CartRow } from '../orders/CartRow'
 import { CreateProductModal } from '../orders/CreateProductModal'
 import { PastedListHint, usePastedListImport } from '../orders/usePastedListImport'
-import type { DocKind, DocView } from './docKind'
+import { apiWeight, type DocKind, type DocView } from './docKind'
 import styles from './documents.module.css'
 
 const ExcelImport = lazy(() =>
@@ -36,6 +36,10 @@ export function DocumentComposer({
   const [supplier, setSupplier] = useState(editDoc?.supplier ?? '')
   const [establishmentId, setEstablishmentId] = useState<number | null>(editDoc?.establishmentId ?? null)
   const [saveContact, setSaveContact] = useState(false)
+  // Приёмка: доставка всей партии — делится по позициям пропорционально весу.
+  const isRegistration = kind.key === 'registration'
+  const [shippingCost, setShippingCost] = useState(editDoc?.shippingCost ?? '')
+  const [shippingCurrencyId, setShippingCurrencyId] = useState<number | null>(editDoc?.shippingCurrencyId ?? defaultCurrencyId)
   const [items, setItems] = useState<CartItem[]>(
     editDoc
       ? editDoc.items.map((it) => ({
@@ -46,6 +50,8 @@ export function DocumentComposer({
           quantity: it.quantity,
           price: it.cost,
           currencyId: it.currencyId,
+          // «1.000» → «1» в поле ввода.
+          weight: it.weight ? String(Number(it.weight)) : '',
         }))
       : [],
   )
@@ -87,11 +93,20 @@ export function DocumentComposer({
       setError('Заполните склад, поставщика и добавьте товары')
       return
     }
+    const shipping = Number(shippingCost.replace(',', '.'))
+    const hasShipping = isRegistration && Number.isFinite(shipping) && shipping > 0
+    // Без веса позиция молча осталась бы без доставки в себестоимости.
+    if (hasShipping && items.some((it) => apiWeight(it.weight) == null)) {
+      setError('Укажите вес у всех позиций — по нему распределяется доставка')
+      return
+    }
     setSubmitting(true)
     const state = {
       establishmentId: establishmentId!,
       supplier: supplier.trim() || null,
       saveContact,
+      shippingCost: hasShipping ? shipping.toFixed(2) : null,
+      shippingCurrencyId: hasShipping ? shippingCurrencyId : null,
       items,
     }
     try {
@@ -150,6 +165,32 @@ export function DocumentComposer({
             />
           </div>
 
+          {isRegistration && (
+            <div className={styles.field}>
+              <span className={styles.label}>Стоимость доставки</span>
+              <div className={styles.shippingRow}>
+                <input
+                  className={styles.shippingInput}
+                  inputMode="decimal"
+                  placeholder="100"
+                  value={shippingCost}
+                  onChange={(e) => setShippingCost(e.target.value.replace(',', '.'))}
+                />
+                <select
+                  className={styles.shippingCurrency}
+                  value={shippingCurrencyId ?? ''}
+                  onChange={(e) => setShippingCurrencyId(Number(e.target.value))}
+                >
+                  {ref.currencies.map((c) => (
+                    <option key={c.currency_id} value={c.currency_id}>
+                      {c.currency_sign || c.currency_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           <div className={styles.cartActions}>
             <div className={styles.productSearch}>
               <SearchSelect<Product>
@@ -186,6 +227,7 @@ export function DocumentComposer({
                 <CartRow
                   key={it.uid}
                   item={it}
+                  showWeight={isRegistration}
                   currencies={ref.currencies}
                   onChange={(patch) => patchItem(it.uid, patch)}
                   onRemove={() => removeItem(it.uid)}

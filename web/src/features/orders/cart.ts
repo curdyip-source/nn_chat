@@ -9,6 +9,8 @@ export type CartItem = {
   quantity: number
   price: string // строка для аккуратного ввода десятичных
   currencyId: number | null
+  /** Вес одной штуки, кг — только приёмка (доставка делится по весу). */
+  weight?: string
   statusId?: number | null // статус позиции (для заказов; сохраняется при редактировании)
   supplier?: string | null
   sourceEstablishmentId?: number | null

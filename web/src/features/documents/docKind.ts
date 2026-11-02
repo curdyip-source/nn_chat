@@ -24,6 +24,11 @@ export type DocItemView = {
   quantity: number
   cost: string
   currencyId: number | null
+  /** Только приёмка: вес штуки и доставка по весу (считает сервер). */
+  weight?: string | null
+  shippingPerUnit?: string | null
+  costPerUnit?: string | null
+  lineTotal?: string | null
 }
 
 export type DocView = {
@@ -35,6 +40,9 @@ export type DocView = {
   status: string | null
   statusColor: string | null
   createdAt: string | null
+  /** Только приёмка: доставка всей партии. */
+  shippingCost?: string | null
+  shippingCurrencyId?: number | null
   items: DocItemView[]
 }
 
@@ -42,6 +50,9 @@ export type ComposerState = {
   establishmentId: number
   supplier: string | null
   saveContact: boolean
+  /** Только приёмка; null — доставки нет. */
+  shippingCost?: string | null
+  shippingCurrencyId?: number | null
   items: CartItem[]
 }
 
@@ -95,6 +106,8 @@ function normRegistration(r: ProductRegistration): DocView {
     status: r.product_registration_status ?? null,
     statusColor: r.product_registration_status_color ?? null,
     createdAt: r.product_registration_created_at ?? null,
+    shippingCost: r.product_registration_shipping_cost ?? null,
+    shippingCurrencyId: r.product_registration_shipping_currency_id ?? null,
     items: r.items.map((it) => ({
       id: it.product_registration_item_id,
       productId: it.product_registration_item_product_id ?? null,
@@ -103,6 +116,10 @@ function normRegistration(r: ProductRegistration): DocView {
       quantity: it.product_registration_item_quantity,
       cost: it.product_registration_item_cost,
       currencyId: it.product_registration_item_currency_id ?? null,
+      weight: it.product_registration_item_weight ?? null,
+      shippingPerUnit: it.product_registration_item_shipping_per_unit ?? null,
+      costPerUnit: it.product_registration_item_cost_per_unit ?? null,
+      lineTotal: it.product_registration_item_line_total ?? null,
     })),
   }
 }
@@ -117,6 +134,24 @@ function itemBody(it: CartItem, prefix: string) {
     [`${prefix}_quantity`]: it.quantity,
     [`${prefix}_cost`]: (Number(it.price) || 0).toFixed(2),
     [`${prefix}_currency_id`]: it.currencyId,
+  }
+}
+
+/** Вес из поля в формате API (до 3 знаков); пусто, ноль или мусор — null. */
+export function apiWeight(raw: string | null | undefined): string | null {
+  const value = Number((raw ?? '').replace(',', '.'))
+  return Number.isFinite(value) && value >= 0.001 ? value.toFixed(3) : null
+}
+
+// Вес и доставку шлём всегда, null в том числе: ключа нет — сервер оставил бы прежние.
+function registrationItemBody(it: CartItem) {
+  return { ...itemBody(it, 'product_registration_item'), product_registration_item_weight: apiWeight(it.weight) }
+}
+
+function registrationShippingBody(s: ComposerState) {
+  return {
+    product_registration_shipping_cost: s.shippingCost ?? null,
+    product_registration_shipping_currency_id: s.shippingCost ? (s.shippingCurrencyId ?? null) : null,
   }
 }
 
@@ -172,13 +207,15 @@ export const REGISTRATION_KIND: DocKind = {
       product_registration_establishment_id: s.establishmentId,
       product_registration_supplier: s.supplier,
       save_contact: s.saveContact,
-      items: s.items.map((it) => itemBody(it, 'product_registration_item')),
+      ...registrationShippingBody(s),
+      items: s.items.map(registrationItemBody),
     }).then(() => undefined),
   update: (id, s) =>
     updateRegistration(id, {
       product_registration_establishment_id: s.establishmentId,
       product_registration_supplier: s.supplier,
-      items: s.items.map((it) => itemBody(it, 'product_registration_item')),
+      ...registrationShippingBody(s),
+      items: s.items.map(registrationItemBody),
     }).then(() => undefined),
   updateStatus: (id, statusId) =>
     updateRegistrationStatus(id, statusId).then((r) => normRegistration(r.item)),

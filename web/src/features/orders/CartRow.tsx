@@ -5,12 +5,14 @@ import styles from './CartRow.module.css'
 
 type Props = {
   item: CartItem
+  /** Поле веса штуки — в приёмке. */
+  showWeight?: boolean
   currencies: Currency[]
   onChange: (patch: Partial<CartItem>) => void
   onRemove: () => void
 }
 
-export function CartRow({ item, currencies, onChange, onRemove }: Props) {
+export function CartRow({ item, showWeight = false, currencies, onChange, onRemove }: Props) {
   const priceMissing = !item.price.trim()
   return (
     <div className={styles.row}>
@@ -19,6 +21,16 @@ export function CartRow({ item, currencies, onChange, onRemove }: Props) {
         {item.article && <span className="dim"> · {item.article}</span>}
       </div>
       <div className={styles.controls}>
+        {showWeight && (
+          <input
+            className={styles.weight}
+            inputMode="decimal"
+            placeholder="Вес 1 шт, кг"
+            title="Вес одной штуки, кг"
+            value={item.weight ?? ''}
+            onChange={(e) => onChange({ weight: e.target.value.replace(',', '.') })}
+          />
+        )}
         <Stepper value={item.quantity} onChange={(q) => onChange({ quantity: q })} />
         <input
           className={[styles.price, priceMissing ? styles.priceMissing : ''].join(' ')}

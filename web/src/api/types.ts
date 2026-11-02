@@ -377,6 +377,12 @@ export type ProductRegistrationItem = {
   product_registration_item_quantity: number
   product_registration_item_cost: string
   product_registration_item_currency_id?: number | null
+  /** Вес одной штуки, кг. */
+  product_registration_item_weight?: string | null
+  /** Доставка по весу — считает сервер. */
+  product_registration_item_shipping_per_unit?: string | null
+  product_registration_item_cost_per_unit?: string | null
+  product_registration_item_line_total?: string | null
 }
 
 export type ProductRegistration = {
@@ -388,6 +394,8 @@ export type ProductRegistration = {
   product_registration_status?: string | null
   product_registration_status_color?: string | null
   product_registration_created_at?: string | null
+  product_registration_shipping_cost?: string | null
+  product_registration_shipping_currency_id?: number | null
   items: ProductRegistrationItem[]
 }
 

@@ -490,6 +490,7 @@ def serialize_product_registration_item(row, *, line_shipping: Decimal | None = 
     cent = Decimal("0.01")
     shipping_per_unit = None
     cost_per_unit = None
+    line_total = None
     if line_shipping is not None:
         exact_per_unit = line_shipping / row.product_registration_item_quantity
         shipping_per_unit = exact_per_unit.quantize(cent, rounding=ROUND_HALF_UP)
@@ -497,6 +498,9 @@ def serialize_product_registration_item(row, *, line_shipping: Decimal | None = 
         # доллары с рублями без курса нельзя.
         if row.product_registration_item_currency_id == shipping_currency_id:
             cost_per_unit = (Decimal(row.product_registration_item_cost) + exact_per_unit).quantize(cent, rounding=ROUND_HALF_UP)
+            # Итого по строке — из точной доли доставки, а не из округлённой цены за
+            # штуку: иначе сумма строк разошлась бы с «Итого с учётом доставки».
+            line_total = (Decimal(row.product_registration_item_cost) * row.product_registration_item_quantity + line_shipping).quantize(cent, rounding=ROUND_HALF_UP)
     return {
         "product_registration_item_id": row.product_registration_item_id,
         "product_registration_item_product_id": row.product_registration_item_product_id,
@@ -510,6 +514,7 @@ def serialize_product_registration_item(row, *, line_shipping: Decimal | None = 
         "product_registration_item_line_shipping": serialize_decimal(line_shipping),
         "product_registration_item_shipping_per_unit": serialize_decimal(shipping_per_unit),
         "product_registration_item_cost_per_unit": serialize_decimal(cost_per_unit),
+        "product_registration_item_line_total": serialize_decimal(line_total),
     }
 
 

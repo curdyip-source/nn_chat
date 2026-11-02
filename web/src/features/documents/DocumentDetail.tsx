@@ -6,6 +6,15 @@ import { formatAmount, formatDateTime } from '../../lib/format'
 import type { DocKind, DocView } from './docKind'
 import styles from './documents.module.css'
 
+function Metric({ title, value }: { title: string; value: string }) {
+  return (
+    <div className={styles.regMetric}>
+      <span className={styles.regMetricTitle}>{title}</span>
+      <span className={styles.regMetricValue}>{value}</span>
+    </div>
+  )
+}
+
 export function DocumentDetail({
   kind,
   id,
@@ -61,6 +70,16 @@ export function DocumentDetail({
     const sign = currencySign(it.currencyId) || '—'
     totals.set(sign, (totals.get(sign) ?? 0) + (Number(it.cost) || 0) * it.quantity)
   }
+  // Приёмка: товары + доставка в её валюте — это и есть общая цена приёмки.
+  const isRegistration = kind.key === 'registration'
+  const hasShipping = doc?.shippingCost != null
+  const totalsWithShipping = new Map(totals)
+  if (hasShipping) {
+    const sign = currencySign(doc?.shippingCurrencyId ?? null) || '—'
+    totalsWithShipping.set(sign, (totalsWithShipping.get(sign) ?? 0) + (Number(doc?.shippingCost) || 0))
+  }
+  const money = (value: string | null | undefined, sign: string) =>
+    value == null ? '—' : `${formatAmount(Number(value) || 0)} ${sign}`.trim()
 
   return (
     <div className={styles.wrap}>
@@ -100,13 +119,40 @@ export function DocumentDetail({
                   <dt>Склад</dt>
                   <dd>{doc.establishmentName || '—'}</dd>
                 </div>
+                {hasShipping && (
+                  <div className={styles.metaItem}>
+                    <dt>Доставка</dt>
+                    <dd>{money(doc.shippingCost, currencySign(doc.shippingCurrencyId ?? null))}</dd>
+                  </div>
+                )}
               </dl>
             </section>
 
             <section>
               <div className={styles.sectionTitle}>Товары · {doc.items.length}</div>
               <div className={styles.items}>
-                {doc.items.map((it) => (
+                {doc.items.map((it) =>
+                  isRegistration ? (
+                    <div key={it.id} className={styles.regItem}>
+                      <div className={styles.itemName}>
+                        {it.name}
+                        {it.article && <span className="dim"> · {it.article}</span>}
+                      </div>
+                      <div className={styles.regMetrics}>
+                        <Metric title="Кол-во" value={String(it.quantity)} />
+                        <Metric title="Цена" value={money(it.cost, currencySign(it.currencyId))} />
+                        <Metric title="Сумма" value={money(String((Number(it.cost) || 0) * it.quantity), currencySign(it.currencyId))} />
+                      </div>
+                      {(hasShipping || it.weight) && (
+                        <div className={styles.regMetrics}>
+                          <Metric title="Вес 1 шт" value={it.weight ? `${Number(it.weight)} кг` : '—'} />
+                          <Metric title="Доставка 1 шт" value={money(it.shippingPerUnit, currencySign(doc.shippingCurrencyId ?? null))} />
+                          <Metric title="С доставкой 1 шт" value={money(it.costPerUnit, currencySign(it.currencyId))} />
+                          <Metric title="Итого" value={money(it.lineTotal, currencySign(it.currencyId))} />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
                   <div key={it.id} className={styles.item}>
                     <div className={styles.itemMain}>
                       <div className={styles.itemName}>
@@ -123,16 +169,27 @@ export function DocumentDetail({
                       {currencySign(it.currencyId)}
                     </div>
                   </div>
-                ))}
+                  ),
+                )}
               </div>
               <div className={styles.totals}>
                 {[...totals.entries()].map(([sign, sum]) => (
-                  <span key={sign} className={styles.total}>
+                  <span key={sign} className={hasShipping ? styles.totalMuted : styles.total}>
                     Итого: {formatAmount(sum)}
                     {sign}
                   </span>
                 ))}
               </div>
+              {hasShipping && (
+                <div className={styles.totals}>
+                  {[...totalsWithShipping.entries()].map(([sign, sum]) => (
+                    <span key={sign} className={styles.total}>
+                      Итого с учетом доставки: {formatAmount(sum)}
+                      {sign}
+                    </span>
+                  ))}
+                </div>
+              )}
             </section>
           </>
         )}

@@ -2175,6 +2175,9 @@ def test_registration_shipping_distributed_by_weight(client, integration_db_sess
     assert second["product_registration_item_line_shipping"] == "16.67"  # сумма сходится: 100.00
     assert second["product_registration_item_shipping_per_unit"] == "8.34"
     assert second["product_registration_item_cost_per_unit"] == "208.34"
+    # Итого по строкам сходится с «товары + доставка»: 250 + 400 + 100 = 750.00.
+    assert first["product_registration_item_line_total"] == "333.33"
+    assert second["product_registration_item_line_total"] == "416.67"
     url = f"{API_PREFIX}/product-registrations/{doc['product_registration_id']}"
 
     # Как правит веб: ключей веса и доставки нет — всё остаётся.
@@ -2193,6 +2196,7 @@ def test_registration_shipping_distributed_by_weight(client, integration_db_sess
     assert mixed["items"][0]["product_registration_item_cost_per_unit"] == "66.67"
     assert mixed["items"][1]["product_registration_item_line_shipping"] == "16.67"
     assert mixed["items"][1]["product_registration_item_cost_per_unit"] is None
+    assert mixed["items"][1]["product_registration_item_line_total"] is None
 
     # Явный null: вес снят — на позицию доставка не приходится, всё идёт на вторую.
     cleared = client.put(url, headers=admin, json={

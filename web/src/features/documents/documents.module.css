@@ -284,3 +284,64 @@
   justify-content: flex-end;
   margin-top: 14px;
 }
+
+/* Приёмка: поле доставки и позиции с весом/доставкой. */
+.shippingRow {
+  display: flex;
+  gap: 8px;
+  max-width: 320px;
+}
+.shippingInput,
+.shippingCurrency {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+}
+.shippingInput {
+  flex: 1;
+  min-width: 0;
+}
+.shippingInput:focus {
+  border-color: var(--focus);
+}
+.regItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+.regMetrics {
+  display: flex;
+  gap: 8px;
+}
+.regMetric {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
+}
+.regMetricTitle {
+  color: var(--text-dim);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.regMetricValue {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.totalMuted {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
