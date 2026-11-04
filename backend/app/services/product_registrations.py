@@ -15,6 +15,7 @@ from app.services.audit import log_audit_event
 from app.services.access_control import can_create_on_establishment, can_delete_document, can_edit_document, can_view_document, list_visibility
 from app.services.card_sync import notify_cards_deleted, notify_product_registration_changed
 from app.services.domain_common import get_default_currency_or_400, get_default_status_or_400, get_establishment_or_404, get_status_or_404, resolve_product_snapshot
+from app.services.product_specs import set_product_weight
 from app.services.push_notifications import send_push_notification_event
 from app.services.serializers import serialize_product_registration
 
@@ -89,6 +90,10 @@ class ProductRegistrationService:
                     "product_registration_item_weight": item.product_registration_item_weight,
                 }
             )
+        # Новая приёмка: указанный вес — самый свежий, он и идёт в справочник.
+        for item_data in items:
+            if item_data["product_registration_item_weight"] is not None:
+                set_product_weight(self.db, item_data["product_registration_item_name"], item_data["product_registration_item_weight"], current_user["user_id"])
         row = self.repository.create(
             {
                 "product_registration_establishment_id": payload.product_registration_establishment_id,
@@ -161,6 +166,10 @@ class ProductRegistrationService:
             carried = previous_weights.get(product_row.product_id) or []
             carried_weight = carried.pop(0) if carried else None
             weight = item.product_registration_item_weight if "product_registration_item_weight" in item.model_fields_set else carried_weight
+            # В справочник — только реально изменённый вес: правка старой приёмки без
+            # смены веса не должна затирать более свежее значение.
+            if weight is not None and weight != carried_weight:
+                set_product_weight(self.db, name, weight, current_user["user_id"])
             items.append(
                 {
                     "product_registration_item_product_id": product_row.product_id,

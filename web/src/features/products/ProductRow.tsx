@@ -15,9 +15,13 @@ export function ProductRow({ product, showOwner = false, onChanged, onError }: P
   const [article, setArticle] = useState(product.product_article)
   const [name, setName] = useState(product.product_name)
   const [cost, setCost] = useState(product.product_cost_usd)
+  const weightText = (raw: string | null | undefined) => (raw ? String(Number(raw)) : '')
+  const [weight, setWeight] = useState(weightText(product.product_weight))
+  // Последний сохранённый вес: строка товара после сохранения не перечитывается.
+  const [savedWeight, setSavedWeight] = useState(weightText(product.product_weight))
   const [saving, setSaving] = useState(false)
 
-  const save = async (patch: { product_article?: string; product_name?: string; product_cost_usd?: string }) => {
+  const save = async (patch: { product_article?: string; product_name?: string; product_cost_usd?: string; product_weight?: string | null }) => {
     setSaving(true)
     try {
       await updateProduct(product.product_id, patch)
@@ -58,6 +62,30 @@ export function ProductRow({ product, showOwner = false, onChanged, onError }: P
     void save({ product_cost_usd: v })
   }
 
+  // Вес — в справочник по наименованию: перезаписывает прежний, пустое поле стирает.
+  const saveWeight = async () => {
+    const value = Number(weight.replace(',', '.'))
+    const cleared = !weight.trim()
+    if (!cleared && (!Number.isFinite(value) || value < 0.001)) {
+      setWeight(savedWeight)
+      return
+    }
+    const next = cleared ? '' : String(Number(value.toFixed(3)))
+    setWeight(next)
+    if (next === savedWeight) return
+    setSaving(true)
+    try {
+      await updateProduct(product.product_id, { product_weight: cleared ? null : value.toFixed(3) })
+      setSavedWeight(next)
+      onError('')
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'Не удалось сохранить вес')
+      setWeight(savedWeight)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const remove = async () => {
     if (!window.confirm(`Удалить товар «${product.product_name}»?`)) return
     setSaving(true)
@@ -79,6 +107,14 @@ export function ProductRow({ product, showOwner = false, onChanged, onError }: P
           {product.product_owner_user_login ?? '—'}
         </span>
       )}
+      <input
+        className={[styles.cellInput, styles.rightInput].join(' ')}
+        inputMode="decimal"
+        placeholder="—"
+        value={weight}
+        onChange={(e) => setWeight(e.target.value)}
+        onBlur={saveWeight}
+      />
       <input
         className={[styles.cellInput, styles.rightInput].join(' ')}
         inputMode="decimal"

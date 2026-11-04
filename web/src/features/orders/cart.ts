@@ -30,5 +30,7 @@ export function cartItemFromProduct(product: Product, currencyId: number | null)
     quantity: 1,
     price: product.product_cost_usd ?? '',
     currencyId,
+    // Вес из справочника — подставляется в приёмку, его можно поправить. «1.000» → «1».
+    weight: product.product_weight ? String(Number(product.product_weight)) : '',
   }
 }

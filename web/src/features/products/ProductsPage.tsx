@@ -132,6 +132,7 @@ export function ProductsPage() {
               <span>Артикул</span>
               <span>Наименование</span>
               {source === 'user' && <span>Кем создан</span>}
+              <span className={styles.right}>Вес, кг</span>
               <span className={styles.right}>Цена, USD</span>
               <span />
             </div>

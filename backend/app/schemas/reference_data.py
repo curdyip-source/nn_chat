@@ -49,3 +49,5 @@ class ProductUpdatePayload(BaseModel):
     product_article: Optional[str] = Field(default=None, min_length=1, max_length=100)
     product_name: Optional[str] = Field(default=None, min_length=1, max_length=500)
     product_cost_usd: Optional[Decimal] = Field(default=None, ge=0, decimal_places=2, max_digits=12)
+    # Вес 1 шт, кг (справочник product_specs): ключа нет — не трогаем, null — стереть.
+    product_weight: Optional[Decimal] = Field(default=None, gt=0, decimal_places=3, max_digits=10)

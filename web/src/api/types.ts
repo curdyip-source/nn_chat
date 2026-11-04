@@ -105,6 +105,8 @@ export type Product = {
   product_article: string
   product_name: string
   product_cost_usd: string
+  /** Вес 1 шт, кг, из справочника по наименованию; null — не внесён. */
+  product_weight?: string | null
   /** Логин автора; null — товар подтянут из прайса CL. */
   product_owner_user_login?: string | null
   product_created_at?: string | null

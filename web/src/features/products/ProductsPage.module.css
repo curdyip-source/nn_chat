@@ -130,7 +130,7 @@
 }
 .row {
   display: grid;
-  grid-template-columns: 180px 1fr 130px 36px;
+  grid-template-columns: 180px minmax(0, 1fr) 90px 130px 36px;
   gap: 10px;
   align-items: center;
   width: 100%;
@@ -145,7 +145,7 @@
    Селектор из двух классов — иначе .row (объявлен выше) перебивал колонки и крестик
    удаления уезжал на вторую строку. */
 .row.rowWithOwner {
-  grid-template-columns: 180px minmax(0, 1fr) 140px 130px 36px;
+  grid-template-columns: 180px minmax(0, 1fr) 140px 90px 130px 36px;
 }
 .saving {
   opacity: 0.6;

@@ -168,7 +168,7 @@ export function createProduct(input: {
 
 export function updateProduct(
   productId: number,
-  patch: { product_article?: string; product_name?: string; product_cost_usd?: string },
+  patch: { product_article?: string; product_name?: string; product_cost_usd?: string; product_weight?: string | null },
 ) {
   return apiRequest<{ item: Product }>(`/products/${productId}`, { method: 'PUT', body: patch })
 }

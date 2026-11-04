@@ -10,6 +10,7 @@ from app.models.messages import Message, MessageAttachment
 from app.models.orders import Order, OrderComment, OrderCommentAttachment, OrderItem
 from app.models.profile_photos import ProfilePhoto
 from app.models.product_registrations import ProductRegistration, ProductRegistrationItem
+from app.models.product_specs import ProductSpec
 from app.models.reference_data import Currency, Establishment, OrderMethod, Product, Status
 from app.models.system_messages import SystemMessage, SystemMessageRecipient
 from app.models.todos import Todo, TodoAssignee, TodoList, TodoSubtask
@@ -19,6 +20,7 @@ from app.models.user_establishment_roles import UserEstablishmentRole
 from app.models.users import User
 
 __all__ = [
+	"ProductSpec",
 	"AppSetting",
 	"User",
 	"UserSession",

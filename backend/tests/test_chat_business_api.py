@@ -2224,3 +2224,57 @@ def test_registration_shipping_distributed_by_weight(client, integration_db_sess
     assert no_shipping["product_registration_shipping_cost"] is None
     assert no_shipping["product_registration_shipping_currency_id"] is None
     assert no_shipping["items"][1]["product_registration_item_line_shipping"] is None
+
+
+def test_product_weight_reference(client, integration_db_session, integration_admin):
+    # Справочник веса по наименованию: наполняется из приёмки и со страницы «Товары»,
+    # подставляется в товар; правка старой приёмки без смены веса его не затирает.
+    from app.services.product_specs import normalize_product_name
+
+    assert normalize_product_name(" Tom  Ford: Tobacco Ёлка 100 мл ") == "tom ford: tobacco елка 100ml"
+    assert normalize_product_name("Tom Ford: Tobacco Елка 100ml") == "tom ford: tobacco елка 100ml"
+
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_db_session.commit()
+    admin = {"Authorization": f"Bearer {login(client, 'admin', 'AdminPass123')['token']}"}
+    est = client.get(f"{API_PREFIX}/reference-data", headers=admin).json()["establishments"][0]["establishment_id"]
+    item = {"product_article": "SPEC-1", "product_name": "Spec Product 100ml", "product_registration_item_quantity": 1, "product_registration_item_cost": "10.00"}
+    base = {"product_registration_establishment_id": est, "product_registration_supplier": "Поставщик"}
+
+    def product() -> dict:
+        items = client.get(f"{API_PREFIX}/products", headers=admin, params={"search": "SPEC-1"}).json()["items"]
+        assert len(items) == 1
+        return items[0]
+
+    first = client.post(f"{API_PREFIX}/product-registrations", headers=admin, json={**base, "items": [item]}).json()["item"]
+    assert product()["product_weight"] is None
+
+    # Вес из новой приёмки попал в справочник.
+    second = client.post(f"{API_PREFIX}/product-registrations", headers=admin, json={**base, "items": [{**item, "product_registration_item_weight": "1.000"}]}).json()["item"]
+    assert product()["product_weight"] == "1.000"
+    match = client.post(f"{API_PREFIX}/products/match", headers=admin, json={"names": ["Spec Product 100ml"]}).json()["results"][0]
+    assert match["matched"]["product_weight"] == "1.000"
+
+    # Новая приёмка с другим весом перезаписывает.
+    third = client.post(f"{API_PREFIX}/product-registrations", headers=admin, json={**base, "items": [{**item, "product_registration_item_weight": "2.000"}]}).json()["item"]
+    assert product()["product_weight"] == "2.000"
+
+    # Правка старой приёмки без смены веса — свежий вес остаётся.
+    keep = client.put(f"{API_PREFIX}/product-registrations/{second['product_registration_id']}", headers=admin, json={**base, "items": [{**item, "product_registration_item_quantity": 3, "product_registration_item_weight": "1.000"}]})
+    assert keep.status_code == 200
+    assert product()["product_weight"] == "2.000"
+
+    # Правка приёмки со сменой веса — перезаписывает.
+    client.put(f"{API_PREFIX}/product-registrations/{third['product_registration_id']}", headers=admin, json={**base, "items": [{**item, "product_registration_item_weight": "2.500"}]})
+    assert product()["product_weight"] == "2.500"
+
+    # Страница «Товары»: правка веса, вес едет за переименованным товаром, null стирает.
+    url = f"{API_PREFIX}/products/{product()['product_id']}"
+    assert client.put(url, headers=admin, json={"product_weight": "0.750"}).json()["item"]["product_weight"] == "0.750"
+    renamed = client.put(url, headers=admin, json={"product_name": "Spec Product New 100ml"}).json()["item"]
+    assert renamed["product_weight"] == "0.750"
+    assert client.put(url, headers=admin, json={"product_weight": None}).json()["item"]["product_weight"] is None
+    # Без данных по-прежнему 400.
+    assert client.put(url, headers=admin, json={}).status_code == 400
+    # Старая приёмка без веса так и осталась без него — снимок, а не ссылка.
+    assert client.get(f"{API_PREFIX}/product-registrations/{first['product_registration_id']}", headers=admin).json()["item"]["items"][0]["product_registration_item_weight"] is None

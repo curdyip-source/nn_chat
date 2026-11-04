@@ -16,6 +16,7 @@ from app.schemas.common import build_pagination, model_to_dict
 from app.schemas.reference_data import CurrencyPayload, EstablishmentPayload, OrderMethodPayload, OrderSalesChannelPayload, ProductCreatePayload, ProductUpdatePayload, StatusPayload
 from app.services.audit import log_audit_event
 from app.services.price_federation import hydrate_products_async, hydrate_products_for_names
+from app.services.product_specs import attach_weights, normalize_product_name, set_product_weight
 from app.services.serializers import serialize_currency, serialize_establishment, serialize_order_method, serialize_order_sales_channel, serialize_product, serialize_status
 
 
@@ -484,7 +485,7 @@ class ReferenceDataService:
             hydrate_products_async(search)
         rows, total = self.product_repository.list(search=search, page=page, page_size=page_size, sort_by=sort_by, sort_order=sort_order, source=source)
         return {
-            "items": [serialize_product(item) for item in rows],
+            "items": attach_weights(self.db, [serialize_product(item) for item in rows]),
             "pagination": build_pagination(page, page_size, total),
             "filters": {"search": search, "sort_by": sort_by, "sort_order": sort_order, "source": source},
         }
@@ -505,12 +506,12 @@ class ReferenceDataService:
                 continue
             exact = self.product_repository.find_by_exact_name(name)
             if len(exact) == 1:
-                results.append({"query": raw, "matched": serialize_product(exact[0]), "candidates": []})
+                results.append({"query": raw, "matched": attach_weights(self.db, [serialize_product(exact[0])])[0], "candidates": []})
             elif len(exact) > 1:
-                results.append({"query": raw, "matched": None, "candidates": [serialize_product(p) for p in exact]})
+                results.append({"query": raw, "matched": None, "candidates": attach_weights(self.db, [serialize_product(p) for p in exact])})
             else:
                 suggestions, _ = self.product_repository.list(search=name, page=1, page_size=5)
-                results.append({"query": raw, "matched": None, "candidates": [serialize_product(p) for p in suggestions]})
+                results.append({"query": raw, "matched": None, "candidates": attach_weights(self.db, [serialize_product(p) for p in suggestions])})
         return {"results": results}
 
     def get_product_or_404(self, product_id: int):
@@ -540,20 +541,31 @@ class ReferenceDataService:
             data["product_cost_usd"] = Decimal("0")
         row = self.product_repository.create({**data, "product_owner_user_id": current_user["user_id"]})
         log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_PRODUCT, entity_id=row.product_id, event_type=EVENT_TYPE_PRODUCT_CREATE, event_payload={"product_article": row.product_article})
-        return serialize_product(row)
+        return attach_weights(self.db, [serialize_product(row)])[0]
 
     def update_product(self, product_id: int, payload: ProductUpdatePayload, current_user: dict) -> dict:
         row = self.get_product_or_404(product_id)
         data = model_to_dict(payload)
-        if not data:
+        weight_sent = "product_weight" in payload.model_fields_set
+        data.pop("product_weight", None)
+        if not data and not weight_sent:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Нет данных для обновления")
+        old_name = row.product_name
+        old_weight = attach_weights(self.db, [{"product_name": old_name}])[0]["product_weight"]
         if "product_article" in data:
             existing = self.product_repository.get_by_article(data["product_article"])
             if existing is not None and existing.product_id != product_id:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Товар с таким артикулом уже существует")
         row = self.product_repository.update(row, data)
-        log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_PRODUCT, entity_id=row.product_id, event_type=EVENT_TYPE_PRODUCT_UPDATE, event_payload={"changed_fields": sorted(data.keys())})
-        return serialize_product(row)
+        if weight_sent:
+            set_product_weight(self.db, row.product_name, payload.product_weight, current_user["user_id"])
+        elif old_weight is not None and normalize_product_name(row.product_name) != normalize_product_name(old_name):
+            # Переименовали руками — вес едет за товаром, вводить заново не нужно.
+            set_product_weight(self.db, row.product_name, Decimal(old_weight), current_user["user_id"])
+        self.db.commit()
+        changed_fields = sorted(data.keys()) + (["product_weight"] if weight_sent else [])
+        log_audit_event(self.db, actor_user_id=current_user["user_id"], entity_type=ENTITY_TYPE_PRODUCT, entity_id=row.product_id, event_type=EVENT_TYPE_PRODUCT_UPDATE, event_payload={"changed_fields": changed_fields})
+        return attach_weights(self.db, [serialize_product(row)])[0]
 
     def delete_product(self, product_id: int, current_user: dict) -> None:
         row = self.get_product_or_404(product_id)
