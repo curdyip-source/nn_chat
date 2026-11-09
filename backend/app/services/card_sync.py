@@ -40,6 +40,12 @@ def notify_user_updated(user_id: int) -> None:
     broker.publish({"type": "user_updated", "user_id": user_id})
 
 
+def notify_price_suppliers_changed() -> None:
+    # Бэкенд прайса принял прайс поставщика — список «В каких прайсах искать» в
+    # приложении изменился. Без содержимого: клиент сам перечитает /price/suppliers.
+    broker.publish({"type": "price_suppliers_changed"})
+
+
 def notify_app_config_updated(min_supported_ios_build: int) -> None:
     # Порог форс-апдейта изменился в «Админке». Публикуем SSE всем подписчикам, чтобы
     # приложение применило новый минимальный билд реалтайм (без перезапуска).

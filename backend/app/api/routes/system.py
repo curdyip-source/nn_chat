@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.config import SYSTEM_PUSH_LOGINS
 from app.core.database import get_database_info, get_db
 from app.dependencies.auth import get_current_user, require_admin
+from app.services.card_sync import notify_price_suppliers_changed
 from app.services.push_notifications import send_system_push
 from app.services.users import get_setup_status
 
@@ -56,6 +57,16 @@ def send_system_notification(
         event_type=payload.event_type.strip(),
     )
     return {"delivered": delivered}
+
+
+@router.post("/price/suppliers/changed")
+def price_suppliers_changed(current_user: dict = Depends(get_current_user)) -> dict:
+    """Сигнал от бэкенда прайса: принят прайс поставщика. Рассылаем SSE, чтобы приложение
+    перечитало список прайсов сразу, а не опрашивало его. Права — как у системного пуша."""
+    if not current_user["user_admin"] and current_user["user_login"] not in SYSTEM_PUSH_LOGINS:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
+    notify_price_suppliers_changed()
+    return {"ok": True}
 
 
 @router.get("/db-info")

@@ -2278,3 +2278,22 @@ def test_product_weight_reference(client, integration_db_session, integration_ad
     assert client.put(url, headers=admin, json={}).status_code == 400
     # Старая приёмка без веса так и осталась без него — снимок, а не ссылка.
     assert client.get(f"{API_PREFIX}/product-registrations/{first['product_registration_id']}", headers=admin).json()["item"]["items"][0]["product_registration_item_weight"] is None
+
+
+def test_price_suppliers_changed_event(client, integration_db_session, integration_admin, integration_user, monkeypatch):
+    # Бэкенд прайса сообщает о новом прайсе поставщика → SSE `price_suppliers_changed`.
+    # Слать могут админ и сервисный пользователь прайса, обычный сотрудник — нет.
+    import app.services.card_sync as card_sync
+
+    published: list[dict] = []
+    monkeypatch.setattr(card_sync.broker, "publish", lambda event: published.append(event))
+    integration_admin.user_password = hash_password("AdminPass123")
+    integration_user.user_password = hash_password("WorkerPass123")
+    integration_db_session.commit()
+    admin = {"Authorization": f"Bearer {login(client, 'admin', 'AdminPass123')['token']}"}
+    worker = {"Authorization": f"Bearer {login(client, 'worker', 'WorkerPass123')['token']}"}
+
+    assert client.post(f"{API_PREFIX}/price/suppliers/changed", headers=worker).status_code == 403
+    assert published == []
+    assert client.post(f"{API_PREFIX}/price/suppliers/changed", headers=admin).status_code == 200
+    assert published == [{"type": "price_suppliers_changed"}]
