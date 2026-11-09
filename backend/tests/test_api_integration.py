@@ -87,6 +87,7 @@ def test_health_endpoints_are_available(client):
 
 def test_message_sync_and_stream_require_auth(client):
     assert client.get(f"{API_PREFIX}/messages/sync").status_code == 401
+    assert client.get(f"{API_PREFIX}/messages/history").status_code == 401
     assert client.get(f"{API_PREFIX}/messages/stream").status_code == 401
 
 

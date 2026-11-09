@@ -85,6 +85,37 @@ class MessageRepository:
             .all()
         )
 
+    def latest_change_cursor(self) -> tuple[datetime, int] | None:
+        """(updated_at, message_id) самого свежего изменения, включая удалённые строки —
+        точка, с которой клиент продолжит дельта-синк после загрузки истории."""
+        row = (
+            self.db.query(Message.message_updated_at, Message.message_id)
+            .order_by(Message.message_updated_at.desc(), Message.message_id.desc())
+            .first()
+        )
+        return (row[0], row[1]) if row else None
+
+    def list_history(
+        self, *, before_created_at: datetime | None, before_message_id: int | None, limit: int
+    ) -> list[Message]:
+        """Живые сообщения от новых к старым; с курсором — строго старше него."""
+        query = self._base_query().filter(Message.message_deleted_at.is_(None))
+        if before_created_at is not None and before_message_id is not None:
+            query = query.filter(
+                or_(
+                    Message.message_created_at < before_created_at,
+                    and_(
+                        Message.message_created_at == before_created_at,
+                        Message.message_id < before_message_id,
+                    ),
+                )
+            )
+        return (
+            query.order_by(Message.message_created_at.desc(), Message.message_id.desc())
+            .limit(limit)
+            .all()
+        )
+
     def get_by_ids(self, message_ids: list[int]) -> list[Message]:
         if not message_ids:
             return []

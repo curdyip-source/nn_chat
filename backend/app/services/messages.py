@@ -101,6 +101,36 @@ def sync_messages(db: Session, current_user: dict, *, cursor: str | None, limit:
     return {"items": items, "cursor": next_cursor, "has_more": len(rows) == limit}
 
 
+def message_history(db: Session, current_user: dict, *, before: str | None, limit: int) -> dict:
+    """Лента с конца — для первого входа: сначала последние сообщения, потом старше.
+
+    Первая страница (без `before`) отдаёт ещё и `sync_cursor` — отметку дельта-синка на
+    момент ДО чтения страницы. Клиент грузит историю в фоне и затем продолжает обычный
+    /messages/sync с этой отметки: всё, что изменилось или удалилось за время загрузки,
+    он догонит, а дубли (сообщение и в истории, и в дельте) — просто upsert по id.
+    """
+    repository = MessageRepository(db)
+    sync_cursor = None
+    if not before:
+        latest = repository.latest_change_cursor()
+        sync_cursor = _encode_sync_cursor(*latest) if latest else ""
+    before_created_at, before_message_id = _decode_sync_cursor(before)
+    rows = repository.list_history(
+        before_created_at=before_created_at,
+        before_message_id=before_message_id,
+        limit=limit,
+    )
+    # Права — как в /sync; курсор страницы — по полному набору строк, чтобы невидимые
+    # карточки не обрывали пагинацию.
+    visible = _card_visibility_predicate(db, current_user)
+    items = [serialize_message(row) for row in rows if visible(row)]
+    next_before = _encode_sync_cursor(rows[-1].message_created_at, rows[-1].message_id) if rows else ""
+    result = {"items": items, "before": next_before, "has_more": len(rows) == limit}
+    if sync_cursor is not None:
+        result["sync_cursor"] = sync_cursor
+    return result
+
+
 def resolve_mention_recipient_ids(db: Session, *, mentioned_user_ids: list[int], sender_user_id: int) -> list[int]:
     unique_ids = {user_id for user_id in mentioned_user_ids if user_id != sender_user_id}
     if not unique_ids:

@@ -9,7 +9,7 @@ from app.core.database import SessionLocal, get_db
 from app.dependencies.auth import get_current_session, get_current_user
 from app.schemas.messages import MessageCreatePayload, MessageUpdatePayload
 from app.services.message_stream import broker
-from app.services.messages import create_message, delete_message, list_messages, sync_messages, update_message
+from app.services.messages import create_message, delete_message, list_messages, message_history, sync_messages, update_message
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
@@ -36,6 +36,17 @@ def sync_messages_route(
     limit: int = Query(default=200, ge=1, le=500),
 ) -> dict:
     return sync_messages(db, current_user, cursor=cursor, limit=limit)
+
+
+@router.get("/history")
+def message_history_route(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    before: str | None = Query(default=None, description="Курсор страницы: сообщения старше него; пусто — последние"),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> dict:
+    # Первый вход в приложение: последние сообщения сразу, история — в фоне от новых к старым.
+    return message_history(db, current_user, before=before, limit=limit)
 
 
 @router.get("/stream")
